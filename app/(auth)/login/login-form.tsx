@@ -80,7 +80,7 @@ export function LoginForm() {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.4, delay: 0.08, ease: [0.34, 1.4, 0.5, 1] }}
           >
-            <LogoMark className="w-6 h-6" />
+            <LogoMark size={24} />
           </motion.div>
           <h1 className="font-display text-xl font-extrabold text-foreground mt-4 tracking-tight">{APP_NAME}</h1>
           <p className="eyebrow text-muted-foreground mt-1">Painel de Captação</p>
