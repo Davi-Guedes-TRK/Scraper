@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { LogoMark, APP_NAME } from './logo'
+import { LogoMark, LogoHorizontal } from './logo'
 import { useNewPropertiesCtx } from './new-properties-provider'
 
 const NAV_GROUPS = [
@@ -157,14 +157,12 @@ export function Navbar() {
       {/* Marca */}
       <div
         className="h-14 flex items-center flex-shrink-0 overflow-hidden"
-        style={{ borderBottom: '1px solid var(--sidebar-border)', padding: collapsed ? '0 0.75rem' : '0 1.25rem' }}
+        style={{ borderBottom: '1px solid var(--sidebar-border)', padding: collapsed ? '0 0.625rem' : '0 1rem' }}
       >
-        <div className="w-7 h-7 rounded-md flex items-center justify-center text-primary-foreground flex-shrink-0" style={{ background: 'var(--primary)' }}>
-          <LogoMark className="w-4 h-4" />
-        </div>
-        {!collapsed && (
-          <p className="ml-2.5 font-display font-extrabold text-foreground text-[14px] tracking-tight whitespace-nowrap overflow-hidden">{APP_NAME}</p>
-        )}
+        {collapsed
+          ? <LogoMark size={32} />
+          : <LogoHorizontal height={32} />
+        }
       </div>
 
       {/* Navegação */}
