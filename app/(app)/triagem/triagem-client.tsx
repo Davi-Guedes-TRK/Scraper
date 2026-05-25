@@ -507,6 +507,8 @@ export function TriagemClient() {
   const [filterTipo, setFilterTipo] = useState('Todos')
   const [filterBairro, setFilterBairro] = useState('Todos')
   const [filterProprietario, setFilterProprietario] = useState(false)
+  const [filterNovos, setFilterNovos] = useState(() => searchParams.get('novos') === '1')
+  const [lastSeen] = useState(() => localStorage.getItem('triagem_last_seen') ?? new Date(0).toISOString())
 
   // Abre automaticamente o imóvel quando vindo de link de e-mail (?highlight=<link>)
   useEffect(() => {
@@ -590,6 +592,7 @@ export function TriagemClient() {
       if (filterTipo !== 'Todos' && item.tipo_imovel !== filterTipo) return false
       if (filterBairro !== 'Todos' && getRegiao(item) !== filterBairro) return false
       if (filterProprietario && classifyAnunciante(item) !== 'proprietario') return false
+      if (filterNovos && (item.coletado_em ?? '') <= lastSeen) return false
       return true
     })
     if (sort === 'endereco') list.sort((a, b) => addressScore(b) - addressScore(a))
@@ -597,7 +600,7 @@ export function TriagemClient() {
     else if (sort === 'publicacao') list.sort((a, b) => (b.data_publicacao ?? '').localeCompare(a.data_publicacao ?? ''))
     else if (sort === 'coleta') list.sort((a, b) => (b.coletado_em ?? '').localeCompare(a.coletado_em ?? ''))
     return list
-  }, [items, q, filterPortal, filterPrecoMin, filterHoje, filterPublicacao, filterTipo, filterBairro, filterProprietario, sort])
+  }, [items, q, filterPortal, filterPrecoMin, filterHoje, filterPublicacao, filterTipo, filterBairro, filterProprietario, filterNovos, lastSeen, sort])
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
   const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -689,6 +692,16 @@ export function TriagemClient() {
             <input type="checkbox" checked={filterHoje} onChange={e => { setFilterHoje(e.target.checked); setPage(1) }} className="w-3 h-3" />
             Hoje
           </label>
+          <button
+            onClick={() => { setFilterNovos(n => !n); setPage(1) }}
+            className={`text-[11px] px-2.5 py-1 rounded-full border font-medium transition-colors ${
+              filterNovos
+                ? 'bg-foreground border-foreground text-background'
+                : 'border-border text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Novos
+          </button>
         </div>
 
         {/* Lista */}

@@ -132,7 +132,7 @@ export function Topbar({ email }: { email?: string }) {
               <p className="eyebrow text-muted-foreground px-2 py-1.5">Notificações</p>
               {count > 0 ? (
                 <Link
-                  href="/triagem"
+                  href="/triagem?novos=1"
                   onClick={() => { markSeen(); setNotifOpen(false) }}
                   className="block px-2 py-2 rounded-lg hover:bg-accent/60 transition-colors"
                 >
