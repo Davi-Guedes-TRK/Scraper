@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { LogoHorizontal } from './logo'
+import { LogoMark } from './logo'
 
 export function SplashScreen() {
   const [phase, setPhase] = useState<'visible' | 'fading' | 'gone'>('visible')
@@ -28,7 +28,7 @@ export function SplashScreen() {
         style={{ animation: 'splash-up 460ms cubic-bezier(0.2,0.7,0.2,1) both' }}
       >
         <div style={{ animation: 'splash-pop 520ms cubic-bezier(0.34,1.4,0.5,1) 60ms both', opacity: 0 }}>
-          <LogoHorizontal height={56} />
+          <LogoMark size={96} />
         </div>
         <p
           className="eyebrow text-muted-foreground"

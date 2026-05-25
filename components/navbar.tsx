@@ -160,8 +160,8 @@ export function Navbar() {
         style={{ borderBottom: '1px solid var(--sidebar-border)', padding: collapsed ? '0 0.625rem' : '0 1rem' }}
       >
         {collapsed
-          ? <LogoMark size={32} />
-          : <LogoHorizontal height={32} />
+          ? <LogoMark size={40} />
+          : <LogoHorizontal height={40} />
         }
       </div>
 
