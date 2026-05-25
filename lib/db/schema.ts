@@ -1,0 +1,49 @@
+import { pgTable, text, boolean, timestamp, jsonb, real } from 'drizzle-orm/pg-core'
+
+const imoveisBase = {
+  link: text('link').primaryKey(),
+  titulo: text('titulo'),
+  preco: text('preco'),
+  area_m2: text('area_m2'),
+  quartos: text('quartos'),
+  suites: text('suites'),
+  vagas: text('vagas'),
+  banheiros: text('banheiros'),
+  bairro: text('bairro'),
+  cidade: text('cidade'),
+  estado: text('estado'),
+  tipo_imovel: text('tipo_imovel'),
+  descricao: text('descricao'),
+  telefone: text('telefone'),
+  nome_anunciante: text('nome_anunciante'),
+  tipo_anunciante: text('tipo_anunciante'),
+  creci: text('creci'),
+  id_anuncio: text('id_anuncio'),
+  data_publicacao: text('data_publicacao'),
+  dados_brutos: jsonb('dados_brutos'),
+  imagens: text('imagens'),
+  coletado_em: timestamp('coletado_em', { withTimezone: true }),
+  atualizado_em: timestamp('atualizado_em', { withTimezone: true }),
+  validado_em: timestamp('validado_em', { withTimezone: true }),
+  ativo: boolean('ativo').default(true),
+  preco_reduzido: boolean('preco_reduzido').default(false),
+  bairro_id: text('bairro_id'),
+  tipo: text('tipo'),
+  // workflow
+  status_triagem: text('status_triagem'),
+  status_solicitacao: text('status_solicitacao'),
+  visitado_em: timestamp('visitado_em', { withTimezone: true }),
+  pistas_ia: jsonb('pistas_ia'),
+  maps_link: text('maps_link'),
+  lat: real('lat'),
+  lng: real('lng'),
+  endereco: text('endereco'),
+}
+
+export const imoveisOlx = pgTable('imoveis_olx', imoveisBase)
+export const imoveisDfimoveis = pgTable('imoveis_dfimoveis', imoveisBase)
+export const imoveisWimoveis = pgTable('imoveis_wimoveis', imoveisBase)
+export const imoveisFacebook = pgTable('imoveis_facebook', imoveisBase)
+
+export type Imovel = typeof imoveisOlx.$inferSelect
+export type NovoImovel = typeof imoveisOlx.$inferInsert
