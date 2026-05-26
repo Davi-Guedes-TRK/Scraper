@@ -3,8 +3,9 @@ import { Providers } from '@/components/providers'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'TRK Imóveis · ERP',
-  description: 'Painel de Captação TRK Imóveis',
+  title: 'ELO · Sistema Imobiliário',
+  description: 'Painel de Captação ELO',
+  icons: { icon: '/logo.png' },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

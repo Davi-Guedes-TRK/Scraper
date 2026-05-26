@@ -80,19 +80,18 @@ function timeAnunciado(pub: string | null | undefined) {
   return `anunciado há ${d} dias`
 }
 
-async function fetchAllRows(buildQuery: () => ReturnType<ReturnType<typeof createClient>['from']>['select']): Promise<Imovel[]> {
+async function fetchAllRows(
+  buildQuery: (from: number, to: number) => PromiseLike<{ data: Imovel[] | null; error: unknown }>
+): Promise<Imovel[]> {
   const PAGE = 1000
-  let from = 0
+  let offset = 0
   const rows: Imovel[] = []
-  // eslint-disable-next-line no-constant-condition
   while (true) {
-    const { data, error } = await (buildQuery() as unknown as Promise<{ data: Imovel[] | null; error: unknown }>)
+    const { data, error } = await buildQuery(offset, offset + PAGE - 1)
     if (error || !data?.length) break
     rows.push(...data)
     if (data.length < PAGE) break
-    from += PAGE
-    void from
-    break // PostgREST handles up to 1000, next call via range
+    offset += PAGE
   }
   return rows
 }
@@ -526,7 +525,7 @@ export function TriagemClient() {
     async function load() {
       setLoading(true)
       const cutoff = daysAgo(30)
-      const rows = await fetchAllRows(() =>
+      const rows = await fetchAllRows((from, to) =>
         supabase
           .from('imoveis_todos')
           .select('link,titulo,preco,bairro,cidade,area_m2,quartos,descricao,imagens,coletado_em,data_publicacao,pistas_ia,tipo_imovel,creci,nome_anunciante,tipo_anunciante,portal')
@@ -534,7 +533,7 @@ export function TriagemClient() {
           .neq('creci', '22784')
           .gte('coletado_em', cutoff)
           .order('coletado_em', { ascending: false })
-          .range(0, 999) as unknown as ReturnType<ReturnType<typeof createClient>['from']>['select']
+          .range(from, to)
       )
       setItems(rows)
       setLoading(false)
