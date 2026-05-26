@@ -671,13 +671,12 @@ export function TriagemClient() {
             }}
             className={selectClass}
           >
-            <option value="0-0">Valor: todos</option>
-            <option value="0-300000">Até R$ 300k</option>
-            <option value="300000-500000">R$ 300k – 500k</option>
-            <option value="500000-800000">R$ 500k – 800k</option>
-            <option value="800000-1200000">R$ 800k – 1,2M</option>
-            <option value="1200000-2000000">R$ 1,2M – 2M</option>
-            <option value="2000000-0">Acima de R$ 2M</option>
+            <option value="0-0">Aluguel: todos</option>
+            <option value="0-2000">Até R$ 2k</option>
+            <option value="2000-5000">R$ 2k – 5k</option>
+            <option value="5000-10000">R$ 5k – 10k</option>
+            <option value="10000-20000">R$ 10k – 20k</option>
+            <option value="20000-0">Acima de R$ 20k</option>
           </select>
           <select value={filterBairro} onChange={e => { setFilterBairro(e.target.value); setPage(1) }} className={selectClass}>
             <option value="Todos">Região: todas</option>
