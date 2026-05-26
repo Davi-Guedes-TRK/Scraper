@@ -157,10 +157,10 @@ export function Navbar() {
       {/* Marca */}
       <div
         className="h-14 flex items-center flex-shrink-0 overflow-hidden"
-        style={{ borderBottom: '1px solid var(--sidebar-border)', padding: collapsed ? '0 0.5rem' : '0 1rem' }}
+        style={{ borderBottom: '1px solid var(--sidebar-border)', padding: collapsed ? '0 0.25rem' : '0 1rem' }}
       >
         {collapsed
-          ? <LogoMark size={36} />
+          ? <LogoMark size={44} />
           : <LogoHorizontal height={40} />
         }
       </div>

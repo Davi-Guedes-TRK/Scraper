@@ -500,6 +500,7 @@ export function TriagemClient() {
 
   const [filterPortal, setFilterPortal] = useState('Todos')
   const [filterPrecoMin, setFilterPrecoMin] = useState(0)
+  const [filterPrecoMax, setFilterPrecoMax] = useState(0)
   const [filterHoje, setFilterHoje] = useState(false)
   const [sort, setSort] = useState('endereco')
   const [filterPublicacao, setFilterPublicacao] = useState(0)
@@ -586,6 +587,7 @@ export function TriagemClient() {
       }
       if (filterPortal !== 'Todos' && item.portal !== filterPortal) return false
       if (filterPrecoMin > 0 && parsePreco(item.preco) < filterPrecoMin) return false
+      if (filterPrecoMax > 0 && parsePreco(item.preco) > filterPrecoMax) return false
       if (filterHoje && (item.coletado_em ?? '') < todayCutoff) return false
       if (pubCutoff && (!item.data_publicacao || item.data_publicacao < pubCutoff)) return false
       if (filterTipo !== 'Todos' && item.tipo_imovel !== filterTipo) return false
@@ -599,7 +601,7 @@ export function TriagemClient() {
     else if (sort === 'publicacao') list.sort((a, b) => (b.data_publicacao ?? '').localeCompare(a.data_publicacao ?? ''))
     else if (sort === 'coleta') list.sort((a, b) => (b.coletado_em ?? '').localeCompare(a.coletado_em ?? ''))
     return list
-  }, [items, q, filterPortal, filterPrecoMin, filterHoje, filterPublicacao, filterTipo, filterBairro, filterProprietario, filterNovos, lastSeen, sort])
+  }, [items, q, filterPortal, filterPrecoMin, filterPrecoMax, filterHoje, filterPublicacao, filterTipo, filterBairro, filterProprietario, filterNovos, lastSeen, sort])
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
   const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -660,6 +662,22 @@ export function TriagemClient() {
           <select value={filterTipo} onChange={e => { setFilterTipo(e.target.value); setPage(1) }} className={selectClass}>
             <option value="Todos">Tipo: todos</option>
             {tiposImovel.filter(v => v !== 'Todos').map(v => <option key={v}>{v}</option>)}
+          </select>
+          <select
+            value={`${filterPrecoMin}-${filterPrecoMax}`}
+            onChange={e => {
+              const [min, max] = e.target.value.split('-').map(Number)
+              setFilterPrecoMin(min); setFilterPrecoMax(max); setPage(1)
+            }}
+            className={selectClass}
+          >
+            <option value="0-0">Valor: todos</option>
+            <option value="0-300000">Até R$ 300k</option>
+            <option value="300000-500000">R$ 300k – 500k</option>
+            <option value="500000-800000">R$ 500k – 800k</option>
+            <option value="800000-1200000">R$ 800k – 1,2M</option>
+            <option value="1200000-2000000">R$ 1,2M – 2M</option>
+            <option value="2000000-0">Acima de R$ 2M</option>
           </select>
           <select value={filterBairro} onChange={e => { setFilterBairro(e.target.value); setPage(1) }} className={selectClass}>
             <option value="Todos">Região: todas</option>
