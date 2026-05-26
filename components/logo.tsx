@@ -10,7 +10,7 @@ const logoClass = 'object-contain mix-blend-multiply dark:mix-blend-normal dark:
 export function LogoMark({ size = 28 }: { size?: number }) {
   return (
     <Image
-      src="/logo.png"
+      src="/logo-mark.png"
       alt="ELO"
       width={size}
       height={size}

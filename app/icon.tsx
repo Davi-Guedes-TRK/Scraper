@@ -6,7 +6,7 @@ export const size = { width: 64, height: 64 }
 export const contentType = 'image/png'
 
 export default function Icon() {
-  const logo = readFileSync(join(process.cwd(), 'public', 'logo.png'))
+  const logo = readFileSync(join(process.cwd(), 'public', 'logo-mark.png'))
   const src = `data:image/png;base64,${logo.toString('base64')}`
 
   return new ImageResponse(
@@ -19,7 +19,7 @@ export default function Icon() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: 4,
+          padding: 6,
         }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
