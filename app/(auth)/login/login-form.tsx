@@ -76,12 +76,7 @@ export function LoginForm() {
         <path d={PATH_2} />
       </svg>
 
-      <motion.div
-        className="w-full max-w-sm relative z-10"
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: [0.2, 0.7, 0.2, 1] }}
-      >
+      <div className="w-full max-w-sm relative z-10">
         {/* Card */}
         <div className="bg-white rounded-2xl shadow-2xl p-7">
           <AnimatePresence mode="wait">
@@ -217,7 +212,7 @@ export function LoginForm() {
         >
           © 2026 TRK Imóveis
         </p>
-      </motion.div>
+      </div>
     </div>
   )
 }
