@@ -3,12 +3,15 @@
 import { useActionState, useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { signIn, resetPassword } from '@/app/actions/auth'
-import { LogoMark, APP_NAME } from '@/components/logo'
+import { LogoMark, APP_NAME, PATH_1, PATH_2, VIEWBOX } from '@/components/logo'
 
 type Mode = 'login' | 'forgot' | 'forgot_sent'
 
 const initialLogin = { error: null }
 const initialReset = { error: null, sent: false }
+
+const BG = '#4A235A'
+const LIGHT = '#C39BD3'
 
 function FloatingInput({
   name, type = 'text', label, value, onChange, autoFocus,
@@ -31,10 +34,10 @@ function FloatingInput({
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         placeholder=" "
-        className="peer w-full pt-5 pb-2 px-3.5 rounded-lg text-sm text-foreground outline-none transition-all duration-200 bg-background"
+        className="peer w-full pt-5 pb-2 px-3.5 rounded-lg text-sm text-slate-900 outline-none transition-all duration-200 bg-white"
         style={{
-          border: `1.5px solid ${focused ? 'var(--primary)' : 'var(--border)'}`,
-          boxShadow: focused ? '0 0 0 3px var(--ring)' : 'none',
+          border: `1.5px solid ${focused ? BG : '#e2e8f0'}`,
+          boxShadow: focused ? '0 0 0 3px rgba(74,35,90,0.12)' : 'none',
         }}
       />
       <label
@@ -43,7 +46,7 @@ function FloatingInput({
           top: focused || hasValue ? '7px' : '50%',
           transform: focused || hasValue ? 'translateY(0)' : 'translateY(-50%)',
           fontSize: focused || hasValue ? '10px' : '14px',
-          color: focused ? 'var(--primary)' : 'var(--muted-foreground)',
+          color: focused ? BG : '#94a3b8',
           fontWeight: focused || hasValue ? 600 : 400,
           letterSpacing: focused || hasValue ? '0.04em' : '0',
           textTransform: focused || hasValue ? 'uppercase' : 'none',
@@ -64,30 +67,60 @@ export function LoginForm() {
   if (resetState.sent && mode !== 'forgot_sent') setMode('forgot_sent')
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 page-bg">
+    <div
+      className="relative min-h-screen flex flex-col items-center justify-center p-4 overflow-hidden"
+      style={{ background: BG }}
+    >
+      {/* Watermark */}
+      <svg
+        viewBox={VIEWBOX}
+        aria-hidden
+        className="absolute pointer-events-none select-none"
+        style={{
+          width: 680,
+          height: Math.round(680 * 150 / 320),
+          fill: LIGHT,
+          opacity: 0.07,
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+        }}
+      >
+        <path d={PATH_1} />
+        <path d={PATH_2} />
+      </svg>
+
       <motion.div
-        className="w-full max-w-sm"
+        className="w-full max-w-sm relative z-10"
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: [0.2, 0.7, 0.2, 1] }}
       >
-        {/* Marca */}
+        {/* Logo */}
         <div className="flex flex-col items-center mb-7">
           <motion.div
-            className="w-12 h-12 rounded-2xl flex items-center justify-center text-primary-foreground"
-            style={{ background: 'var(--primary)', boxShadow: '0 8px 24px rgba(110,77,52,0.3)' }}
             initial={{ opacity: 0, scale: 0.85 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.4, delay: 0.08, ease: [0.34, 1.4, 0.5, 1] }}
           >
-            <LogoMark size={24} />
+            <LogoMark size={40} className="text-[#C39BD3]" />
           </motion.div>
-          <h1 className="font-display text-xl font-extrabold text-foreground mt-4 tracking-tight">{APP_NAME}</h1>
-          <p className="eyebrow text-muted-foreground mt-1">Painel de Captação</p>
+          <h1
+            className="font-display text-xl font-extrabold mt-3 tracking-tight"
+            style={{ color: LIGHT }}
+          >
+            {APP_NAME}
+          </h1>
+          <p
+            className="text-[10px] font-medium tracking-widest uppercase mt-1"
+            style={{ color: 'rgba(195,155,211,0.6)' }}
+          >
+            Painel de Captação
+          </p>
         </div>
 
         {/* Card */}
-        <div className="card rounded-2xl p-7">
+        <div className="bg-white rounded-2xl shadow-2xl p-7">
           <AnimatePresence mode="wait">
             {mode === 'login' && (
               <motion.div
@@ -97,8 +130,8 @@ export function LoginForm() {
                 exit={{ opacity: 0, x: 8 }}
                 transition={{ duration: 0.2, ease: 'easeOut' }}
               >
-                <h2 className="text-lg font-bold text-foreground mb-1 font-display">Bem-vindo de volta</h2>
-                <p className="text-muted-foreground text-sm mb-6">Acesse sua conta para continuar.</p>
+                <h2 className="text-lg font-bold text-slate-900 mb-1 font-display">Bem-vindo de volta</h2>
+                <p className="text-slate-500 text-sm mb-6">Acesse sua conta para continuar.</p>
 
                 <form action={loginAction} className="flex flex-col gap-3">
                   <FloatingInput name="email" type="email" label="Email" value={email} onChange={setEmail} autoFocus />
@@ -110,8 +143,7 @@ export function LoginForm() {
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="text-xs text-destructive rounded-lg px-3 py-2"
-                        style={{ background: 'color-mix(in srgb, var(--destructive) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--destructive) 25%, transparent)' }}
+                        className="text-xs text-red-600 rounded-lg px-3 py-2 bg-red-50 border border-red-200"
                       >
                         {loginState.error}
                       </motion.p>
@@ -121,11 +153,12 @@ export function LoginForm() {
                   <button
                     type="submit"
                     disabled={loginPending}
-                    className="btn-primary w-full mt-1 h-11 rounded-lg text-sm font-bold cursor-pointer"
+                    className="w-full mt-1 h-11 rounded-lg text-sm font-bold text-white cursor-pointer transition-opacity disabled:opacity-60"
+                    style={{ background: BG }}
                   >
                     {loginPending
                       ? <span className="flex items-center justify-center gap-2">
-                          <span className="w-3.5 h-3.5 border-2 border-current/40 border-t-current rounded-full animate-spin" />
+                          <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                           Entrando…
                         </span>
                       : 'Entrar'}
@@ -134,7 +167,7 @@ export function LoginForm() {
 
                 <button
                   onClick={() => setMode('forgot')}
-                  className="mt-5 w-full text-center text-xs text-muted-foreground hover:text-primary transition-colors cursor-pointer font-medium"
+                  className="mt-5 w-full text-center text-xs text-slate-400 hover:text-slate-600 transition-colors cursor-pointer font-medium"
                 >
                   Esqueci minha senha
                 </button>
@@ -151,7 +184,7 @@ export function LoginForm() {
               >
                 <button
                   onClick={() => setMode('login')}
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-5 transition-colors cursor-pointer font-medium"
+                  className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600 mb-5 transition-colors cursor-pointer font-medium"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
@@ -159,15 +192,14 @@ export function LoginForm() {
                   Voltar
                 </button>
 
-                <h2 className="text-lg font-bold text-foreground mb-1 font-display">Redefinir senha</h2>
-                <p className="text-muted-foreground text-sm mb-6">Enviaremos um link ao seu email.</p>
+                <h2 className="text-lg font-bold text-slate-900 mb-1 font-display">Redefinir senha</h2>
+                <p className="text-slate-500 text-sm mb-6">Enviaremos um link ao seu email.</p>
 
                 <form action={resetAction} className="flex flex-col gap-3">
                   <FloatingInput name="email" type="email" label="Email" value={email} onChange={setEmail} autoFocus />
 
                   {resetState.error && (
-                    <p className="text-xs text-destructive rounded-lg px-3 py-2"
-                       style={{ background: 'color-mix(in srgb, var(--destructive) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--destructive) 25%, transparent)' }}>
+                    <p className="text-xs text-red-600 rounded-lg px-3 py-2 bg-red-50 border border-red-200">
                       {resetState.error}
                     </p>
                   )}
@@ -175,7 +207,8 @@ export function LoginForm() {
                   <button
                     type="submit"
                     disabled={resetPending}
-                    className="btn-primary w-full mt-1 h-11 rounded-lg text-sm font-bold cursor-pointer"
+                    className="w-full mt-1 h-11 rounded-lg text-sm font-bold text-white cursor-pointer transition-opacity disabled:opacity-60"
+                    style={{ background: BG }}
                   >
                     {resetPending ? 'Enviando…' : 'Enviar link'}
                   </button>
@@ -191,18 +224,22 @@ export function LoginForm() {
                 transition={{ duration: 0.3, ease: [0.34, 1.4, 0.5, 1] }}
                 className="text-center py-4"
               >
-                <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 text-primary" style={{ background: 'var(--accent)' }}>
-                  <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                <div
+                  className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                  style={{ background: 'rgba(74,35,90,0.08)' }}
+                >
+                  <svg className="w-7 h-7" style={{ color: BG }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                   </svg>
                 </div>
-                <h2 className="text-lg font-bold text-foreground mb-2 font-display">Email enviado</h2>
-                <p className="text-muted-foreground text-sm mb-6">
-                  Verifique <span className="text-foreground font-semibold">{email}</span> e clique no link.
+                <h2 className="text-lg font-bold text-slate-900 mb-2 font-display">Email enviado</h2>
+                <p className="text-slate-500 text-sm mb-6">
+                  Verifique <span className="text-slate-900 font-semibold">{email}</span> e clique no link.
                 </p>
                 <button
                   onClick={() => setMode('login')}
-                  className="text-xs text-primary hover:underline cursor-pointer font-semibold"
+                  className="text-xs font-semibold cursor-pointer hover:opacity-75 transition-opacity"
+                  style={{ color: BG }}
                 >
                   Voltar para o login
                 </button>
@@ -211,8 +248,11 @@ export function LoginForm() {
           </AnimatePresence>
         </div>
 
-        <p className="text-center eyebrow text-muted-foreground/70 text-[9px] mt-6">
-          TRK Imóveis · Lago Sul · Brasília
+        <p
+          className="text-center text-[10px] font-medium mt-6 tracking-widest"
+          style={{ color: 'rgba(195,155,211,0.45)' }}
+        >
+          © 2026 TRK Imóveis
         </p>
       </motion.div>
     </div>
