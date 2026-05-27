@@ -167,17 +167,6 @@ export function DashboardClient({
           <DashboardChart data={chartData} />
         </div>
 
-        {/* Grafana — Funil de Captação */}
-        <div className="card rounded-lg overflow-hidden mb-3">
-          <iframe
-            src="https://dguedes.grafana.net/d-solo/trk-funil-captacao-v2/funil-de-captacao-trk-imoveis?orgId=1&from=1704067200000&to=1779894715332&timezone=browser&var-bairro=Todos&var-tipo_imovel=Todos&panelId=panel-2"
-            width="100%"
-            height="200"
-            style={{ border: 'none', display: 'block' }}
-            title="Funil de Captação TRK"
-          />
-        </div>
-
         {/* Barras status */}
         <div className="flex gap-2.5">
           <div className="flex-1 rounded-lg px-3 py-2.5 flex items-center justify-between"

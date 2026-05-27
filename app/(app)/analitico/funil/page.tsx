@@ -7,7 +7,7 @@ export default function FunilPage() {
       </div>
       <div className="flex-1 rounded-xl overflow-hidden border border-border" style={{ minHeight: 600 }}>
         <iframe
-          src="https://dguedes.grafana.net/public-dashboards/3d4eda6968cd4941b0f663de82588820?theme=light"
+          src="https://dguedes.grafana.net/d-solo/trk-funil-captacao-v2/funil-de-captacao-trk-imoveis?orgId=1&from=1704067200000&to=1779894715332&timezone=browser&var-bairro=Todos&var-tipo_imovel=Todos&panelId=panel-2"
           width="100%"
           height="100%"
           style={{ minHeight: 600, border: 'none', display: 'block' }}
