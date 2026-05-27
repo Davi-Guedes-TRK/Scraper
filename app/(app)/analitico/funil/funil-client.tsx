@@ -301,7 +301,7 @@ function FasesChart({ data }: { data: Fase[] }) {
       <BarChart data={sorted} layout="vertical" margin={{ left: 8, right: 56, top: 4, bottom: 4 }}>
         <XAxis type="number" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
         <YAxis type="category" dataKey="fase" tick={{ fontSize: 10 }} width={155} tickLine={false} axisLine={false} />
-        <Tooltip formatter={(v: number, _: string, p: { payload: Fase }) => [v, p.payload.fase]} />
+        <Tooltip formatter={(v: number, _: string, p: { payload?: Fase }) => [v, p.payload?.fase ?? '']} />
         <Bar dataKey="cards" radius={[0, 3, 3, 0]} isAnimationActive>
           <LabelList dataKey="cards" position="right" style={{ fontSize: 10, fill: 'var(--foreground)', fontWeight: 600 }} />
           {sorted.map((f, i) => (
@@ -332,9 +332,9 @@ function OrigemChart({ data }: { data: Origem[] }) {
 }
 
 // Tooltip financeiro para Por Bairro / Por Tipo
-function ValorTooltip({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; color: string }[]; label?: string }) {
+function ValorTooltip({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; color: string; payload?: { valor_medio?: number | null } }[]; label?: string }) {
   if (!active || !payload?.length) return null
-  const valorMedio = (payload[0]?.payload as { valor_medio?: number })?.valor_medio
+  const valorMedio = payload[0]?.payload?.valor_medio
   return (
     <div className="bg-white border border-border rounded-lg shadow-lg px-3 py-2 text-xs min-w-[140px]">
       <p className="font-semibold text-foreground mb-1.5">{label}</p>
@@ -528,9 +528,9 @@ export function FunilClient() {
             <XAxis dataKey="mes" tick={{ fontSize: 10 }} tickLine={false} />
             <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
             <Tooltip
-              formatter={(v: number, name: string, p: { payload: PorMes }) => {
+              formatter={(v: number, name: string, p: { payload?: PorMes }) => {
                 const rows: [string, string][] = [[name, String(v)]]
-                if (name === 'Captados' && p.payload.ticket_medio) {
+                if (name === 'Captados' && p.payload?.ticket_medio) {
                   rows.push(['Ticket médio', fmtBRL(p.payload.ticket_medio)])
                 }
                 return rows
