@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { Fragment, useEffect, useState, useCallback } from 'react'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, PieChart, Pie, Cell, LineChart, Line, LabelList,
 } from 'recharts'
+import { fmtBRL } from '@/lib/formatters'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -12,15 +13,30 @@ type Stats = {
   oportunidades: number; leads: number; visitados: number
   captados: number; taxa_perda: number; em_andamento: number
 }
+
+type Financeiro = {
+  carteira_captada: number | null
+  ticket_medio_captados: number | null
+  qtd_captados_com_valor: number | null
+  potencial_pipeline: number | null
+  ticket_medio_geral: number | null
+  mediana_anuncio: number | null
+  faixa_0_10k: number; faixa_10_20k: number; faixa_20_30k: number
+  faixa_30_50k: number; faixa_50k_plus: number
+  dias_leads: number | null; dias_contato: number | null
+  dias_visita: number | null; dias_fechado: number | null
+}
+
 type Motivo    = { motivo: string; total: number }
 type Fase      = { fase: string; cards: number }
-type PorBairro = { bairro: string; oportunidades: number; perdidos: number; captados: number }
-type PorTipo   = { tipo: string; oportunidades: number; perdidos: number; captados: number }
-type PorMes    = { mes: string; oportunidades: number }
+type PorBairro = { bairro: string; oportunidades: number; perdidos: number; captados: number; valor_medio: number | null }
+type PorTipo   = { tipo: string;   oportunidades: number; perdidos: number; captados: number; valor_medio: number | null }
+type PorMes    = { mes: string; oportunidades: number; captados: number; ticket_medio: number | null }
 type Origem    = { origem: string; total: number; captados: number }
 
 type Data = {
-  stats: Stats; motivos: Motivo[]; fases: Fase[]
+  stats: Stats; financeiro: Financeiro | null
+  motivos: Motivo[]; fases: Fase[]
   porBairro: PorBairro[]; porTipo: PorTipo[]; porMes: PorMes[]
   origem: Origem[]; bairros: string[]; tipos: string[]
 }
@@ -35,22 +51,25 @@ const C = {
   perda:         '#ef4444',
   andamento:     '#06b6d4',
   perdidos:      '#ef4444',
+  pipeline:      '#6366f1',
+  mediana:       '#f97316',
 }
 
 const DONUT_COLORS = ['#ef4444','#f97316','#eab308','#06b6d4','#8b5cf6','#ec4899','#6366f1','#22c55e','#14b8a6']
 
 const FASES_CORES: Record<string, string> = {
-  'Leads': '#8b5cf6',
-  'Em Contato': '#06b6d4',
-  'Lead Completo': '#6366f1',
-  'Visita': '#f59e0b',
-  'Captação Realizada ✅': '#22c55e',
-  'Avaliação': '#f97316',
-  'Fechado Comercialmente': '#16a34a',
-  'Matricula Solicitada': '#10b981',
-  'Ônus Solicitada': '#10b981',
-  'Não Captado ❌': '#ef4444',
-  'Locado / Retirado': '#94a3b8',
+  'Leads':                   '#8b5cf6',
+  'Em Contato':              '#06b6d4',
+  'Lead Completo':           '#6366f1',
+  'Para Visitar':            '#f59e0b',
+  'Visita':                  '#f59e0b',
+  'Captação Realizada ✅':   '#22c55e',
+  'Avaliação':               '#f97316',
+  'Fechado Comercialmente':  '#16a34a',
+  'Matricula Solicitada':    '#10b981',
+  'Ônus Solicitada':         '#10b981',
+  'Não Captado ❌':          '#ef4444',
+  'Locado / Retirado':       '#94a3b8',
 }
 
 const ORIGEM_CORES: Record<string, string> = {
@@ -78,6 +97,10 @@ function fmtMes(mes: string) {
   return `${m}/${y?.slice(2)}`
 }
 
+function convColor(pct: number) {
+  return pct >= 50 ? '#22c55e' : pct >= 25 ? '#f59e0b' : '#ef4444'
+}
+
 // ── Sub-componentes ───────────────────────────────────────────────────────────
 
 function PanelCard({ title, children, className = '' }: { title: string; children: React.ReactNode; className?: string }) {
@@ -91,55 +114,143 @@ function PanelCard({ title, children, className = '' }: { title: string; childre
   )
 }
 
-function StatCard({ label, value, color, unit }: { label: string; value: number | null; color: string; unit?: string }) {
-  return (
-    <div
-      className="rounded-lg flex flex-col items-center justify-center py-5 px-3 cursor-default transition-all duration-200 hover:scale-[1.03] hover:shadow-lg select-none"
-      style={{ background: color + '1a', border: `1px solid ${color}40` }}
-    >
-      <p className="text-[10px] font-semibold uppercase tracking-widest mb-1 text-center" style={{ color }}>
-        {label}
-      </p>
-      <p className="text-3xl font-extrabold font-display tabular leading-none" style={{ color }}>
-        {value ?? '—'}{unit}
-      </p>
-    </div>
-  )
-}
-
-function FunilGauge({ stats }: { stats: Stats }) {
+// Funil horizontal — substitui os 6 StatCards
+function FunilVisual({ stats, fin }: { stats: Stats; fin: Financeiro | null }) {
   const max = stats.oportunidades || 1
   const stages = [
-    { label: 'Oportunidades', value: stats.oportunidades, color: C.oportunidades },
-    { label: 'Leads',         value: stats.leads,         color: C.leads },
-    { label: 'Visitados',     value: stats.visitados,     color: C.visitados },
-    { label: 'Captados',      value: stats.captados,      color: C.captados },
+    { label: 'Oportunidades', value: stats.oportunidades, color: C.oportunidades, time: null },
+    { label: 'c/ Contato',    value: stats.leads,          color: C.leads,          time: fin?.dias_leads ?? null },
+    { label: 'Visitados',     value: stats.visitados,      color: C.visitados,      time: fin?.dias_visita ?? null },
+    { label: 'Captados',      value: stats.captados,       color: C.captados,       time: fin?.dias_fechado ?? null },
   ]
+
   return (
-    <div className="flex flex-col gap-2.5 px-4 pb-4">
-      {stages.map(s => {
-        const pct = Math.max(3, (s.value / max) * 100)
-        return (
-          <div key={s.label} className="flex items-center gap-3 group">
-            <span className="w-28 text-xs text-right text-muted-foreground shrink-0 group-hover:text-foreground transition-colors">
-              {s.label}
-            </span>
-            <div className="flex-1 h-9 rounded overflow-hidden bg-muted/40">
+    <div className="card rounded-lg p-3">
+      <div className="flex items-stretch gap-1">
+        {stages.map((stage, i) => {
+          const prev = stages[i - 1]
+          const pct  = prev ? Math.round((stage.value / Math.max(1, prev.value)) * 100) : null
+          const barW = Math.max(6, Math.round((stage.value / max) * 100))
+          const cc   = pct != null ? convColor(pct) : ''
+
+          return (
+            <Fragment key={stage.label}>
+              {/* seta de conversão */}
+              {pct != null && (
+                <div className="flex flex-col items-center justify-center shrink-0 px-1">
+                  <span className="text-[10px] font-bold font-mono leading-none" style={{ color: cc }}>{pct}%</span>
+                  <svg width="18" height="12" viewBox="0 0 18 12" fill="none">
+                    <path d="M1 6 H14 M10 2 L16 6 L10 10" stroke={cc} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+              )}
+              {/* card de estágio */}
               <div
-                className="h-full rounded flex items-center justify-end pr-3 text-white text-sm font-bold transition-all duration-700"
-                style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${s.color}88, ${s.color})` }}
+                className="flex-1 rounded-xl px-3 py-2.5 flex flex-col gap-1 transition-transform duration-200 hover:scale-[1.02] cursor-default select-none"
+                style={{ background: stage.color + '12', border: `1px solid ${stage.color}28` }}
               >
-                {s.value}
+                <div className="h-1 rounded-full overflow-hidden" style={{ background: stage.color + '28' }}>
+                  <div className="h-full rounded-full transition-all duration-700" style={{ width: `${barW}%`, background: stage.color }} />
+                </div>
+                <p className="text-2xl font-extrabold tabular leading-none mt-0.5" style={{ color: stage.color }}>{stage.value}</p>
+                <p className="text-[11px] text-muted-foreground font-medium">{stage.label}</p>
+                {stage.time != null && stage.time > 0 && (
+                  <p className="text-[10px] font-mono" style={{ color: stage.color + 'aa' }}>~{stage.time}d na fase</p>
+                )}
               </div>
-            </div>
+            </Fragment>
+          )
+        })}
+
+        {/* métricas secundárias */}
+        <div className="ml-2 pl-3 border-l border-border flex flex-col gap-3 justify-center shrink-0 pr-1">
+          <div>
+            <p className="text-[9px] uppercase tracking-widest text-muted-foreground leading-none">Taxa de Perda</p>
+            <p className="text-xl font-extrabold tabular mt-1 leading-none" style={{ color: C.perda }}>{stats.taxa_perda ?? 0}%</p>
           </div>
-        )
-      })}
+          <div>
+            <p className="text-[9px] uppercase tracking-widest text-muted-foreground leading-none">Em Andamento</p>
+            <p className="text-xl font-extrabold tabular mt-1 leading-none" style={{ color: C.andamento }}>{stats.em_andamento ?? 0}</p>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
 
-// Tooltip customizado para o donut — mostra nome + valor + %
+// KPIs financeiros
+function KpiCard({ label, value, sub, color, note }: { label: string; value: string; sub: string; color: string; note?: string }) {
+  return (
+    <div
+      className="card rounded-lg px-4 py-3 flex flex-col gap-1 transition-shadow duration-200 hover:shadow-md cursor-default select-none"
+      style={{ borderLeft: `3px solid ${color}` }}
+    >
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{label}</p>
+      <p className="text-xl font-extrabold tabular leading-none text-foreground">{value}</p>
+      <p className="text-[11px] text-muted-foreground">{sub}</p>
+      {note && <p className="text-[10px] font-mono text-muted-foreground/60">{note}</p>}
+    </div>
+  )
+}
+
+// Faixas de valor do anúncio
+function FaixasChart({ fin }: { fin: Financeiro }) {
+  const data = [
+    { faixa: 'até R$10k', count: fin.faixa_0_10k,   color: '#6366f1' },
+    { faixa: 'R$10–20k',  count: fin.faixa_10_20k,  color: '#8b5cf6' },
+    { faixa: 'R$20–30k',  count: fin.faixa_20_30k,  color: '#f59e0b' },
+    { faixa: 'R$30–50k',  count: fin.faixa_30_50k,  color: '#f97316' },
+    { faixa: '+R$50k',    count: fin.faixa_50k_plus, color: '#22c55e' },
+  ]
+  const max = Math.max(...data.map(d => d.count), 1)
+  return (
+    <div className="flex flex-col gap-2 px-4 pb-4">
+      {data.map(d => (
+        <div key={d.faixa} className="flex items-center gap-3 group">
+          <span className="w-20 text-[11px] text-muted-foreground text-right shrink-0 group-hover:text-foreground transition-colors">{d.faixa}</span>
+          <div className="flex-1 h-7 rounded overflow-hidden bg-muted/30">
+            <div
+              className="h-full rounded flex items-center justify-end pr-2 text-white text-xs font-bold transition-all duration-700"
+              style={{ width: `${Math.max(10, (d.count / max) * 100)}%`, background: `linear-gradient(90deg, ${d.color}80, ${d.color})` }}
+            >
+              {d.count}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// Velocidade média por fase
+function VelocidadeChart({ fin }: { fin: Financeiro }) {
+  const data = [
+    { fase: 'Leads',       dias: fin.dias_leads    ?? 0, color: C.leads },
+    { fase: 'Em Contato',  dias: fin.dias_contato  ?? 0, color: C.andamento },
+    { fase: 'Visita',      dias: fin.dias_visita   ?? 0, color: C.visitados },
+    { fase: 'Fechado',     dias: fin.dias_fechado  ?? 0, color: C.captados },
+  ].filter(d => d.dias > 0)
+  const max = Math.max(...data.map(d => d.dias), 1)
+  return (
+    <div className="flex flex-col gap-2 px-4 pb-4">
+      {data.map(d => (
+        <div key={d.fase} className="flex items-center gap-3 group">
+          <span className="w-24 text-[11px] text-muted-foreground text-right shrink-0 group-hover:text-foreground transition-colors">{d.fase}</span>
+          <div className="flex-1 h-7 rounded overflow-hidden bg-muted/30">
+            <div
+              className="h-full rounded flex items-center justify-end pr-2 text-white text-xs font-bold transition-all duration-700"
+              style={{ width: `${Math.max(10, (d.dias / max) * 100)}%`, background: `linear-gradient(90deg, ${d.color}80, ${d.color})` }}
+            >
+              {d.dias}d
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// Tooltip customizado para donut
 function DonutTooltip({ active, payload }: { active?: boolean; payload?: { name: string; value: number; payload: { pct: number } }[] }) {
   if (!active || !payload?.length) return null
   const { name, value, payload: p } = payload[0]
@@ -159,7 +270,6 @@ function DonutChart({ data }: { data: Motivo[] }) {
     pct:   Math.round(d.total * 100 / (total || 1)),
     color: DONUT_COLORS[i % DONUT_COLORS.length],
   }))
-
   return (
     <div className="flex gap-3 px-3 pb-3">
       <ResponsiveContainer width={180} height={200}>
@@ -221,6 +331,29 @@ function OrigemChart({ data }: { data: Origem[] }) {
   )
 }
 
+// Tooltip financeiro para Por Bairro / Por Tipo
+function ValorTooltip({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; color: string }[]; label?: string }) {
+  if (!active || !payload?.length) return null
+  const valorMedio = (payload[0]?.payload as { valor_medio?: number })?.valor_medio
+  return (
+    <div className="bg-white border border-border rounded-lg shadow-lg px-3 py-2 text-xs min-w-[140px]">
+      <p className="font-semibold text-foreground mb-1.5">{label}</p>
+      {payload.map((p, i) => (
+        <div key={i} className="flex items-center justify-between gap-3 mb-0.5">
+          <span style={{ color: p.color }}>{p.name}</span>
+          <span className="font-bold tabular">{p.value}</span>
+        </div>
+      ))}
+      {valorMedio != null && valorMedio > 0 && (
+        <div className="mt-1.5 pt-1.5 border-t border-border/60 flex justify-between">
+          <span className="text-muted-foreground">Valor médio</span>
+          <span className="font-bold text-foreground">{fmtBRL(valorMedio)}</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Componente principal ──────────────────────────────────────────────────────
 
 export function FunilClient() {
@@ -242,7 +375,8 @@ export function FunilClient() {
 
   useEffect(() => { load(bairro, tipo, range) }, [bairro, tipo, range, load])
 
-  const s = data?.stats
+  const s   = data?.stats
+  const fin = data?.financeiro ?? null
 
   return (
     <div className="flex flex-col h-full p-4 gap-3 overflow-y-auto" style={{ minHeight: 0 }}>
@@ -256,7 +390,6 @@ export function FunilClient() {
           </p>
         </div>
         <div className="flex gap-2 flex-wrap items-center">
-          {/* Range */}
           <div className="flex rounded-lg border border-border overflow-hidden">
             {RANGE_OPTS.map(o => (
               <button
@@ -283,29 +416,61 @@ export function FunilClient() {
         </div>
       </div>
 
-      {/* Row 1 — 6 Stats */}
-      <div className="grid grid-cols-6 gap-2.5">
-        <StatCard label="Oportunidades"     value={s?.oportunidades ?? null} color={C.oportunidades} />
-        <StatCard label="Leads (c/ contato)" value={s?.leads         ?? null} color={C.leads} />
-        <StatCard label="Visitados"          value={s?.visitados     ?? null} color={C.visitados} />
-        <StatCard label="Captados"           value={s?.captados      ?? null} color={C.captados} />
-        <StatCard label="Taxa de Perda"      value={s?.taxa_perda    ?? null} color={C.perda}    unit="%" />
-        <StatCard label="Em Andamento"       value={s?.em_andamento  ?? null} color={C.andamento} />
+      {/* Row 1 — Funil visual */}
+      {s && <FunilVisual stats={s} fin={fin} />}
+
+      {/* Row 2 — KPIs Financeiros */}
+      <div className="grid grid-cols-4 gap-2.5">
+        <KpiCard
+          label="Carteira Captada"
+          value={fmtBRL(fin?.carteira_captada ?? 0)}
+          sub={`${fin?.qtd_captados_com_valor ?? 0} imóveis captados`}
+          color={C.captados}
+          note="soma do valor anunciado"
+        />
+        <KpiCard
+          label="Ticket Médio Captados"
+          value={fmtBRL(fin?.ticket_medio_captados ?? 0)}
+          sub="média dos captados"
+          color="#16a34a"
+        />
+        <KpiCard
+          label="Potencial em Pipeline"
+          value={fmtBRL(fin?.potencial_pipeline ?? 0)}
+          sub="leads ainda em andamento"
+          color={C.pipeline}
+          note={`ticket médio geral: ${fmtBRL(fin?.ticket_medio_geral ?? 0)}`}
+        />
+        <KpiCard
+          label="Mediana do Anúncio"
+          value={fmtBRL(fin?.mediana_anuncio ?? 0)}
+          sub="50% dos anúncios estão abaixo"
+          color={C.mediana}
+        />
       </div>
 
-      {/* Row 2 — Funil + Origem do Lead */}
-      <div className="grid gap-2.5" style={{ gridTemplateColumns: '3fr 2fr' }}>
-        <PanelCard title="Funil de Conversão">
-          {s && <FunilGauge stats={s} />}
+      {/* Row 3 — Faixas de Valor + Velocidade do Funil */}
+      <div className="grid grid-cols-2 gap-2.5">
+        <PanelCard title="Distribuição de Valor Anunciado">
+          {fin
+            ? <FaixasChart fin={fin} />
+            : <p className="text-xs text-muted-foreground py-8 text-center px-3">Sem dados</p>}
         </PanelCard>
-        <PanelCard title="Origem do Lead (portal)">
-          {data?.origem?.length
-            ? <OrigemChart data={data.origem} />
+        <PanelCard title="Velocidade Média por Fase (dias)">
+          {fin
+            ? <VelocidadeChart fin={fin} />
             : <p className="text-xs text-muted-foreground py-8 text-center px-3">Sem dados</p>}
         </PanelCard>
       </div>
 
-      {/* Row 3 — Motivos + Fases */}
+      {/* Row 4 — Origem do Lead */}
+      <PanelCard title="Origem do Lead (portal)">
+        {data?.origem?.length
+          ? <OrigemChart data={data.origem} />
+          : <p className="text-xs text-muted-foreground py-8 text-center px-3">Sem dados</p>}
+      </PanelCard>
+
+      {/* Row 5 — Motivos + Fases */}
       <div className="grid gap-2.5" style={{ gridTemplateColumns: '11fr 13fr' }}>
         <PanelCard title="Motivos de Não Captação">
           {data?.motivos?.length
@@ -319,15 +484,15 @@ export function FunilClient() {
         </PanelCard>
       </div>
 
-      {/* Row 4 — Por Bairro + Por Tipo */}
+      {/* Row 6 — Por Bairro + Por Tipo */}
       <div className="grid gap-2.5" style={{ gridTemplateColumns: '14fr 10fr' }}>
-        <PanelCard title="Por Bairro">
+        <PanelCard title="Por Bairro (valor médio anunciado no tooltip)">
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={data?.porBairro ?? []} margin={{ left: 4, right: 12, top: 4, bottom: 40 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
               <XAxis dataKey="bairro" tick={{ fontSize: 10 }} tickLine={false} angle={-30} textAnchor="end" interval={0} />
               <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
-              <Tooltip />
+              <Tooltip content={<ValorTooltip />} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="oportunidades" name="Oportunidades" fill={C.oportunidades} radius={[2,2,0,0]} />
               <Bar dataKey="perdidos"      name="Perdidos"      fill={C.perdidos}      radius={[2,2,0,0]} />
@@ -342,7 +507,7 @@ export function FunilClient() {
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
               <XAxis dataKey="tipo" tick={{ fontSize: 10 }} tickLine={false} />
               <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
-              <Tooltip />
+              <Tooltip content={<ValorTooltip />} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="oportunidades" name="Oportunidades" fill={C.oportunidades} radius={[2,2,0,0]} />
               <Bar dataKey="perdidos"      name="Perdidos"      fill={C.perdidos}      radius={[2,2,0,0]} />
@@ -352,8 +517,8 @@ export function FunilClient() {
         </PanelCard>
       </div>
 
-      {/* Row 5 — Novas Oportunidades por Mês */}
-      <PanelCard title="Novas Oportunidades por Mês">
+      {/* Row 7 — Oportunidades + Captados por Mês */}
+      <PanelCard title="Evolução Mensal — Oportunidades e Captados">
         <ResponsiveContainer width="100%" height={220}>
           <LineChart
             data={(data?.porMes ?? []).map(d => ({ ...d, mes: fmtMes(d.mes) }))}
@@ -362,11 +527,26 @@ export function FunilClient() {
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
             <XAxis dataKey="mes" tick={{ fontSize: 10 }} tickLine={false} />
             <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
-            <Tooltip />
+            <Tooltip
+              formatter={(v: number, name: string, p: { payload: PorMes }) => {
+                const rows: [string, string][] = [[name, String(v)]]
+                if (name === 'Captados' && p.payload.ticket_medio) {
+                  rows.push(['Ticket médio', fmtBRL(p.payload.ticket_medio)])
+                }
+                return rows
+              }}
+            />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
             <Line
               type="linear" dataKey="oportunidades" name="Oportunidades"
               stroke={C.oportunidades} strokeWidth={2}
               dot={{ r: 3, fill: C.oportunidades, strokeWidth: 0 }}
+              activeDot={{ r: 5 }}
+            />
+            <Line
+              type="linear" dataKey="captados" name="Captados"
+              stroke={C.captados} strokeWidth={2}
+              dot={{ r: 3, fill: C.captados, strokeWidth: 0 }}
               activeDot={{ r: 5 }}
             />
           </LineChart>
