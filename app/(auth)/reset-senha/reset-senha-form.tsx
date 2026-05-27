@@ -43,7 +43,7 @@ export function ResetSenhaForm() {
     <div className="min-h-screen bg-zinc-100 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="flex justify-center mb-8">
-          <Logo className="text-zinc-900" markClass="w-9 h-9" textClass="text-2xl" />
+          <Logo className="text-zinc-900" />
         </div>
 
         <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-8">
