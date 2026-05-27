@@ -91,10 +91,12 @@ export async function POST(request: NextRequest) {
     const vals = Object.values(filtered)
 
     // Columns and table name are from hardcoded whitelist — sql.unsafe is safe here
-    const setClauses = cols
-      .filter(c => c !== 'link')
-      .map(c => `"${c}" = EXCLUDED."${c}"`)
-      .join(', ')
+    // preco_reduzido is always handled via CASE to detect price drops server-side
+    const regularCols = cols.filter(c => c !== 'link' && c !== 'preco_reduzido')
+    const setClauses = [
+      ...regularCols.map(c => `"${c}" = EXCLUDED."${c}"`),
+      `"preco_reduzido" = CASE WHEN EXCLUDED."preco" IS DISTINCT FROM public."${table}"."preco" AND public."${table}"."preco" IS NOT NULL THEN true ELSE COALESCE(public."${table}"."preco_reduzido", false) END`,
+    ].join(', ')
 
     const colList = cols.map(c => `"${c}"`).join(', ')
     const placeholders = cols.map((_, i) => `$${i + 1}`).join(', ')

@@ -21,6 +21,8 @@ type Imovel = {
   maps_link?: string | null
   lat?: number | null
   lng?: number | null
+  ativo?: boolean | null
+  preco_reduzido?: boolean | null
 }
 
 type RouteItem = Imovel & { coords: Coords | null; distKm: number | null }
@@ -195,6 +197,12 @@ function RouteItemCard({ item, index, active, onSelect, onMarkVisited }: {
           {item.bairro && <span className="text-[#656d76] text-xs">{item.bairro}</span>}
           {preco > 0 && <span className="text-green-700 text-xs font-semibold">{fmtBRL(preco)}</span>}
           <PortalBadge portal={item.portal} />
+          {item.preco_reduzido && (
+            <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200">↓ preço</span>
+          )}
+          {item.ativo === false && (
+            <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-red-100 text-red-700 border border-red-200">anúncio off</span>
+          )}
         </div>
         {distLabel && <p className="text-teal-600 text-xs mt-1 font-medium">{distLabel} do ponto anterior</p>}
         {!item.coords && <p className="text-amber-500 text-xs mt-1">Sem coordenadas — não entra na rota</p>}

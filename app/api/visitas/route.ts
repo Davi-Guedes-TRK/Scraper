@@ -12,11 +12,13 @@ type VisitaRow = {
   maps_link: string | null
   lat: number | null
   lng: number | null
+  ativo: boolean | null
+  preco_reduzido: boolean | null
 }
 
 export async function GET() {
   const rows = await sql<VisitaRow[]>`
-    SELECT link, portal, titulo, bairro, preco, endereco, maps_link, lat, lng
+    SELECT link, portal, titulo, bairro, preco, endereco, maps_link, lat, lng, ativo, preco_reduzido
     FROM imoveis_todos
     WHERE status_triagem = 'para_visitar'
       AND visitado_em IS NULL
