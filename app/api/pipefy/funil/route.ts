@@ -10,16 +10,13 @@ function resolverDesde(range: string): string {
   return '2024-01-01'
 }
 
-const CAPTADOS_FASES = ['Fechado Comercialmente', 'Captação Realizada ✅', 'Ônus Solicitada', 'Matricula Solicitada']
-const ENCERRADAS_FASES = ['Não Captado ❌', 'Captação Realizada ✅', 'Fechado Comercialmente', 'Matricula Solicitada', 'Ônus Solicitada', 'Locado / Retirado']
-
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const bairro = searchParams.get('bairro')      ?? 'Todos'
   const tipo   = searchParams.get('tipo_imovel') ?? 'Todos'
   const desde  = resolverDesde(searchParams.get('range') ?? 'tudo')
 
-  const [statsRows, motivosRows, fasesRows, porBairroRows, porTipoRows, porMesRows, origemRows, filtrosRow, finRows] = await Promise.all([
+  const [statsRows, motivosRows, fasesRows, porBairroRows, porTipoRows, porMesRows, origemRows, filtrosRow, responsavelRows] = await Promise.all([
 
     sql`
       SELECT
@@ -28,7 +25,15 @@ export async function GET(req: NextRequest) {
         count(*) FILTER (WHERE visita_agendada IS NOT NULL OR visita_entrada IS NOT NULL OR obs_visita IS NOT NULL)::int AS visitados,
         count(*) FILTER (WHERE fase_atual IN ('Fechado Comercialmente', 'Captação Realizada ✅'))::int AS captados,
         round(count(*) FILTER (WHERE fase_atual = 'Não Captado ❌') * 100.0 / NULLIF(count(*), 0), 1)::float AS taxa_perda,
-        count(*) FILTER (WHERE fase_atual NOT IN ('Não Captado ❌','Captação Realizada ✅','Fechado Comercialmente','Matricula Solicitada','Ônus Solicitada','Locado / Retirado'))::int AS em_andamento
+        count(*) FILTER (WHERE fase_atual NOT IN ('Não Captado ❌','Captação Realizada ✅','Fechado Comercialmente','Matricula Solicitada','Ônus Solicitada','Locado / Retirado'))::int AS em_andamento,
+        round(avg(valor_anuncio) FILTER (WHERE valor_anuncio > 0))::int AS valor_medio_geral,
+        round(avg(valor_anuncio) FILTER (WHERE (telefone_contato IS NOT NULL OR outros_contatos IS NOT NULL) AND valor_anuncio > 0))::int AS valor_medio_leads,
+        round(avg(valor_anuncio) FILTER (WHERE (visita_agendada IS NOT NULL OR visita_entrada IS NOT NULL OR obs_visita IS NOT NULL) AND valor_anuncio > 0))::int AS valor_medio_visitados,
+        round(avg(valor_anuncio) FILTER (WHERE fase_atual IN ('Fechado Comercialmente','Captação Realizada ✅','Ônus Solicitada','Matricula Solicitada') AND valor_anuncio > 0))::int AS valor_medio_captados,
+        round(avg(leads_dias)      FILTER (WHERE leads_dias      BETWEEN 0.01 AND 365))::int AS dias_leads,
+        round(avg(em_contato_dias) FILTER (WHERE em_contato_dias BETWEEN 0.01 AND 365))::int AS dias_contato,
+        round(avg(visita_dias)     FILTER (WHERE visita_dias     BETWEEN 0.01 AND 365))::int AS dias_visita,
+        round(avg(fechado_dias)    FILTER (WHERE fechado_dias    BETWEEN 0.01 AND 365))::int AS dias_fechado
       FROM pipefy_captacoes
       WHERE criado_em >= ${desde}
         AND (${bairro} = 'Todos' OR bairro = ${bairro})
@@ -121,40 +126,31 @@ export async function GET(req: NextRequest) {
 
     sql`
       SELECT
-        round(sum(valor_anuncio) FILTER (WHERE fase_atual IN ('Fechado Comercialmente','Captação Realizada ✅','Ônus Solicitada','Matricula Solicitada')))::int           AS carteira_captada,
-        round(avg(valor_anuncio) FILTER (WHERE fase_atual IN ('Fechado Comercialmente','Captação Realizada ✅','Ônus Solicitada','Matricula Solicitada')))::int           AS ticket_medio_captados,
-        count(*) FILTER (WHERE fase_atual IN ('Fechado Comercialmente','Captação Realizada ✅','Ônus Solicitada','Matricula Solicitada'))::int                           AS qtd_captados_com_valor,
-        round(sum(valor_anuncio) FILTER (WHERE fase_atual NOT IN ('Não Captado ❌','Captação Realizada ✅','Fechado Comercialmente','Matricula Solicitada','Ônus Solicitada','Locado / Retirado')))::int AS potencial_pipeline,
-        round(avg(valor_anuncio) FILTER (WHERE valor_anuncio > 0))::int                                                                                                AS ticket_medio_geral,
-        round(percentile_cont(0.5) WITHIN GROUP (ORDER BY valor_anuncio) FILTER (WHERE valor_anuncio IS NOT NULL AND valor_anuncio > 0))::int                           AS mediana_anuncio,
-        count(*) FILTER (WHERE valor_anuncio BETWEEN 0.01 AND 9999)::int   AS faixa_0_10k,
-        count(*) FILTER (WHERE valor_anuncio BETWEEN 10000 AND 19999)::int AS faixa_10_20k,
-        count(*) FILTER (WHERE valor_anuncio BETWEEN 20000 AND 29999)::int AS faixa_20_30k,
-        count(*) FILTER (WHERE valor_anuncio BETWEEN 30000 AND 49999)::int AS faixa_30_50k,
-        count(*) FILTER (WHERE valor_anuncio >= 50000)::int                 AS faixa_50k_plus,
-        round(avg(leads_dias)       FILTER (WHERE leads_dias       BETWEEN 0.01 AND 365))::int AS dias_leads,
-        round(avg(em_contato_dias)  FILTER (WHERE em_contato_dias  BETWEEN 0.01 AND 365))::int AS dias_contato,
-        round(avg(visita_dias)      FILTER (WHERE visita_dias      BETWEEN 0.01 AND 365))::int AS dias_visita,
-        round(avg(fechado_dias)     FILTER (WHERE fechado_dias     BETWEEN 0.01 AND 365))::int AS dias_fechado
+        COALESCE(responsaveis, 'Sem responsável') AS pessoa,
+        count(*)::int AS oportunidades,
+        count(*) FILTER (WHERE fase_atual IN ('Fechado Comercialmente','Captação Realizada ✅','Ônus Solicitada','Matricula Solicitada'))::int AS captados,
+        count(*) FILTER (WHERE fase_atual = 'Não Captado ❌')::int AS perdidos
       FROM pipefy_captacoes
       WHERE criado_em >= ${desde}
         AND (${bairro} = 'Todos' OR bairro = ${bairro})
         AND (${tipo}   = 'Todos' OR tipo_imovel = ${tipo})
+      GROUP BY 1 ORDER BY 2 DESC
+      LIMIT 12
     `,
   ])
 
   const f = filtrosRow[0] as { bairros: string[] | null; tipos: string[] | null }
 
   return Response.json({
-    stats:      statsRows[0],
-    motivos:    motivosRows,
-    fases:      fasesRows,
-    porBairro:  porBairroRows,
-    porTipo:    porTipoRows,
-    porMes:     porMesRows,
-    origem:     origemRows,
-    financeiro: finRows[0] ?? null,
-    bairros:    ['Todos', ...(f?.bairros ?? [])],
-    tipos:      ['Todos', ...(f?.tipos   ?? [])],
+    stats:          statsRows[0],
+    motivos:        motivosRows,
+    fases:          fasesRows,
+    porBairro:      porBairroRows,
+    porTipo:        porTipoRows,
+    porMes:         porMesRows,
+    origem:         origemRows,
+    porResponsavel: responsavelRows,
+    bairros:        ['Todos', ...(f?.bairros ?? [])],
+    tipos:          ['Todos', ...(f?.tipos   ?? [])],
   })
 }
