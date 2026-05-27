@@ -3,7 +3,7 @@
 import { useActionState, useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { signIn, resetPassword } from '@/app/actions/auth'
-import { LogoMark, APP_NAME, PATH_1, PATH_2, VIEWBOX } from '@/components/logo'
+import { PATH_1, PATH_2, VIEWBOX } from '@/components/logo'
 
 type Mode = 'login' | 'forgot' | 'forgot_sent'
 
@@ -71,19 +71,18 @@ export function LoginForm() {
       className="relative min-h-screen flex flex-col items-center justify-center p-4 overflow-hidden"
       style={{ background: BG }}
     >
-      {/* Watermark */}
+      {/* Watermark — canto inferior direito, parcialmente cortado */}
       <svg
         viewBox={VIEWBOX}
         aria-hidden
         className="absolute pointer-events-none select-none"
         style={{
-          width: 680,
-          height: Math.round(680 * 150 / 320),
+          width: 600,
+          height: Math.round(600 * 150 / 320),
           fill: LIGHT,
-          opacity: 0.07,
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
+          opacity: 0.1,
+          bottom: -60,
+          right: -80,
         }}
       >
         <path d={PATH_1} />
@@ -96,29 +95,6 @@ export function LoginForm() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: [0.2, 0.7, 0.2, 1] }}
       >
-        {/* Logo */}
-        <div className="flex flex-col items-center mb-7">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.85 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4, delay: 0.08, ease: [0.34, 1.4, 0.5, 1] }}
-          >
-            <LogoMark size={40} className="text-[#C39BD3]" />
-          </motion.div>
-          <h1
-            className="font-display text-xl font-extrabold mt-3 tracking-tight"
-            style={{ color: LIGHT }}
-          >
-            {APP_NAME}
-          </h1>
-          <p
-            className="text-[10px] font-medium tracking-widest uppercase mt-1"
-            style={{ color: 'rgba(195,155,211,0.6)' }}
-          >
-            Painel de Captação
-          </p>
-        </div>
-
         {/* Card */}
         <div className="bg-white rounded-2xl shadow-2xl p-7">
           <AnimatePresence mode="wait">
