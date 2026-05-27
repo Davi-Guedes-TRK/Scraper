@@ -44,7 +44,7 @@ export async function PATCH(req: NextRequest) {
   if (!updates.length) return Response.json({ error: 'Sem campos para atualizar' }, { status: 400 })
 
   const table = portalTable(portal)
-  const vals: unknown[] = updates.map(k => fields[k] ?? null)
+  const vals: (string | number | null)[] = updates.map(k => (fields[k] ?? null) as string | number | null)
   const sets = updates.map((k, i) => `${k}=$${i + 1}`).join(', ')
   vals.push(link)
 
