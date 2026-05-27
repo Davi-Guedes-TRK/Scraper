@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import * as XLSX from 'xlsx'
-import { createClient } from '@/lib/supabase/client'
 import { parsePreco, fmtBRL, classifyAnunciante } from '@/lib/formatters'
 import { portalTable } from '@/lib/portals'
 import { PortalBadge } from '@/components/portal-badge'
@@ -132,7 +131,6 @@ function EditEnderecoModal({ item, current, onSave, onClose }: {
 // ── RelatorioClient ────────────────────────────────────────────────────────────
 export function RelatorioClient() {
   const { toasts, toast } = useToast()
-  const supabase = useMemo(() => createClient(), [])
   const [items, setItems] = useState<Imovel[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -143,17 +141,18 @@ export function RelatorioClient() {
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const { data } = await supabase
-        .from('imoveis_todos')
-        .select('link,titulo,bairro,cidade,preco,coletado_em,descricao,pistas_ia,status_solicitacao,endereco,maps_link,visitado_em,nome_anunciante,telefone,tipo_anunciante,tipo_imovel,creci,portal')
-        .or('status_triagem.eq.aprovado,visitado_em.not.is.null')
-        .order('coletado_em', { ascending: false })
-        .range(0, 999)
-      setItems((data as Imovel[]) ?? [])
-      setLoading(false)
+      try {
+        const res = await fetch('/api/relatorio')
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        setItems(await res.json())
+      } catch (err) {
+        toast(`Erro ao carregar: ${err instanceof Error ? err.message : 'desconhecido'}`, 'error')
+      } finally {
+        setLoading(false)
+      }
     }
     load()
-  }, [supabase])
+  }, [])
 
   const toggleSelect = (link: string) => {
     setSelected(prev => {
@@ -174,11 +173,21 @@ export function RelatorioClient() {
       if (!byPortal[i.portal]) byPortal[i.portal] = []
       byPortal[i.portal].push(i.link)
     })
-    await Promise.all(
-      Object.entries(byPortal).map(([p, links]) =>
-        supabase.from(portalTable(p)).update({ status_solicitacao: status }).in('link', links)
-      )
-    )
+    try {
+      const res = await fetch('/api/relatorio', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'status_solicitacao', byPortal, status }),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        toast(`Erro: ${d.error ?? res.status}`, 'error')
+        return
+      }
+    } catch (err) {
+      toast(`Erro: ${err instanceof Error ? err.message : 'desconhecido'}`, 'error')
+      return
+    }
     setItems(prev => prev.map(i => selected.has(i.link) ? { ...i, status_solicitacao: status } : i))
     const count = selected.size
     setSelected(new Set())
@@ -246,11 +255,21 @@ export function RelatorioClient() {
   }
 
   const saveEndereco = async (item: Imovel, newEndereco: string) => {
-    const { error } = await supabase
-      .from(portalTable(item.portal))
-      .update({ endereco: newEndereco })
-      .eq('link', item.link)
-    if (error) { toast(`Erro: ${error.message}`, 'error'); return }
+    try {
+      const res = await fetch('/api/relatorio', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'endereco', link: item.link, portal: item.portal, endereco: newEndereco }),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        toast(`Erro: ${d.error ?? res.status}`, 'error')
+        return
+      }
+    } catch (err) {
+      toast(`Erro: ${err instanceof Error ? err.message : 'desconhecido'}`, 'error')
+      return
+    }
     setItems(prev => prev.map(i => i.link === item.link ? { ...i, endereco: newEndereco } : i))
     setEditItem(null)
     toast('Endereço atualizado', 'success')

@@ -1,6 +1,7 @@
-import { pgTable, text, boolean, timestamp, jsonb, real } from 'drizzle-orm/pg-core'
+import { pgTable, text, boolean, timestamp, jsonb, doublePrecision, bigint } from 'drizzle-orm/pg-core'
 
 const imoveisBase = {
+  id: bigint('id', { mode: 'number' }),
   link: text('link').primaryKey(),
   titulo: text('titulo'),
   preco: text('preco'),
@@ -20,6 +21,7 @@ const imoveisBase = {
   creci: text('creci'),
   id_anuncio: text('id_anuncio'),
   data_publicacao: text('data_publicacao'),
+  data_anuncio: text('data_anuncio'),
   dados_brutos: jsonb('dados_brutos'),
   imagens: text('imagens'),
   coletado_em: timestamp('coletado_em', { withTimezone: true }),
@@ -33,11 +35,15 @@ const imoveisBase = {
   status_triagem: text('status_triagem'),
   status_solicitacao: text('status_solicitacao'),
   visitado_em: timestamp('visitado_em', { withTimezone: true }),
+  geocoded_em: timestamp('geocoded_em', { withTimezone: true }),
   pistas_ia: jsonb('pistas_ia'),
+  pistas_imagem: jsonb('pistas_imagem'),
   maps_link: text('maps_link'),
-  lat: real('lat'),
-  lng: real('lng'),
+  lat: doublePrecision('lat'),
+  lng: doublePrecision('lng'),
   endereco: text('endereco'),
+  endereco_norm: text('endereco_norm'),
+  predio_id: text('predio_id'),
 }
 
 export const imoveisOlx = pgTable('imoveis_olx', imoveisBase)

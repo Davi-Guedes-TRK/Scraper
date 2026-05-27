@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import sql from '@/lib/db'
+import { log } from '@/lib/logger'
 
 const ALLOWED_TABLES = ['imoveis_olx', 'imoveis_dfimoveis', 'imoveis_wimoveis', 'imoveis_facebook'] as const
 type AllowedTable = (typeof ALLOWED_TABLES)[number]
@@ -114,7 +115,9 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  console.log(`[api/imoveis] ${portal} → ${table}: ${inserted} inseridos, ${updated} atualizados, ${errors.length} erros`)
+  await log('info', 'scraper-ingest', 'Lote recebido', {
+    portal, count: items.length, inseridos: inserted, atualizados: updated, erros: errors.length,
+  })
 
   return NextResponse.json({ ok: true, inserted, updated, errors })
 }

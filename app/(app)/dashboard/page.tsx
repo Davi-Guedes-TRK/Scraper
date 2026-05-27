@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
-import { classifyAnunciante, parsePreco, daysAgo, startOfToday } from '@/lib/formatters'
+import { classifyAnunciante, daysAgo, startOfToday } from '@/lib/formatters'
 import { PORTALS, portalKeys } from '@/lib/portals'
+import { withCache } from '@/lib/redis'
 import { DashboardClient } from './dashboard-client'
 
 export const metadata = { title: 'Dashboard · TRK Imóveis' }
@@ -19,30 +20,46 @@ async function getDashboardData() {
     return c ?? 0
   }
 
-  const [pendentes, paraVisitar, visitados, aprovados, solicitados, recebidos, alertasRaw, chartRaw, filaRaw, col7Raw, colPrevRaw] =
-    await Promise.all([
+  // Counts do funil e gráfico — cacheados 60s (dados pesados, tolerantes a leve delay)
+  const today = startOfToday()
+  const cached = await withCache('dashboard:counts', 60, async () => {
+    const [p, pv, v, ap, sol, rec, chart, col7, colPrev] = await Promise.all([
       count([['status_triagem', 'eq', 'pendente']]),
       count([['status_triagem', 'eq', 'para_visitar'], ['visitado_em', 'isnull', null]]),
       count([['visitado_em', 'notnull', null]]),
       count([['status_triagem', 'eq', 'aprovado']]),
       count([['status_solicitacao', 'eq', 'enviado']]),
       count([['status_solicitacao', 'eq', 'recebido']]),
+      supabase.from('imoveis_todos').select('coletado_em,portal').gte('coletado_em', daysAgo(7)),
+      supabase.from('imoveis_todos').select('*', { count: 'exact', head: true }).gte('coletado_em', daysAgo(7)),
+      supabase.from('imoveis_todos').select('*', { count: 'exact', head: true }).gte('coletado_em', daysAgo(14)).lt('coletado_em', daysAgo(7)),
+    ])
+    return { p, pv, v, ap, sol, rec, chartData: chart.data, col7: col7.count ?? 0, colPrev: colPrev.count ?? 0 }
+  })
+
+  const pendentes   = cached.p
+  const paraVisitar = cached.pv
+  const visitados   = cached.v
+  const aprovados   = cached.ap
+  const solicitados = cached.sol
+  const recebidos   = cached.rec
+  const col7Raw     = { count: cached.col7 }
+  const colPrevRaw  = { count: cached.colPrev }
+  const chartRaw    = { data: cached.chartData }
+
+  // Alertas e fila — sempre frescos (mostram dados de hoje/agora)
+  const [alertasRaw, filaRaw] = await Promise.all([
       supabase.from('imoveis_todos')
         .select('link,titulo,bairro,cidade,preco,descricao,creci,nome_anunciante,tipo_anunciante,coletado_em,portal')
         .eq('status_triagem', 'pendente')
-        .gte('coletado_em', startOfToday())
+        .gte('coletado_em', today)
         .order('coletado_em', { ascending: false })
         .limit(50),
-      supabase.from('imoveis_todos')
-        .select('coletado_em,portal')
-        .gte('coletado_em', daysAgo(7)),
       supabase.from('imoveis_todos')
         .select('link,titulo,bairro,cidade,preco,descricao,creci,nome_anunciante,tipo_anunciante,coletado_em,portal')
         .eq('status_triagem', 'pendente')
         .order('coletado_em', { ascending: false })
         .limit(8),
-      supabase.from('imoveis_todos').select('*', { count: 'exact', head: true }).gte('coletado_em', daysAgo(7)),
-      supabase.from('imoveis_todos').select('*', { count: 'exact', head: true }).gte('coletado_em', daysAgo(14)).lt('coletado_em', daysAgo(7)),
     ])
 
   const funnelCounts: Record<string, number> = {

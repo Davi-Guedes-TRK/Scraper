@@ -1,12 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { timeAgo, startOfToday, daysAgo } from '@/lib/formatters'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { timeAgo } from '@/lib/formatters'
 
 const PORTALS = [
-  { key: 'dfimoveis', label: 'DFImóveis', table: 'imoveis_dfimoveis' },
-  { key: 'olx',       label: 'OLX Brasil', table: 'imoveis_olx' },
+  { key: 'dfimoveis', label: 'DFImóveis' },
+  { key: 'olx',       label: 'OLX Brasil' },
 ] as const
 
 type PortalDef = typeof PORTALS[number]
@@ -106,7 +105,7 @@ type PortalStats = {
   ultimoLog: ScraperLog | null
 }
 
-function PortalCard({ portal, supabase }: { portal: PortalDef; supabase: ReturnType<typeof createClient> }) {
+function PortalCard({ portal }: { portal: PortalDef }) {
   const [stats, setStats] = useState<PortalStats | null>(null)
   const [statsLoading, setStatsLoading] = useState(true)
   const [logsOpen, setLogsOpen] = useState(false)
@@ -116,36 +115,24 @@ function PortalCard({ portal, supabase }: { portal: PortalDef; supabase: ReturnT
   useEffect(() => {
     async function load() {
       setStatsLoading(true)
-      const today = startOfToday()
-      const d3 = daysAgo(3)
-
-      const [lastRec, cToday, c3d, lastLog] = await Promise.all([
-        supabase.from(portal.table).select('coletado_em').order('coletado_em', { ascending: false }).limit(1).single(),
-        supabase.from(portal.table).select('*', { count: 'exact', head: true }).gte('coletado_em', today),
-        supabase.from(portal.table).select('*', { count: 'exact', head: true }).gte('coletado_em', d3),
-        supabase.from('scraper_logs').select('*').eq('portal', portal.key).order('created_at', { ascending: false }).limit(1).single(),
-      ])
-
-      setStats({
-        ultimoRegistro: (lastRec.data as { coletado_em: string } | null)?.coletado_em ?? null,
-        countToday: cToday.count ?? 0,
-        count3d: c3d.count ?? 0,
-        status: (lastLog.data as ScraperLog | null)?.status ?? 'desconhecido',
-        ultimoLog: (lastLog.data as ScraperLog | null),
-      })
-      setStatsLoading(false)
+      try {
+        const res = await fetch(`/api/scrapers/stats?portal=${portal.key}`)
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        setStats(await res.json())
+      } catch { /* mostra vazio */ }
+      finally { setStatsLoading(false) }
     }
     load()
-  }, [portal.key, portal.table, supabase])
+  }, [portal.key])
 
   const openLogs = async () => {
     setLogsOpen(true)
     setLogsLoading(true)
-    const { data } = await supabase
-      .from('scraper_logs').select('*').eq('portal', portal.key)
-      .order('created_at', { ascending: false }).limit(20)
-    setLogs((data as ScraperLog[]) ?? [])
-    setLogsLoading(false)
+    try {
+      const res = await fetch(`/api/scrapers/logs?portal=${portal.key}`)
+      if (res.ok) setLogs(await res.json())
+    } catch { /* silencioso */ }
+    finally { setLogsLoading(false) }
   }
 
   return (
@@ -450,8 +437,6 @@ function RunPanel() {
 
 // ── ScrapersClient ─────────────────────────────────────────────────────────────
 export function ScrapersClient() {
-  const supabase = useMemo(() => createClient(), [])
-
   return (
     <div className="p-6 max-w-5xl mx-auto flex flex-col gap-8">
       <div>
@@ -462,7 +447,7 @@ export function ScrapersClient() {
       <div className="flex flex-col gap-3">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-[#656d76]">Monitores</h2>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {PORTALS.map(p => <PortalCard key={p.key} portal={p} supabase={supabase} />)}
+          {PORTALS.map(p => <PortalCard key={p.key} portal={p} />)}
         </div>
       </div>
 

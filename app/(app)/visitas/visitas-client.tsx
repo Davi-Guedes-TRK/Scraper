@@ -4,9 +4,7 @@ import 'leaflet/dist/leaflet.css'
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { MapContainer, TileLayer, Marker, CircleMarker, useMap } from 'react-leaflet'
 import L from 'leaflet'
-import { createClient } from '@/lib/supabase/client'
 import { parsePreco, fmtBRL, parseLatLng } from '@/lib/formatters'
-import { portalTable } from '@/lib/portals'
 import { PortalBadge } from '@/components/portal-badge'
 
 const BRASILIA_CENTER: [number, number] = [-15.7942, -47.8825]
@@ -226,7 +224,6 @@ function RouteItemCard({ item, index, active, onSelect, onMarkVisited }: {
 // ── VisitasClient ──────────────────────────────────────────────────────────────
 export function VisitasClient() {
   const { toasts, toast } = useToast()
-  const supabase = useMemo(() => createClient(), [])
   const [items, setItems] = useState<RouteItem[]>([])
   const [loading, setLoading] = useState(true)
   const [location, setLocation] = useState<Coords | null>(null)
@@ -238,18 +235,19 @@ export function VisitasClient() {
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const { data } = await supabase
-        .from('imoveis_todos')
-        .select('link,titulo,bairro,preco,endereco,maps_link,lat,lng,portal')
-        .eq('status_triagem', 'para_visitar')
-        .is('visitado_em', null)
-        .range(0, 999)
-      const rows = (data as Imovel[] ?? []).map(i => ({ ...i, coords: resolveCoords(i), distKm: null }))
-      setItems(rows)
-      setLoading(false)
+      try {
+        const res = await fetch('/api/visitas')
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const rows: Imovel[] = await res.json()
+        setItems(rows.map(i => ({ ...i, coords: resolveCoords(i), distKm: null })))
+      } catch (err) {
+        toast(`Erro ao carregar: ${err instanceof Error ? err.message : 'desconhecido'}`, 'error')
+      } finally {
+        setLoading(false)
+      }
     }
     load()
-  }, [supabase])
+  }, [])
 
   const route = useMemo<RouteItem[]>(() => {
     if (location) return nearestNeighbor(location, items)
@@ -277,29 +275,56 @@ export function VisitasClient() {
     if (url) window.open(url, '_blank')
   }
 
+  const patch = async (body: Record<string, unknown>) => {
+    const res = await fetch('/api/visitas', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}))
+      throw new Error(d.error ?? `HTTP ${res.status}`)
+    }
+  }
+
   const markVisited = async (item: RouteItem, endereco: string) => {
-    const table = portalTable(item.portal)
-    const { error } = await supabase.from(table).update({
-      visitado_em: new Date().toISOString(),
-      endereco: endereco || item.endereco || null,
-    }).eq('link', item.link)
-    if (error) { toast(`Erro: ${error.message}`, 'error'); return }
+    try {
+      await patch({
+        link: item.link,
+        portal: item.portal,
+        visitado_em: new Date().toISOString(),
+        endereco: endereco || item.endereco || null,
+      })
+    } catch (err) {
+      toast(`Erro: ${err instanceof Error ? err.message : 'desconhecido'}`, 'error')
+      return
+    }
+
     setItems(prev => prev.filter(i => i.link !== item.link))
     setMarking(null)
+    toast('Visitado → enviado ao cartório', 'success')
 
+    // geocodificação não-crítica: fire-and-forget
     if (endereco && endereco !== item.endereco) {
       fetch('/api/geocodificar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ endereco }),
-      }).then(r => r.json()).then((geo: { lat?: number; lng?: number; endereco_norm?: string }) => {
-        if (geo.lat && geo.lng) {
-          supabase.from(table).update({ lat: geo.lat, lng: geo.lng, geocoded_em: new Date().toISOString() }).eq('link', item.link)
-        }
-      }).catch(() => { /* non-critical */ })
+      })
+        .then(r => r.json())
+        .then((geo: { lat?: number; lng?: number }) => {
+          if (geo.lat && geo.lng) {
+            patch({
+              link: item.link,
+              portal: item.portal,
+              lat: geo.lat,
+              lng: geo.lng,
+              geocoded_em: new Date().toISOString(),
+            }).catch(() => {})
+          }
+        })
+        .catch(() => {})
     }
-
-    toast('Visitado → enviado ao cartório', 'success')
   }
 
   return (

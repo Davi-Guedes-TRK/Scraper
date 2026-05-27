@@ -2,9 +2,8 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-import { classifyAnunciante, parsePreco, fmtBRL, timeAgo, allImgs, parseLatLng, dedupKey, daysAgo, startOfToday } from '@/lib/formatters'
-import { portalLabel, portalTable } from '@/lib/portals'
+import { classifyAnunciante, parsePreco, fmtBRL, timeAgo, allImgs, dedupKey, startOfToday } from '@/lib/formatters'
+import { portalLabel } from '@/lib/portals'
 import { PortalBadge } from '@/components/portal-badge'
 import { MatriculaModal } from './matricula-modal'
 
@@ -80,22 +79,6 @@ function timeAnunciado(pub: string | null | undefined) {
   return `anunciado há ${d} dias`
 }
 
-async function fetchAllRows(
-  buildQuery: (from: number, to: number) => PromiseLike<{ data: Imovel[] | null; error: unknown }>
-): Promise<Imovel[]> {
-  const PAGE = 1000
-  let offset = 0
-  const rows: Imovel[] = []
-  while (true) {
-    const { data, error } = await buildQuery(offset, offset + PAGE - 1)
-    if (error || !data?.length) break
-    rows.push(...data)
-    if (data.length < PAGE) break
-    offset += PAGE
-  }
-  return rows
-}
-
 // ── Lightbox ───────────────────────────────────────────────────────────────────
 function Lightbox({ imgs, startIdx, title, onClose }: { imgs: string[]; startIdx: number; title?: string | null; onClose: () => void }) {
   const [idx, setIdx] = useState(startIdx)
@@ -158,15 +141,22 @@ function ReviewPanel({ item, onApprove, onVisitar, onDiscard, onClose }: {
   const [zoom, setZoom] = useState(false)
   const [zoomIdx, setZoomIdx] = useState(0)
   const [matriculaOpen, setMatriculaOpen] = useState(false)
+  const [descricao, setDescricao] = useState<string | null>(null)
 
   useEffect(() => {
     setEndereco('')
     setMapsLink('')
+    setDescricao(null)
     if (item.pistas_ia) {
       const p = item.pistas_ia as Record<string, string>
       const parts = [p.quadra, p.conjunto, p.casa_lote].filter(Boolean)
       if (parts.length) setEndereco(parts.join(', '))
     }
+    // lazy-load descrição
+    fetch(`/api/triagem/detalhe?link=${encodeURIComponent(item.link)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.descricao) setDescricao(d.descricao) })
+      .catch(() => {})
   }, [item.link, item.pistas_ia])
 
   const preco = parsePreco(item.preco)
@@ -268,13 +258,13 @@ function ReviewPanel({ item, onApprove, onVisitar, onDiscard, onClose }: {
             </div>
           )}
 
-          {item.descricao && (
+          {descricao && (
             <div className="rounded-lg border border-border overflow-hidden" style={{ background: 'var(--muted)' }}>
               <p className="text-[9px] font-bold uppercase tracking-wider px-2.5 pt-2 pb-0.5 font-mono text-muted-foreground">
                 {item.portal === 'olx' ? 'Características' : 'Descrição'}
               </p>
               <div className="text-[11px] text-muted-foreground leading-relaxed whitespace-pre-line px-2.5 pb-2 max-h-28 overflow-y-auto">
-                {item.descricao}
+                {descricao}
               </div>
             </div>
           )}
@@ -489,7 +479,6 @@ function ImovelCard({ item, fsbo, dups, onReview, selected }: {
 // ── TriagemClient ──────────────────────────────────────────────────────────────
 export function TriagemClient() {
   const { toasts, toast } = useToast()
-  const supabase = useMemo(() => createClient(), [])
   const searchParams = useSearchParams()
   const q = (searchParams.get('q') ?? '').toLowerCase().trim()
   const [items, setItems] = useState<Imovel[]>([])
@@ -525,22 +514,19 @@ export function TriagemClient() {
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const cutoff = daysAgo(30)
-      const rows = await fetchAllRows((from, to) =>
-        supabase
-          .from('imoveis_todos')
-          .select('link,titulo,preco,bairro,cidade,area_m2,quartos,descricao,imagens,coletado_em,data_publicacao,pistas_ia,tipo_imovel,creci,nome_anunciante,tipo_anunciante,portal')
-          .eq('status_triagem', 'pendente')
-          .neq('creci', '22784')
-          .gte('coletado_em', cutoff)
-          .order('coletado_em', { ascending: false })
-          .range(from, to)
-      )
-      setItems(rows)
-      setLoading(false)
+      try {
+        const res = await fetch('/api/triagem')
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const rows: Imovel[] = await res.json()
+        setItems(rows)
+      } catch (err) {
+        toast(`Erro ao carregar: ${err instanceof Error ? err.message : 'desconhecido'}`, 'error')
+      } finally {
+        setLoading(false)
+      }
     }
     load()
-  }, [supabase])
+  }, [])
 
   const bairros = useMemo(() => {
     const set = new Set(items.map(i => getRegiao(i)).filter(Boolean))
@@ -606,17 +592,22 @@ export function TriagemClient() {
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
   const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
-  const updateStatus = async (item: Imovel, status: string, extra: Record<string, unknown> = {}) => {
-    const table = portalTable(item.portal)
-    let geoFields: Record<string, unknown> = {}
-    if (['aprovado', 'para_visitar'].includes(status) && extra.maps_link) {
-      const parsed = parseLatLng(extra.maps_link as string)
-      if (parsed) geoFields = { lat: parsed.lat, lng: parsed.lng, geocoded_em: new Date().toISOString() }
+  const updateStatus = async (item: Imovel, status: string, extra: { endereco?: string; maps_link?: string } = {}) => {
+    try {
+      const res = await fetch('/api/triagem', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ link: item.link, portal: item.portal, status, ...extra }),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        toast(`Erro ao atualizar: ${d.error ?? res.status}`, 'error')
+        return false
+      }
+    } catch (err) {
+      toast(`Erro ao atualizar: ${err instanceof Error ? err.message : 'desconhecido'}`, 'error')
+      return false
     }
-    const { error } = await supabase.from(table)
-      .update({ status_triagem: status, ...extra, ...geoFields })
-      .eq('link', item.link)
-    if (error) { toast(`Erro ao atualizar: ${error.message}`, 'error'); return false }
     setItems(prev => prev.filter(i => i.link !== item.link))
     const msg = { aprovado: 'Imóvel aprovado', para_visitar: 'Enviado para visitas', descartado: 'Imóvel descartado' }[status] ?? 'Atualizado'
     toast(msg, status === 'descartado' ? 'info' : 'success')
@@ -625,11 +616,11 @@ export function TriagemClient() {
   }
 
   const handleApprove = async (item: Imovel, data: { endereco: string; mapsLink: string }) => {
-    const ok = await updateStatus(item, 'aprovado', { endereco: data.endereco || null, maps_link: data.mapsLink || null })
+    const ok = await updateStatus(item, 'aprovado', { endereco: data.endereco || undefined, maps_link: data.mapsLink || undefined })
     if (ok) setReviewItem(null)
   }
   const handleVisitar = async (item: Imovel, data: { endereco: string; mapsLink: string }) => {
-    const ok = await updateStatus(item, 'para_visitar', { endereco: data.endereco || null, maps_link: data.mapsLink || null })
+    const ok = await updateStatus(item, 'para_visitar', { endereco: data.endereco || undefined, maps_link: data.mapsLink || undefined })
     if (ok) setReviewItem(null)
   }
   const handleDiscard = async (item: Imovel) => {
