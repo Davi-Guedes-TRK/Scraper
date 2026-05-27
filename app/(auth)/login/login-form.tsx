@@ -13,17 +13,19 @@ const initialReset = { error: null, sent: false }
 const BG = '#4A235A'
 const LIGHT = '#C39BD3'
 
-function FloatingInput({
+function Field({
   name, type = 'text', label, value, onChange, autoFocus,
 }: {
   name: string; type?: string; label: string
   value?: string; onChange?: (v: string) => void; autoFocus?: boolean
 }) {
   const [focused, setFocused] = useState(false)
-  const hasValue = !!value
 
   return (
-    <div className="relative">
+    <div className="flex flex-col gap-1.5">
+      <label className="text-xs font-semibold tracking-widest uppercase" style={{ color: '#64748b' }}>
+        {label}
+      </label>
       <input
         name={name}
         type={type}
@@ -33,27 +35,12 @@ function FloatingInput({
         onChange={e => onChange?.(e.target.value)}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        placeholder=" "
-        className="peer w-full pt-5 pb-2 px-3.5 rounded-lg text-sm text-slate-900 outline-none transition-all duration-200 bg-white"
+        className="w-full h-10 px-3.5 rounded-lg text-sm text-slate-900 outline-none transition-all duration-150 bg-slate-50"
         style={{
           border: `1.5px solid ${focused ? BG : '#e2e8f0'}`,
           boxShadow: focused ? '0 0 0 3px rgba(74,35,90,0.12)' : 'none',
         }}
       />
-      <label
-        className="absolute left-3.5 pointer-events-none transition-all duration-200"
-        style={{
-          top: focused || hasValue ? '7px' : '50%',
-          transform: focused || hasValue ? 'translateY(0)' : 'translateY(-50%)',
-          fontSize: focused || hasValue ? '10px' : '14px',
-          color: focused ? BG : '#94a3b8',
-          fontWeight: focused || hasValue ? 600 : 400,
-          letterSpacing: focused || hasValue ? '0.04em' : '0',
-          textTransform: focused || hasValue ? 'uppercase' : 'none',
-        }}
-      >
-        {label}
-      </label>
     </div>
   )
 }
@@ -110,8 +97,8 @@ export function LoginForm() {
                 <p className="text-slate-500 text-sm mb-6">Acesse sua conta para continuar.</p>
 
                 <form action={loginAction} className="flex flex-col gap-3">
-                  <FloatingInput name="email" type="email" label="Email" value={email} onChange={setEmail} autoFocus />
-                  <FloatingInput name="password" type="password" label="Senha" />
+                  <Field name="email" type="email" label="Email" value={email} onChange={setEmail} autoFocus />
+                  <Field name="password" type="password" label="Senha" />
 
                   <AnimatePresence>
                     {loginState.error && (
@@ -172,7 +159,7 @@ export function LoginForm() {
                 <p className="text-slate-500 text-sm mb-6">Enviaremos um link ao seu email.</p>
 
                 <form action={resetAction} className="flex flex-col gap-3">
-                  <FloatingInput name="email" type="email" label="Email" value={email} onChange={setEmail} autoFocus />
+                  <Field name="email" type="email" label="Email" value={email} onChange={setEmail} autoFocus />
 
                   {resetState.error && (
                     <p className="text-xs text-red-600 rounded-lg px-3 py-2 bg-red-50 border border-red-200">
