@@ -1,14 +1,22 @@
 import { NextRequest } from 'next/server'
 import sql from '@/lib/db'
 
-const DESDE = '2024-01-01'
+function resolverDesde(range: string): string {
+  const d = new Date()
+  if (range === '7d')  { d.setDate(d.getDate() - 7);   return d.toISOString().slice(0, 10) }
+  if (range === '30d') { d.setDate(d.getDate() - 30);  return d.toISOString().slice(0, 10) }
+  if (range === '90d') { d.setDate(d.getDate() - 90);  return d.toISOString().slice(0, 10) }
+  if (range === 'ano') { return `${d.getFullYear()}-01-01` }
+  return '2024-01-01' // tudo
+}
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
-  const bairro = searchParams.get('bairro') ?? 'Todos'
+  const bairro = searchParams.get('bairro')      ?? 'Todos'
   const tipo   = searchParams.get('tipo_imovel') ?? 'Todos'
+  const desde  = resolverDesde(searchParams.get('range') ?? 'tudo')
 
-  const [statsRows, motivosRows, fasesRows, porBairroRows, porTipoRows, porMesRows, filtrosRow] = await Promise.all([
+  const [statsRows, motivosRows, fasesRows, porBairroRows, porTipoRows, porMesRows, origemRows, filtrosRow] = await Promise.all([
     sql`
       SELECT
         count(*)::int AS oportunidades,
@@ -18,14 +26,14 @@ export async function GET(req: NextRequest) {
         round(count(*) FILTER (WHERE fase_atual = 'Não Captado ❌') * 100.0 / NULLIF(count(*), 0), 1)::float AS taxa_perda,
         count(*) FILTER (WHERE fase_atual NOT IN ('Não Captado ❌','Captação Realizada ✅','Fechado Comercialmente','Matricula Solicitada','Ônus Solicitada','Locado / Retirado'))::int AS em_andamento
       FROM pipefy_captacoes
-      WHERE criado_em >= ${DESDE}
+      WHERE criado_em >= ${desde}
         AND (${bairro} = 'Todos' OR bairro = ${bairro})
         AND (${tipo}   = 'Todos' OR tipo_imovel = ${tipo})
     `,
     sql`
       SELECT COALESCE(motivo_nao_captacao, 'Sem registro') AS motivo, count(*)::int AS total
       FROM pipefy_captacoes
-      WHERE criado_em >= ${DESDE} AND fase_atual = 'Não Captado ❌'
+      WHERE criado_em >= ${desde} AND fase_atual = 'Não Captado ❌'
         AND (${bairro} = 'Todos' OR bairro = ${bairro})
         AND (${tipo}   = 'Todos' OR tipo_imovel = ${tipo})
       GROUP BY 1 ORDER BY 2 DESC
@@ -33,7 +41,7 @@ export async function GET(req: NextRequest) {
     sql`
       SELECT COALESCE(fase_atual, 'Sem fase') AS fase, count(*)::int AS cards
       FROM pipefy_captacoes
-      WHERE criado_em >= ${DESDE}
+      WHERE criado_em >= ${desde}
         AND (${bairro} = 'Todos' OR bairro = ${bairro})
         AND (${tipo}   = 'Todos' OR tipo_imovel = ${tipo})
       GROUP BY 1 ORDER BY 2 DESC
@@ -44,7 +52,7 @@ export async function GET(req: NextRequest) {
         count(*) FILTER (WHERE fase_atual = 'Não Captado ❌')::int AS perdidos,
         count(*) FILTER (WHERE fase_atual IN ('Fechado Comercialmente', 'Captação Realizada ✅'))::int AS captados
       FROM pipefy_captacoes
-      WHERE criado_em >= ${DESDE}
+      WHERE criado_em >= ${desde}
         AND (${tipo} = 'Todos' OR tipo_imovel = ${tipo})
       GROUP BY 1 ORDER BY 2 DESC
     `,
@@ -54,17 +62,36 @@ export async function GET(req: NextRequest) {
         count(*) FILTER (WHERE fase_atual = 'Não Captado ❌')::int AS perdidos,
         count(*) FILTER (WHERE fase_atual IN ('Fechado Comercialmente', 'Captação Realizada ✅'))::int AS captados
       FROM pipefy_captacoes
-      WHERE criado_em >= ${DESDE}
+      WHERE criado_em >= ${desde}
         AND (${bairro} = 'Todos' OR bairro = ${bairro})
       GROUP BY 1 ORDER BY 2 DESC
     `,
     sql`
       SELECT to_char(date_trunc('month', criado_em), 'YYYY-MM') AS mes, count(*)::int AS oportunidades
       FROM pipefy_captacoes
-      WHERE criado_em >= ${DESDE}
+      WHERE criado_em >= ${desde}
         AND (${bairro} = 'Todos' OR bairro = ${bairro})
         AND (${tipo}   = 'Todos' OR tipo_imovel = ${tipo})
       GROUP BY 1 ORDER BY 1
+    `,
+    sql`
+      SELECT
+        CASE
+          WHEN links_anuncio ILIKE '%dfimoveis%' THEN 'DFImóveis'
+          WHEN links_anuncio ILIKE '%wimoveis%'  THEN 'WImóveis'
+          WHEN links_anuncio ILIKE '%olx%'       THEN 'OLX'
+          WHEN links_anuncio ILIKE '%facebook%'  THEN 'Facebook'
+          WHEN links_anuncio ILIKE '%nidos%'     THEN 'Nidos'
+          WHEN links_anuncio IS NOT NULL          THEN 'Outro'
+          ELSE 'Sem link'
+        END AS origem,
+        count(*)::int AS total,
+        count(*) FILTER (WHERE fase_atual IN ('Fechado Comercialmente', 'Captação Realizada ✅'))::int AS captados
+      FROM pipefy_captacoes
+      WHERE criado_em >= ${desde}
+        AND (${bairro} = 'Todos' OR bairro = ${bairro})
+        AND (${tipo}   = 'Todos' OR tipo_imovel = ${tipo})
+      GROUP BY 1 ORDER BY 2 DESC
     `,
     sql`
       SELECT
@@ -83,6 +110,7 @@ export async function GET(req: NextRequest) {
     porBairro: porBairroRows,
     porTipo:   porTipoRows,
     porMes:    porMesRows,
+    origem:    origemRows,
     bairros:   ['Todos', ...(f?.bairros ?? [])],
     tipos:     ['Todos', ...(f?.tipos   ?? [])],
   })
