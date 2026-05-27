@@ -17,12 +17,12 @@ type Stats = {
   dias_leads: number | null; dias_contato: number | null
   dias_visita: number | null; dias_fechado: number | null
 }
-type Motivo         = { motivo: string; total: number }
-type Fase           = { fase: string; cards: number }
-type PorBairro      = { bairro: string; oportunidades: number; perdidos: number; captados: number; valor_medio: number | null }
-type PorTipo        = { tipo: string;   oportunidades: number; perdidos: number; captados: number; valor_medio: number | null }
-type PorMes         = { mes: string; oportunidades: number; captados: number; ticket_medio: number | null }
-type Origem         = { origem: string; total: number; captados: number }
+type Motivo = { motivo: string; total: number }
+type Fase = { fase: string; cards: number }
+type PorBairro = { bairro: string; oportunidades: number; perdidos: number; captados: number; valor_medio: number | null }
+type PorTipo = { tipo: string; oportunidades: number; perdidos: number; captados: number; valor_medio: number | null }
+type PorMes = { mes: string; oportunidades: number; captados: number; ticket_medio: number | null }
+type Origem = { origem: string; total: number; captados: number }
 type PorResponsavel = { pessoa: string; oportunidades: number; captados: number; perdidos: number }
 
 type Data = {
@@ -37,47 +37,47 @@ type Data = {
 
 const C = {
   oportunidades: '#6366f1',
-  leads:         '#8b5cf6',
-  visitados:     '#f59e0b',
-  captados:      '#22c55e',
-  perda:         '#ef4444',
-  andamento:     '#06b6d4',
-  perdidos:      '#ef4444',
+  leads: '#8b5cf6',
+  visitados: '#f59e0b',
+  captados: '#22c55e',
+  perda: '#ef4444',
+  andamento: '#06b6d4',
+  perdidos: '#ef4444',
 }
 
-const DONUT_COLORS = ['#ef4444','#f97316','#eab308','#06b6d4','#8b5cf6','#ec4899','#6366f1','#22c55e','#14b8a6']
+const DONUT_COLORS = ['#ef4444', '#f97316', '#eab308', '#06b6d4', '#8b5cf6', '#ec4899', '#6366f1', '#22c55e', '#14b8a6']
 
 const FASES_CORES: Record<string, string> = {
-  'Leads':                   '#8b5cf6',
-  'Em Contato':              '#06b6d4',
-  'Lead Completo':           '#6366f1',
-  'Para Visitar':            '#f59e0b',
-  'Visita':                  '#f59e0b',
-  'Captação Realizada ✅':   '#22c55e',
-  'Avaliação':               '#f97316',
-  'Fechado Comercialmente':  '#16a34a',
-  'Matricula Solicitada':    '#10b981',
-  'Ônus Solicitada':         '#10b981',
-  'Não Captado ❌':          '#ef4444',
-  'Locado / Retirado':       '#94a3b8',
+  'Leads': '#8b5cf6',
+  'Em Contato': '#06b6d4',
+  'Lead Completo': '#6366f1',
+  'Para Visitar': '#f59e0b',
+  'Visita': '#f59e0b',
+  'Captação Realizada ✅': '#22c55e',
+  'Avaliação': '#f97316',
+  'Fechado Comercialmente': '#16a34a',
+  'Matricula Solicitada': '#10b981',
+  'Ônus Solicitada': '#10b981',
+  'Não Captado ❌': '#ef4444',
+  'Locado / Retirado': '#94a3b8',
 }
 
 const ORIGEM_CORES: Record<string, string> = {
   'DFImóveis': '#0ea5e9',
-  'WImóveis':  '#22c55e',
-  'OLX':       '#f97316',
-  'Facebook':  '#3b82f6',
-  'Nidos':     '#8b5cf6',
-  'Outro':     '#a78bfa',
-  'Sem link':  '#94a3b8',
+  'WImóveis': '#22c55e',
+  'OLX': '#f97316',
+  'Facebook': '#3b82f6',
+  'Nidos': '#8b5cf6',
+  'Outro': '#a78bfa',
+  'Sem link': '#94a3b8',
 }
 
 const RANGE_OPTS = [
   { value: 'tudo', label: 'Desde 2024' },
-  { value: 'ano',  label: 'Este ano'   },
-  { value: '90d',  label: 'Últ. 90d'  },
-  { value: '30d',  label: 'Últ. 30d'  },
-  { value: '7d',   label: 'Últ. 7d'   },
+  { value: 'ano', label: 'Este ano' },
+  { value: '90d', label: 'Últ. 90d' },
+  { value: '30d', label: 'Últ. 30d' },
+  { value: '7d', label: 'Últ. 7d' },
 ]
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -89,7 +89,7 @@ function fmtMes(mes: string) {
 
 function fmtK(n: number | null | undefined): string | null {
   if (!n || n <= 0) return null
-  return n >= 1000 ? `ø R$${Math.round(n / 1000)}k` : `ø R$${n}`
+  return n >= 1000 ? `R$${Math.round(n / 1000)}k` : `R$${n}`
 }
 
 function convColor(pct: number) {
@@ -113,10 +113,10 @@ function PanelCard({ title, children, className = '' }: { title: string; childre
 function FunilVisual({ stats }: { stats: Stats }) {
   const max = stats.oportunidades || 1
   const stages = [
-    { label: 'Oportunidades', value: stats.oportunidades, color: C.oportunidades, valor: stats.valor_medio_geral,     time: null },
-    { label: 'c/ Contato',    value: stats.leads,          color: C.leads,          valor: stats.valor_medio_leads,    time: stats.dias_leads },
-    { label: 'Visitados',     value: stats.visitados,      color: C.visitados,      valor: stats.valor_medio_visitados, time: stats.dias_visita },
-    { label: 'Captados',      value: stats.captados,       color: C.captados,       valor: stats.valor_medio_captados, time: stats.dias_fechado },
+    { label: 'Oportunidades', value: stats.oportunidades, color: C.oportunidades, valor: stats.valor_medio_geral, time: null },
+    { label: 'c/ Contato', value: stats.leads, color: C.leads, valor: stats.valor_medio_leads, time: stats.dias_leads },
+    { label: 'Visitados', value: stats.visitados, color: C.visitados, valor: stats.valor_medio_visitados, time: stats.dias_visita },
+    { label: 'Captados', value: stats.captados, color: C.captados, valor: stats.valor_medio_captados, time: stats.dias_fechado },
   ]
 
   return (
@@ -124,10 +124,10 @@ function FunilVisual({ stats }: { stats: Stats }) {
       <div className="flex items-stretch gap-1">
         {stages.map((stage, i) => {
           const prev = stages[i - 1]
-          const pct  = prev ? Math.round((stage.value / Math.max(1, prev.value)) * 100) : null
+          const pct = prev ? Math.round((stage.value / Math.max(1, prev.value)) * 100) : null
           const barW = Math.max(6, Math.round((stage.value / max) * 100))
-          const cc   = pct != null ? convColor(pct) : ''
-          const avg  = fmtK(stage.valor)
+          const cc = pct != null ? convColor(pct) : ''
+          const avg = fmtK(stage.valor)
 
           return (
             <Fragment key={stage.label}>
@@ -135,7 +135,7 @@ function FunilVisual({ stats }: { stats: Stats }) {
                 <div className="flex flex-col items-center justify-center shrink-0 px-1">
                   <span className="text-[10px] font-bold font-mono leading-none" style={{ color: cc }}>{pct}%</span>
                   <svg width="16" height="10" viewBox="0 0 16 10" fill="none">
-                    <path d="M0 5 H12 M9 2 L14 5 L9 8" stroke={cc} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M0 5 H12 M9 2 L14 5 L9 8" stroke={cc} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </div>
               )}
@@ -218,9 +218,9 @@ function DonutTooltip({ active, payload }: { active?: boolean; payload?: { name:
 function DonutChart({ data }: { data: Motivo[] }) {
   const total = data.reduce((s, d) => s + d.total, 0)
   const items = data.map((d, i) => ({
-    name:  d.motivo,
+    name: d.motivo,
     value: d.total,
-    pct:   Math.round(d.total * 100 / (total || 1)),
+    pct: Math.round(d.total * 100 / (total || 1)),
     color: DONUT_COLORS[i % DONUT_COLORS.length],
   }))
   return (
@@ -273,10 +273,10 @@ function OrigemChart({ data }: { data: Origem[] }) {
         <YAxis tick={{ fontSize: 9 }} tickLine={false} axisLine={false} />
         <Tooltip />
         <Legend wrapperStyle={{ fontSize: 10 }} />
-        <Bar dataKey="total"    name="Oportunidades" radius={[3,3,0,0]}>
+        <Bar dataKey="total" name="Oportunidades" radius={[3, 3, 0, 0]}>
           {data.map((d, i) => <Cell key={i} fill={ORIGEM_CORES[d.origem] ?? '#6366f1'} />)}
         </Bar>
-        <Bar dataKey="captados" name="Captados" fill={C.captados} radius={[3,3,0,0]} />
+        <Bar dataKey="captados" name="Captados" fill={C.captados} radius={[3, 3, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   )
@@ -311,10 +311,10 @@ function ValorTooltip({ active, payload, label }: {
 // ── Componente principal ──────────────────────────────────────────────────────
 
 export function FunilClient() {
-  const [bairro,  setBairro]  = useState('Todos')
-  const [tipo,    setTipo]    = useState('Todos')
-  const [range,   setRange]   = useState('tudo')
-  const [data,    setData]    = useState<Data | null>(null)
+  const [bairro, setBairro] = useState('Todos')
+  const [tipo, setTipo] = useState('Todos')
+  const [range, setRange] = useState('tudo')
+  const [data, setData] = useState<Data | null>(null)
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async (b: string, t: string, r: string) => {
@@ -348,11 +348,10 @@ export function FunilClient() {
               <button
                 key={o.value}
                 onClick={() => setRange(o.value)}
-                className={`px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                  range === o.value
+                className={`px-2.5 py-1.5 text-xs font-medium transition-colors ${range === o.value
                     ? 'bg-primary text-white'
                     : 'bg-background text-muted-foreground hover:bg-muted'
-                }`}
+                  }`}
               >
                 {o.label}
               </button>
@@ -410,9 +409,9 @@ export function FunilClient() {
               <YAxis tick={{ fontSize: 9 }} tickLine={false} axisLine={false} />
               <Tooltip content={<ValorTooltip />} />
               <Legend wrapperStyle={{ fontSize: 10 }} />
-              <Bar dataKey="oportunidades" name="Oportunidades" fill={C.oportunidades} radius={[2,2,0,0]} />
-              <Bar dataKey="perdidos"      name="Perdidos"      fill={C.perdidos}      radius={[2,2,0,0]} />
-              <Bar dataKey="captados"      name="Captados"      fill={C.captados}      radius={[2,2,0,0]} />
+              <Bar dataKey="oportunidades" name="Oportunidades" fill={C.oportunidades} radius={[2, 2, 0, 0]} />
+              <Bar dataKey="perdidos" name="Perdidos" fill={C.perdidos} radius={[2, 2, 0, 0]} />
+              <Bar dataKey="captados" name="Captados" fill={C.captados} radius={[2, 2, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </PanelCard>
@@ -425,9 +424,9 @@ export function FunilClient() {
               <YAxis tick={{ fontSize: 9 }} tickLine={false} axisLine={false} />
               <Tooltip content={<ValorTooltip />} />
               <Legend wrapperStyle={{ fontSize: 10 }} />
-              <Bar dataKey="oportunidades" name="Oportunidades" fill={C.oportunidades} radius={[2,2,0,0]} />
-              <Bar dataKey="perdidos"      name="Perdidos"      fill={C.perdidos}      radius={[2,2,0,0]} />
-              <Bar dataKey="captados"      name="Captados"      fill={C.captados}      radius={[2,2,0,0]} />
+              <Bar dataKey="oportunidades" name="Oportunidades" fill={C.oportunidades} radius={[2, 2, 0, 0]} />
+              <Bar dataKey="perdidos" name="Perdidos" fill={C.perdidos} radius={[2, 2, 0, 0]} />
+              <Bar dataKey="captados" name="Captados" fill={C.captados} radius={[2, 2, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </PanelCard>

@@ -3,18 +3,18 @@ import sql from '@/lib/db'
 
 function resolverDesde(range: string): string {
   const d = new Date()
-  if (range === '7d')  { d.setDate(d.getDate() - 7);   return d.toISOString().slice(0, 10) }
-  if (range === '30d') { d.setDate(d.getDate() - 30);  return d.toISOString().slice(0, 10) }
-  if (range === '90d') { d.setDate(d.getDate() - 90);  return d.toISOString().slice(0, 10) }
+  if (range === '7d') { d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10) }
+  if (range === '30d') { d.setDate(d.getDate() - 30); return d.toISOString().slice(0, 10) }
+  if (range === '90d') { d.setDate(d.getDate() - 90); return d.toISOString().slice(0, 10) }
   if (range === 'ano') { return `${d.getFullYear()}-01-01` }
   return '2024-01-01'
 }
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
-  const bairro = searchParams.get('bairro')      ?? 'Todos'
-  const tipo   = searchParams.get('tipo_imovel') ?? 'Todos'
-  const desde  = resolverDesde(searchParams.get('range') ?? 'tudo')
+  const bairro = searchParams.get('bairro') ?? 'Todos'
+  const tipo = searchParams.get('tipo_imovel') ?? 'Todos'
+  const desde = resolverDesde(searchParams.get('range') ?? 'tudo')
 
   const [statsRows, motivosRows, fasesRows, porBairroRows, porTipoRows, porMesRows, origemRows, filtrosRow, responsavelRows] = await Promise.all([
 
@@ -104,7 +104,6 @@ export async function GET(req: NextRequest) {
           WHEN links_anuncio ILIKE '%wimoveis%'  THEN 'WImóveis'
           WHEN links_anuncio ILIKE '%olx%'       THEN 'OLX'
           WHEN links_anuncio ILIKE '%facebook%'  THEN 'Facebook'
-          WHEN links_anuncio ILIKE '%nidos%'     THEN 'Nidos'
           WHEN links_anuncio IS NOT NULL          THEN 'Outro'
           ELSE 'Sem link'
         END AS origem,
@@ -142,15 +141,15 @@ export async function GET(req: NextRequest) {
   const f = filtrosRow[0] as { bairros: string[] | null; tipos: string[] | null }
 
   return Response.json({
-    stats:          statsRows[0],
-    motivos:        motivosRows,
-    fases:          fasesRows,
-    porBairro:      porBairroRows,
-    porTipo:        porTipoRows,
-    porMes:         porMesRows,
-    origem:         origemRows,
+    stats: statsRows[0],
+    motivos: motivosRows,
+    fases: fasesRows,
+    porBairro: porBairroRows,
+    porTipo: porTipoRows,
+    porMes: porMesRows,
+    origem: origemRows,
     porResponsavel: responsavelRows,
-    bairros:        ['Todos', ...(f?.bairros ?? [])],
-    tipos:          ['Todos', ...(f?.tipos   ?? [])],
+    bairros: ['Todos', ...(f?.bairros ?? [])],
+    tipos: ['Todos', ...(f?.tipos ?? [])],
   })
 }
