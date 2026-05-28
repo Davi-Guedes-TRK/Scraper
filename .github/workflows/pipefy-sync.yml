@@ -1,0 +1,31 @@
+name: Sync Pipefy → Banco
+
+on:
+  schedule:
+    - cron: '0 6 * * *'    # 03:00 BRT
+    - cron: '0 14 * * *'   # 11:00 BRT
+    - cron: '0 20 * * *'   # 17:00 BRT
+  workflow_dispatch:
+
+jobs:
+  pipefy-sync:
+    name: Sincronizar cards do Pipefy
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Instalar dependências
+        run: pip install requests psycopg2-binary
+
+      - name: Sincronizar
+        env:
+          PIPEFY_TOKEN: ${{ secrets.PIPEFY_TOKEN }}
+          PIPEFY_PIPE_ID: ${{ secrets.PIPEFY_PIPE_ID }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python scripts/pipefy_sync.py
