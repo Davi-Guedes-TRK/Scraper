@@ -7,76 +7,11 @@ import { PATH_1, PATH_2, VIEWBOX } from '@/components/logo'
 
 type Mode = 'login' | 'forgot' | 'forgot_sent'
 
-// ── Ondas diagonais ────────────────────────────────────────────────────────────
-const PERIOD = 1800
-
-function buildWavePath(amp: number, yc: number): string {
-  let d = `M0,${yc}`
-  for (let i = 0; i < 4; i++) {
-    const x = PERIOD * i
-    d += ` C${x + PERIOD / 4},${yc - amp} ${x + (3 * PERIOD) / 4},${yc + amp} ${x + PERIOD},${yc}`
-  }
-  return d + ` L${PERIOD * 4},400 L0,400 Z`
-}
-
-const WAVE_LAYERS = [
-  { color: '#6B3280', opacity: 0.28, dur: 14, delay:  0,    amp: 65, yc: 160 },
-  { color: '#3D1A4D', opacity: 0.24, dur: 9,  delay: -2.25, amp: 78, yc: 148 },
-  { color: '#8A55B5', opacity: 0.16, dur: 20, delay: -6.6,  amp: 52, yc: 172 },
-  { color: '#C39BD3', opacity: 0.09, dur: 27, delay: -9.0,  amp: 38, yc: 182 },
-]
-
-function DiagonalWaves() {
-  return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none select-none" aria-hidden>
-      <div style={{
-        position: 'absolute',
-        bottom: '5%',
-        left: '-25%',
-        width: '200%',
-        height: '130%',
-        transform: 'rotate(-28deg)',
-        transformOrigin: 'bottom center',
-      }}>
-        {WAVE_LAYERS.map((w, i) => (
-          <svg
-            key={i}
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox={`0 0 ${PERIOD * 4} 400`}
-            preserveAspectRatio="none"
-            style={{
-              position: 'absolute',
-              bottom: `${i * 18}px`,
-              left: 0,
-              width: `${PERIOD * 4}px`,
-              height: '400px',
-              fill: w.color,
-              opacity: w.opacity,
-              animation: `velvet-wave ${w.dur}s linear infinite`,
-              animationDelay: `${w.delay}s`,
-              willChange: 'transform',
-            }}
-          >
-            <path d={buildWavePath(w.amp, w.yc)} />
-          </svg>
-        ))}
-      </div>
-      <style>{`
-        @keyframes velvet-wave {
-          from { transform: translateX(0); }
-          to   { transform: translateX(-${PERIOD}px); }
-        }
-      `}</style>
-    </div>
-  )
-}
-
 const initialLogin = { error: null }
 const initialReset = { error: null, sent: false }
 
-const BG       = '#4A235A'   // roxo velvet — lado da logo (baixo-direito)
-const BG_OTHER = '#0D0921'   // índigo escuro — lado oposto (cima-esquerda)
-const LIGHT    = '#C39BD3'
+const BG = '#4A235A'
+const LIGHT = '#C39BD3'
 
 function Field({
   name, type = 'text', label, value, onChange, autoFocus,
@@ -123,10 +58,8 @@ export function LoginForm() {
   return (
     <div
       className="relative min-h-screen flex flex-col items-center justify-center p-4 overflow-hidden"
-      style={{ background: `linear-gradient(to top left, ${BG} 38%, ${BG_OTHER} 62%)` }}
+      style={{ background: BG }}
     >
-      <DiagonalWaves />
-
       {/* Watermark — canto inferior direito, parcialmente cortado */}
       <svg
         viewBox={VIEWBOX}
