@@ -1,4 +1,4 @@
-export const APP_NAME = 'TRK'
+export const APP_NAME = 'Velvet'
 
 const COLOR_CLASS = 'text-[#4A235A] dark:text-[#C39BD3]'
 
