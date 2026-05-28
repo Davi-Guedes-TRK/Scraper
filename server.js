@@ -7,6 +7,7 @@ const fs = require('fs')
 const { GoogleGenerativeAI } = require('@google/generative-ai')
 
 const app = express()
+app.disable('x-powered-by')
 const PORT = process.env.PORT || 3001
 
 // Diretório raiz onde fica o main.py
@@ -48,19 +49,38 @@ const TRK_CIDADES = [
   'jardim-botanico', 'lago-norte', 'sudoeste', 'noroeste',
 ]
 
+// ── Allowlists para validação de parâmetros do scraper ────────────────────────
+const ALLOWED_PORTALS     = new Set(['dfimoveis', 'olx', 'wimoveis'])
+const ALLOWED_TIPOS       = new Set(['venda', 'aluguel', 'todos'])
+const ALLOWED_TIPO_IMOVEL = new Set(['todos', 'apartamento', 'casa', 'terreno', 'comercial', 'kitnet', 'cobertura'])
+const ALLOWED_ESTADOS     = new Set(['df', 'go', 'mg', 'sp', 'rj', 'ba', 'pr', 'rs', 'sc', 'pe', 'ce', 'es', 'am'])
+const ALLOWED_CIDADES     = new Set([...TRK_CIDADES, 'todos', 'trk-preset'])
+
+function requireEnum(value, allowed) {
+  const v = String(value ?? '').toLowerCase().trim()
+  return allowed.has(v) ? v : null
+}
+
+function requirePosInt(value, min, max) {
+  const n = parseInt(value, 10)
+  return (!isNaN(n) && n >= min && n <= max) ? n : null
+}
+
 // ── GET /api/scrapers/run  (SSE — streaming de logs em tempo real) ─────────────
 // Params: portal, paginas, cidade, tipo, tipo_imovel, estado
 app.get('/api/scrapers/run', (req, res) => {
-  const {
-    portal = 'dfimoveis',
-    paginas = '10',
-    cidade = 'todos',
-    tipo = 'venda',
-    tipo_imovel = 'todos',
-    estado = 'df',
-    fast = 'false',
-    publicados_ha = '0',
-  } = req.query
+  const portal      = requireEnum(req.query.portal     ?? 'dfimoveis', ALLOWED_PORTALS)
+  const tipo        = requireEnum(req.query.tipo        ?? 'venda',     ALLOWED_TIPOS)
+  const tipo_imovel = requireEnum(req.query.tipo_imovel ?? 'todos',     ALLOWED_TIPO_IMOVEL)
+  const estado      = requireEnum(req.query.estado      ?? 'df',        ALLOWED_ESTADOS)
+  const cidade      = requireEnum(req.query.cidade      ?? 'todos',     ALLOWED_CIDADES)
+  const paginas     = requirePosInt(req.query.paginas   ?? '10',        1, 200) ?? 10
+  const publicados_ha = requirePosInt(req.query.publicados_ha ?? '0',   0, 365) ?? 0
+  const fast        = req.query.fast === 'true'
+
+  if (!portal || !tipo || !tipo_imovel || !estado || !cidade) {
+    return res.status(400).json({ error: 'Parâmetro inválido.' })
+  }
 
   // SSE headers
   res.setHeader('Content-Type', 'text/event-stream')
@@ -86,8 +106,8 @@ app.get('/api/scrapers/run', (req, res) => {
 
   const runCidade = (cidadeSlug) => new Promise((resolve) => {
     const args = ['main.py', portal, `--paginas=${paginas}`]
-    if (fast === 'true') args.push('--fast')
-    if (parseInt(publicados_ha) > 0) args.push(`--publicados-ha=${publicados_ha}`)
+    if (fast) args.push('--fast')
+    if (publicados_ha > 0) args.push(`--publicados-ha=${publicados_ha}`)
     if (portal === 'dfimoveis') {
       args.push(`--cidade=${cidadeSlug}`, `--tipo=${tipo}`, `--tipo-imovel=${tipo_imovel}`)
     } else if (portal === 'olx') {
@@ -96,8 +116,8 @@ app.get('/api/scrapers/run', (req, res) => {
       args.push(`--tipo=${tipo}`)
     }
 
-    send({ type: 'start', cmd: `${PYTHON} ${args.join(' ')}`, cidade: cidadeSlug })
-    console.log(`[Scraper] ${cidadeSlug}: ${PYTHON} ${args.join(' ')}`)
+    send({ type: 'start', cmd: `python main.py ${portal} [args validados]`, cidade: cidadeSlug })
+    console.log(`[Scraper] iniciando ${portal} — cidade: ${cidadeSlug}`)
 
     const child = spawn(PYTHON, args, {
       cwd: GIT_DIR,
