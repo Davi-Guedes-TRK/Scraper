@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState, useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { signIn, resetPassword } from '@/app/actions/auth'
 import { PATH_1, PATH_2, VIEWBOX } from '@/components/logo'
@@ -51,7 +51,9 @@ export function LoginForm() {
   const [loginState, loginAction, loginPending] = useActionState(signIn, initialLogin)
   const [resetState, resetAction, resetPending] = useActionState(resetPassword, initialReset)
 
-  if (resetState.sent && mode !== 'forgot_sent') setMode('forgot_sent')
+  useEffect(() => {
+    if (resetState.sent) setMode('forgot_sent')
+  }, [resetState.sent])
 
   return (
     <div
