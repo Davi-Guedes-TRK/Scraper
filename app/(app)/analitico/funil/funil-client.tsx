@@ -89,7 +89,9 @@ function fmtMes(mes: string) {
 
 function fmtK(n: number | null | undefined): string | null {
   if (!n || n <= 0) return null
-  return n >= 1000 ? `R$${Math.round(n / 1000)}k` : `R$${n}`
+  if (n >= 1_000_000) return `R$${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000)     return `R$${Math.round(n / 1_000)}k`
+  return `R$${n}`
 }
 
 function convColor(pct: number) {
@@ -313,7 +315,7 @@ function ValorTooltip({ active, payload, label }: {
 export function FunilClient() {
   const [bairro,     setBairro]     = useState('Todos')
   const [tipo,       setTipo]       = useState('Todos')
-  const [range,      setRange]      = useState('tudo')
+  const [range,      setRange]      = useState('ano')
   const [showCustom, setShowCustom] = useState(false)
   const [customDe,   setCustomDe]   = useState('')
   const [customAte,  setCustomAte]  = useState('')
