@@ -20,10 +20,10 @@ function buildWavePath(amp: number, yc: number): string {
 }
 
 const WAVE_LAYERS = [
-  { color: '#6B3280', opacity: 0.22, dur: 14, delay:  0,    amp: 60, yc: 200 },
-  { color: '#3D1A4D', opacity: 0.20, dur: 9,  delay: -2.25, amp: 72, yc: 190 },
-  { color: '#8A55B5', opacity: 0.13, dur: 20, delay: -6.6,  amp: 48, yc: 210 },
-  { color: '#C39BD3', opacity: 0.07, dur: 27, delay: -9.0,  amp: 35, yc: 220 },
+  { color: '#6B3280', opacity: 0.28, dur: 14, delay:  0,    amp: 65, yc: 160 },
+  { color: '#3D1A4D', opacity: 0.24, dur: 9,  delay: -2.25, amp: 78, yc: 148 },
+  { color: '#8A55B5', opacity: 0.16, dur: 20, delay: -6.6,  amp: 52, yc: 172 },
+  { color: '#C39BD3', opacity: 0.09, dur: 27, delay: -9.0,  amp: 38, yc: 182 },
 ]
 
 function DiagonalWaves() {
@@ -31,12 +31,12 @@ function DiagonalWaves() {
     <div className="absolute inset-0 overflow-hidden pointer-events-none select-none" aria-hidden>
       <div style={{
         position: 'absolute',
-        bottom: '-20%',
-        left: '-30%',
-        width: '180%',
-        height: '80%',
+        bottom: '5%',
+        left: '-25%',
+        width: '200%',
+        height: '130%',
         transform: 'rotate(-28deg)',
-        transformOrigin: 'bottom left',
+        transformOrigin: 'bottom center',
       }}>
         {WAVE_LAYERS.map((w, i) => (
           <svg
@@ -74,8 +74,9 @@ function DiagonalWaves() {
 const initialLogin = { error: null }
 const initialReset = { error: null, sent: false }
 
-const BG = '#4A235A'
-const LIGHT = '#C39BD3'
+const BG       = '#4A235A'   // roxo velvet — lado da logo (baixo-direito)
+const BG_OTHER = '#0D0921'   // índigo escuro — lado oposto (cima-esquerda)
+const LIGHT    = '#C39BD3'
 
 function Field({
   name, type = 'text', label, value, onChange, autoFocus,
@@ -122,7 +123,7 @@ export function LoginForm() {
   return (
     <div
       className="relative min-h-screen flex flex-col items-center justify-center p-4 overflow-hidden"
-      style={{ background: BG }}
+      style={{ background: `linear-gradient(to top left, ${BG} 38%, ${BG_OTHER} 62%)` }}
     >
       <DiagonalWaves />
 
