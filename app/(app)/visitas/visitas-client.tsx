@@ -137,8 +137,8 @@ function MarkVisitedModal({ item, onConfirm, onClose }: {
   }
 
   return (
-    <div role="presentation" className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
-      <div role="presentation" className="bg-white border border-[#d0d7de] rounded-lg w-full max-w-md shadow-xl" onClick={e => e.stopPropagation()}>
+    <div role="button" tabIndex={0} className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose} onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}>
+      <div className="bg-white border border-[#d0d7de] rounded-lg w-full max-w-md shadow-xl" onClick={e => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
         <div className="px-5 py-4 border-b border-[#d0d7de]">
           <h2 className="text-[#1f2328] font-semibold text-base">Marcar como visitado</h2>
           <p className="text-[#656d76] text-xs mt-0.5 truncate">{item.titulo}</p>

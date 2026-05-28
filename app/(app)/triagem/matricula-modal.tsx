@@ -99,14 +99,15 @@ export function MatriculaModal({ item, onClose }: Props) {
 
   return (
     <div
-      role="presentation"
+      role="button" tabIndex={0}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
       onClick={onClose}
+      onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}
     >
       <div
-        role="presentation"
         className="bg-white border border-[#d0d7de] rounded-lg w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]"
         onClick={e => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#d0d7de] flex-shrink-0">

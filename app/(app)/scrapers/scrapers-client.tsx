@@ -57,8 +57,8 @@ function LogsModal({ title, logs, loading, onClose }: {
   title: string; logs: ScraperLog[]; loading: boolean; onClose: () => void
 }) {
   return (
-    <div role="presentation" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
-      <div role="presentation" className="bg-white border border-[#d0d7de] rounded-lg w-full max-w-2xl shadow-xl" onClick={e => e.stopPropagation()}>
+    <div role="button" tabIndex={0} className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose} onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}>
+      <div className="bg-white border border-[#d0d7de] rounded-lg w-full max-w-2xl shadow-xl" onClick={e => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#d0d7de]">
           <h2 className="text-[#1f2328] font-semibold">{title}</h2>
           <button onClick={onClose} className="text-[#656d76] hover:text-[#1f2328] text-xl leading-none">✕</button>

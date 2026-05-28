@@ -96,15 +96,15 @@ function Lightbox({ imgs, startIdx, title, onClose }: { imgs: string[]; startIdx
   }, [prev, next, onClose])
 
   return (
-    <div role="presentation" className="fixed inset-0 z-[60] flex flex-col bg-black/90 backdrop-blur-sm" onClick={onClose}>
-      <div role="presentation" className="flex items-center justify-between px-4 py-3 flex-shrink-0" onClick={e => e.stopPropagation()}>
+    <div role="button" tabIndex={0} className="fixed inset-0 z-[60] flex flex-col bg-black/90 backdrop-blur-sm" onClick={onClose} onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}>
+      <div className="flex items-center justify-between px-4 py-3 flex-shrink-0" onClick={e => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
         <p className="text-white text-sm font-medium truncate max-w-lg">{title}</p>
         <div className="flex items-center gap-3">
           <span className="text-gray-400 text-sm">{idx + 1} / {imgs.length}</span>
           <button onClick={onClose} className="text-gray-400 hover:text-white text-xl leading-none">✕</button>
         </div>
       </div>
-      <div role="presentation" className="flex-1 flex items-center justify-center relative min-h-0" onClick={e => e.stopPropagation()}>
+      <div className="flex-1 flex items-center justify-center relative min-h-0" onClick={e => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
         {imgs.length > 1 && (
           <button onClick={prev} className="absolute left-3 z-10 w-10 h-10 rounded-full bg-black/50 hover:bg-black/80 text-white flex items-center justify-center text-lg transition-colors">‹</button>
         )}
@@ -114,7 +114,7 @@ function Lightbox({ imgs, startIdx, title, onClose }: { imgs: string[]; startIdx
         )}
       </div>
       {imgs.length > 1 && (
-        <div role="presentation" className="flex gap-1.5 px-4 py-3 overflow-x-auto flex-shrink-0" onClick={e => e.stopPropagation()}>
+        <div className="flex gap-1.5 px-4 py-3 overflow-x-auto flex-shrink-0" onClick={e => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
           {imgs.map((src, i) => (
             <button key={i} onClick={() => setIdx(i)} className={`flex-shrink-0 w-14 h-10 rounded overflow-hidden border-2 transition-colors ${i === idx ? 'border-trk-blue' : 'border-transparent opacity-60 hover:opacity-100'}`}>
               <img src={src} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />

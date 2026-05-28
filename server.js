@@ -60,12 +60,12 @@ const VALID_CIDADES     = [...TRK_CIDADES, 'todos', 'trk-preset']
 
 function pickFrom(list, raw, fallback) {
   const idx = list.indexOf(String(raw ?? '').toLowerCase().trim())
-  return idx !== -1 ? list[idx] : fallback
+  return idx === -1 ? fallback : list[idx]
 }
 
 function clampInt(value, min, max, fallback) {
-  const n = parseInt(value, 10)
-  return (!isNaN(n) && n >= min && n <= max) ? n : fallback
+  const n = Number.parseInt(value, 10)
+  return (Number.isNaN(n) || n < min || n > max) ? fallback : n
 }
 
 // ── GET /api/scrapers/run  (SSE — streaming de logs em tempo real) ─────────────
