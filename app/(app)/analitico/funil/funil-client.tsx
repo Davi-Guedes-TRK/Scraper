@@ -311,23 +311,36 @@ function ValorTooltip({ active, payload, label }: {
 // ── Componente principal ──────────────────────────────────────────────────────
 
 export function FunilClient() {
-  const [bairro, setBairro] = useState('Todos')
-  const [tipo, setTipo] = useState('Todos')
-  const [range, setRange] = useState('tudo')
-  const [data, setData] = useState<Data | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [bairro,     setBairro]     = useState('Todos')
+  const [tipo,       setTipo]       = useState('Todos')
+  const [range,      setRange]      = useState('tudo')
+  const [showCustom, setShowCustom] = useState(false)
+  const [customDe,   setCustomDe]   = useState('')
+  const [customAte,  setCustomAte]  = useState('')
+  const [data,       setData]       = useState<Data | null>(null)
+  const [loading,    setLoading]    = useState(true)
 
-  const load = useCallback(async (b: string, t: string, r: string) => {
+  const today = new Date().toISOString().slice(0, 10)
+
+  const load = useCallback(async (b: string, t: string, r: string, de?: string, ate?: string) => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/pipefy/funil?bairro=${encodeURIComponent(b)}&tipo_imovel=${encodeURIComponent(t)}&range=${r}`)
+      const p = new URLSearchParams({ bairro: b, tipo_imovel: t })
+      if (de && ate) { p.set('desde', de); p.set('ate', ate) }
+      else           { p.set('range', r) }
+      const res = await fetch(`/api/pipefy/funil?${p}`, { cache: 'no-store' })
       setData(await res.json())
     } finally {
       setLoading(false)
     }
   }, [])
 
-  useEffect(() => { load(bairro, tipo, range) }, [bairro, tipo, range, load])
+  const customAtivo = showCustom && !!customDe && !!customAte
+
+  useEffect(() => {
+    if (customAtivo) load(bairro, tipo, range, customDe, customAte)
+    else             load(bairro, tipo, range)
+  }, [bairro, tipo, range, customAtivo, customDe, customAte, load])
 
   const s = data?.stats
 
@@ -342,29 +355,70 @@ export function FunilClient() {
             Pipefy{loading && <span className="ml-2 opacity-50">carregando…</span>}
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap items-center">
-          <div className="flex rounded-lg border border-border overflow-hidden">
-            {RANGE_OPTS.map(o => (
-              <button
-                key={o.value}
-                onClick={() => setRange(o.value)}
-                className={`px-2.5 py-1.5 text-xs font-medium transition-colors ${range === o.value
-                    ? 'bg-primary text-white'
-                    : 'bg-background text-muted-foreground hover:bg-muted'
+        <div className="flex flex-col items-end gap-1.5">
+          <div className="flex gap-2 items-center flex-wrap">
+            {/* Presets de período */}
+            <div className="flex rounded-lg border border-border overflow-hidden">
+              {RANGE_OPTS.map(o => (
+                <button
+                  key={o.value}
+                  onClick={() => { setRange(o.value); setShowCustom(false) }}
+                  className={`px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                    !customAtivo && range === o.value
+                      ? 'bg-primary text-white'
+                      : 'bg-background text-muted-foreground hover:bg-muted'
                   }`}
-              >
-                {o.label}
-              </button>
-            ))}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+            {/* Toggle período customizado */}
+            <button
+              onClick={() => setShowCustom(v => !v)}
+              title="Período personalizado"
+              className={`h-8 w-8 rounded-lg border flex items-center justify-center transition-colors ${
+                customAtivo
+                  ? 'bg-primary text-white border-primary'
+                  : showCustom
+                    ? 'bg-muted text-foreground border-border'
+                    : 'bg-background text-muted-foreground border-border hover:bg-muted'
+              }`}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+                <rect x="3" y="4" width="18" height="18" rx="2"/>
+                <line x1="16" y1="2" x2="16" y2="6"/>
+                <line x1="8" y1="2" x2="8" y2="6"/>
+                <line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
+            </button>
+            {/* Selects bairro/tipo */}
+            <select value={bairro} onChange={e => setBairro(e.target.value)}
+              className="h-8 px-2.5 text-sm rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
+              {(data?.bairros ?? ['Todos']).map(b => <option key={b} value={b}>{b}</option>)}
+            </select>
+            <select value={tipo} onChange={e => setTipo(e.target.value)}
+              className="h-8 px-2.5 text-sm rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
+              {(data?.tipos ?? ['Todos']).map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
           </div>
-          <select value={bairro} onChange={e => setBairro(e.target.value)}
-            className="h-8 px-2.5 text-sm rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
-            {(data?.bairros ?? ['Todos']).map(b => <option key={b} value={b}>{b}</option>)}
-          </select>
-          <select value={tipo} onChange={e => setTipo(e.target.value)}
-            className="h-8 px-2.5 text-sm rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
-            {(data?.tipos ?? ['Todos']).map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
+          {/* Período customizado — retraído por padrão */}
+          {showCustom && (
+            <div className="flex items-center gap-2 pr-0.5">
+              <span className="text-[11px] text-muted-foreground">De</span>
+              <input type="date" value={customDe} max={customAte || today}
+                onChange={e => setCustomDe(e.target.value)}
+                className="h-7 px-2 text-xs rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+              <span className="text-[11px] text-muted-foreground">Até</span>
+              <input type="date" value={customAte} min={customDe || undefined} max={today}
+                onChange={e => setCustomAte(e.target.value)}
+                className="h-7 px-2 text-xs rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+              {customAtivo
+                ? <span className="text-[10px] font-semibold text-primary">● ativo</span>
+                : <span className="text-[10px] text-muted-foreground">selecione as duas datas</span>
+              }
+            </div>
+          )}
         </div>
       </div>
 

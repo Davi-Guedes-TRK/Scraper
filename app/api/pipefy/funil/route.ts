@@ -1,20 +1,27 @@
 import { NextRequest } from 'next/server'
 import sql from '@/lib/db'
 
+export const dynamic = 'force-dynamic'
+
 function resolverDesde(range: string): string {
   const d = new Date()
-  if (range === '7d') { d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10) }
-  if (range === '30d') { d.setDate(d.getDate() - 30); return d.toISOString().slice(0, 10) }
-  if (range === '90d') { d.setDate(d.getDate() - 90); return d.toISOString().slice(0, 10) }
+  if (range === '7d')  { d.setDate(d.getDate() - 7);   return d.toISOString().slice(0, 10) }
+  if (range === '30d') { d.setDate(d.getDate() - 30);  return d.toISOString().slice(0, 10) }
+  if (range === '90d') { d.setDate(d.getDate() - 90);  return d.toISOString().slice(0, 10) }
   if (range === 'ano') { return `${d.getFullYear()}-01-01` }
   return '2024-01-01'
 }
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
-  const bairro = searchParams.get('bairro') ?? 'Todos'
-  const tipo = searchParams.get('tipo_imovel') ?? 'Todos'
-  const desde = resolverDesde(searchParams.get('range') ?? 'tudo')
+  const bairro = searchParams.get('bairro')      ?? 'Todos'
+  const tipo   = searchParams.get('tipo_imovel') ?? 'Todos'
+
+  // range customizado tem prioridade; caso contrário usa preset
+  const desdeParam = searchParams.get('desde')
+  const ateParam   = searchParams.get('ate')
+  const desde = desdeParam || resolverDesde(searchParams.get('range') ?? 'tudo')
+  const ate   = ateParam   || new Date().toISOString().slice(0, 10)
 
   const [statsRows, motivosRows, fasesRows, porBairroRows, porTipoRows, porMesRows, origemRows, filtrosRow, responsavelRows] = await Promise.all([
 
@@ -35,7 +42,7 @@ export async function GET(req: NextRequest) {
         round(avg(visita_dias)     FILTER (WHERE visita_dias     BETWEEN 0.01 AND 365))::int AS dias_visita,
         round(avg(fechado_dias)    FILTER (WHERE fechado_dias    BETWEEN 0.01 AND 365))::int AS dias_fechado
       FROM pipefy_captacoes
-      WHERE criado_em >= ${desde}
+      WHERE criado_em >= ${desde} AND criado_em < (${ate}::date + INTERVAL '1 day')
         AND (${bairro} = 'Todos' OR bairro = ${bairro})
         AND (${tipo}   = 'Todos' OR tipo_imovel = ${tipo})
     `,
@@ -43,7 +50,8 @@ export async function GET(req: NextRequest) {
     sql`
       SELECT COALESCE(motivo_nao_captacao, 'Sem registro') AS motivo, count(*)::int AS total
       FROM pipefy_captacoes
-      WHERE criado_em >= ${desde} AND fase_atual = 'Não Captado ❌'
+      WHERE criado_em >= ${desde} AND criado_em < (${ate}::date + INTERVAL '1 day')
+        AND fase_atual = 'Não Captado ❌'
         AND (${bairro} = 'Todos' OR bairro = ${bairro})
         AND (${tipo}   = 'Todos' OR tipo_imovel = ${tipo})
       GROUP BY 1 ORDER BY 2 DESC
@@ -52,7 +60,7 @@ export async function GET(req: NextRequest) {
     sql`
       SELECT COALESCE(fase_atual, 'Sem fase') AS fase, count(*)::int AS cards
       FROM pipefy_captacoes
-      WHERE criado_em >= ${desde}
+      WHERE criado_em >= ${desde} AND criado_em < (${ate}::date + INTERVAL '1 day')
         AND (${bairro} = 'Todos' OR bairro = ${bairro})
         AND (${tipo}   = 'Todos' OR tipo_imovel = ${tipo})
       GROUP BY 1 ORDER BY 2 DESC
@@ -66,7 +74,7 @@ export async function GET(req: NextRequest) {
         count(*) FILTER (WHERE fase_atual IN ('Fechado Comercialmente', 'Captação Realizada ✅'))::int AS captados,
         round(avg(valor_anuncio) FILTER (WHERE valor_anuncio > 0))::int AS valor_medio
       FROM pipefy_captacoes
-      WHERE criado_em >= ${desde}
+      WHERE criado_em >= ${desde} AND criado_em < (${ate}::date + INTERVAL '1 day')
         AND (${tipo} = 'Todos' OR tipo_imovel = ${tipo})
       GROUP BY 1 ORDER BY 2 DESC
     `,
@@ -79,7 +87,7 @@ export async function GET(req: NextRequest) {
         count(*) FILTER (WHERE fase_atual IN ('Fechado Comercialmente', 'Captação Realizada ✅'))::int AS captados,
         round(avg(valor_anuncio) FILTER (WHERE valor_anuncio > 0))::int AS valor_medio
       FROM pipefy_captacoes
-      WHERE criado_em >= ${desde}
+      WHERE criado_em >= ${desde} AND criado_em < (${ate}::date + INTERVAL '1 day')
         AND (${bairro} = 'Todos' OR bairro = ${bairro})
       GROUP BY 1 ORDER BY 2 DESC
     `,
@@ -91,7 +99,7 @@ export async function GET(req: NextRequest) {
         count(*) FILTER (WHERE fase_atual IN ('Fechado Comercialmente', 'Captação Realizada ✅'))::int AS captados,
         round(avg(valor_anuncio) FILTER (WHERE valor_anuncio > 0))::int AS ticket_medio
       FROM pipefy_captacoes
-      WHERE criado_em >= ${desde}
+      WHERE criado_em >= ${desde} AND criado_em < (${ate}::date + INTERVAL '1 day')
         AND (${bairro} = 'Todos' OR bairro = ${bairro})
         AND (${tipo}   = 'Todos' OR tipo_imovel = ${tipo})
       GROUP BY 1 ORDER BY 1
@@ -104,18 +112,20 @@ export async function GET(req: NextRequest) {
           WHEN links_anuncio ILIKE '%wimoveis%'  THEN 'WImóveis'
           WHEN links_anuncio ILIKE '%olx%'       THEN 'OLX'
           WHEN links_anuncio ILIKE '%facebook%'  THEN 'Facebook'
+          WHEN links_anuncio ILIKE '%nidos%'     THEN 'Nidos'
           WHEN links_anuncio IS NOT NULL          THEN 'Outro'
           ELSE 'Sem link'
         END AS origem,
         count(*)::int AS total,
         count(*) FILTER (WHERE fase_atual IN ('Fechado Comercialmente', 'Captação Realizada ✅'))::int AS captados
       FROM pipefy_captacoes
-      WHERE criado_em >= ${desde}
+      WHERE criado_em >= ${desde} AND criado_em < (${ate}::date + INTERVAL '1 day')
         AND (${bairro} = 'Todos' OR bairro = ${bairro})
         AND (${tipo}   = 'Todos' OR tipo_imovel = ${tipo})
       GROUP BY 1 ORDER BY 2 DESC
     `,
 
+    // filtros sempre sem corte de data (mostrar todas as opções disponíveis)
     sql`
       SELECT
         array_agg(DISTINCT bairro      ORDER BY bairro)      FILTER (WHERE bairro      IS NOT NULL) AS bairros,
@@ -130,7 +140,7 @@ export async function GET(req: NextRequest) {
         count(*) FILTER (WHERE fase_atual IN ('Fechado Comercialmente','Captação Realizada ✅','Ônus Solicitada','Matricula Solicitada'))::int AS captados,
         count(*) FILTER (WHERE fase_atual = 'Não Captado ❌')::int AS perdidos
       FROM pipefy_captacoes
-      WHERE criado_em >= ${desde}
+      WHERE criado_em >= ${desde} AND criado_em < (${ate}::date + INTERVAL '1 day')
         AND (${bairro} = 'Todos' OR bairro = ${bairro})
         AND (${tipo}   = 'Todos' OR tipo_imovel = ${tipo})
       GROUP BY 1 ORDER BY 2 DESC
@@ -141,15 +151,15 @@ export async function GET(req: NextRequest) {
   const f = filtrosRow[0] as { bairros: string[] | null; tipos: string[] | null }
 
   return Response.json({
-    stats: statsRows[0],
-    motivos: motivosRows,
-    fases: fasesRows,
-    porBairro: porBairroRows,
-    porTipo: porTipoRows,
-    porMes: porMesRows,
-    origem: origemRows,
+    stats:          statsRows[0],
+    motivos:        motivosRows,
+    fases:          fasesRows,
+    porBairro:      porBairroRows,
+    porTipo:        porTipoRows,
+    porMes:         porMesRows,
+    origem:         origemRows,
     porResponsavel: responsavelRows,
-    bairros: ['Todos', ...(f?.bairros ?? [])],
-    tipos: ['Todos', ...(f?.tipos ?? [])],
+    bairros:        ['Todos', ...(f?.bairros ?? [])],
+    tipos:          ['Todos', ...(f?.tipos   ?? [])],
   })
 }
