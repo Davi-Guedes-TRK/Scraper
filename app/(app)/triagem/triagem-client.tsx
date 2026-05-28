@@ -323,7 +323,7 @@ function ReviewPanel({ item, onApprove, onVisitar, onDiscard, onClose }: {
 }
 
 // ── StatsPanel — painel direito com resumo da fila ─────────────────────────────
-function StatsPanel({ items, reviewItem }: { items: Imovel[]; reviewItem: Imovel | null }) {
+function StatsPanel({ items, total, reviewItem }: { items: Imovel[]; total: number; reviewItem: Imovel | null }) {
   const byPortal = useMemo(() => {
     const m: Record<string, number> = {}
     for (const it of items) m[it.portal] = (m[it.portal] ?? 0) + 1
@@ -339,7 +339,7 @@ function StatsPanel({ items, reviewItem }: { items: Imovel[]; reviewItem: Imovel
     <div className="flex flex-col h-full overflow-y-auto">
       {/* total */}
       <div className="px-4 py-4 flex-shrink-0" style={{ borderBottom: '1px solid var(--sidebar-border)' }}>
-        <p className="text-[28px] font-extrabold font-display tabular text-foreground leading-none">{items.length}</p>
+        <p className="text-[28px] font-extrabold font-display tabular text-foreground leading-none">{total}</p>
         <p className="eyebrow text-muted-foreground mt-1">Pendentes na fila</p>
       </div>
 
@@ -482,6 +482,7 @@ export function TriagemClient() {
   const searchParams = useSearchParams()
   const q = (searchParams.get('q') ?? '').toLowerCase().trim()
   const [items, setItems] = useState<Imovel[]>([])
+  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [reviewItem, setReviewItem] = useState<Imovel | null>(null)
@@ -517,8 +518,9 @@ export function TriagemClient() {
       try {
         const res = await fetch('/api/triagem')
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const rows: Imovel[] = await res.json()
-        setItems(rows)
+        const data: { items: Imovel[]; total: number } = await res.json()
+        setItems(data.items)
+        setTotal(data.total)
       } catch (err) {
         toast(`Erro ao carregar: ${err instanceof Error ? err.message : 'desconhecido'}`, 'error')
       } finally {
@@ -784,7 +786,7 @@ export function TriagemClient() {
         className="w-[240px] flex-shrink-0 flex flex-col overflow-hidden"
         style={{ borderLeft: '1px solid var(--sidebar-border)', background: 'var(--sidebar)' }}
       >
-        <StatsPanel items={items} reviewItem={reviewItem} />
+        <StatsPanel items={items} total={total} reviewItem={reviewItem} />
       </div>
 
       <ToastStack toasts={toasts} />

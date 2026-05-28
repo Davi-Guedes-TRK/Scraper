@@ -78,7 +78,7 @@ async function getDashboardData() {
 
   const coletados7d = col7Raw.count ?? 0
   const coletadosPrev = colPrevRaw.count ?? 0
-  const coletaDelta = coletadosPrev > 0 ? Math.round(((coletados7d - coletadosPrev) / coletadosPrev) * 100) : null
+  const coletaDelta = coletadosPrev >= 10 ? Math.round(((coletados7d - coletadosPrev) / coletadosPrev) * 100) : null
 
   const byDay: Record<string, Record<string, number>> = {}
   for (let i = 6; i >= 0; i--) {

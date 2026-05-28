@@ -27,21 +27,33 @@ type ImovelRow = {
   tipo_anunciante: string | null
 }
 
+type TriagemResponse = { items: ImovelRow[]; total: number }
+
 export async function GET() {
-  const items = await withCache<ImovelRow[]>(CACHE_KEY, CACHE_TTL, async () => {
-    return sql<ImovelRow[]>`
-      SELECT link, portal, titulo, preco, bairro, cidade, area_m2, quartos,
-             imagens, coletado_em, data_publicacao, pistas_ia,
-             tipo_imovel, creci, nome_anunciante, tipo_anunciante
-      FROM imoveis_todos
-      WHERE status_triagem = 'pendente'
-        AND (creci IS NULL OR creci != '22784')
-        AND coletado_em >= NOW() - (${CUTOFF_DAYS} || ' days')::interval
-      ORDER BY coletado_em DESC
-      LIMIT 2000
-    `
+  const data = await withCache<TriagemResponse>(CACHE_KEY, CACHE_TTL, async () => {
+    const [items, countRows] = await Promise.all([
+      sql<ImovelRow[]>`
+        SELECT link, portal, titulo, preco, bairro, cidade, area_m2, quartos,
+               imagens, coletado_em, data_publicacao, pistas_ia,
+               tipo_imovel, creci, nome_anunciante, tipo_anunciante
+        FROM imoveis_todos
+        WHERE status_triagem = 'pendente'
+          AND (creci IS NULL OR creci != '22784')
+          AND coletado_em >= NOW() - (${CUTOFF_DAYS} || ' days')::interval
+        ORDER BY coletado_em DESC
+        LIMIT 2000
+      `,
+      sql<[{ total: number }]>`
+        SELECT count(*)::int AS total
+        FROM imoveis_todos
+        WHERE status_triagem = 'pendente'
+          AND (creci IS NULL OR creci != '22784')
+          AND coletado_em >= NOW() - (${CUTOFF_DAYS} || ' days')::interval
+      `,
+    ])
+    return { items, total: countRows[0]?.total ?? items.length }
   })
-  return Response.json(items)
+  return Response.json(data)
 }
 
 export async function PATCH(req: NextRequest) {
