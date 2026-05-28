@@ -135,7 +135,7 @@ export async function GET(req: NextRequest) {
 
     sql`
       SELECT
-        COALESCE(responsaveis, 'Sem responsável') AS pessoa,
+        COALESCE(pessoa_origem, 'Sem origem') AS pessoa,
         count(*)::int AS oportunidades,
         count(*) FILTER (WHERE fase_atual IN ('Fechado Comercialmente','Captação Realizada ✅','Ônus Solicitada','Matricula Solicitada'))::int AS captados,
         count(*) FILTER (WHERE fase_atual = 'Não Captado ❌')::int AS perdidos

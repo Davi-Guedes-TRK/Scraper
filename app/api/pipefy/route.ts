@@ -42,7 +42,7 @@ const TEXT_COLS = [
   'data_captacao', 'obs_captacao', 'contrato_assinado', 'data_assinatura_contrato',
   'motivo_nao_captacao', 'obs_nao_captacao', 'contato_validado', 'data_locado',
   'motivos_secundarios', 'matricula', 'vk_nido', 'corretor',
-  'endereco_completo', 'meu_interesse',
+  'endereco_completo', 'meu_interesse', 'pessoa_origem',
 ]
 
 export async function POST(request: NextRequest) {
