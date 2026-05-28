@@ -7,6 +7,70 @@ import { PATH_1, PATH_2, VIEWBOX } from '@/components/logo'
 
 type Mode = 'login' | 'forgot' | 'forgot_sent'
 
+// ── Ondas diagonais ────────────────────────────────────────────────────────────
+const PERIOD = 1800
+
+function buildWavePath(amp: number, yc: number): string {
+  let d = `M0,${yc}`
+  for (let i = 0; i < 4; i++) {
+    const x = PERIOD * i
+    d += ` C${x + PERIOD / 4},${yc - amp} ${x + (3 * PERIOD) / 4},${yc + amp} ${x + PERIOD},${yc}`
+  }
+  return d + ` L${PERIOD * 4},400 L0,400 Z`
+}
+
+const WAVE_LAYERS = [
+  { color: '#6B3280', opacity: 0.22, dur: 14, delay:  0,    amp: 60, yc: 200 },
+  { color: '#3D1A4D', opacity: 0.20, dur: 9,  delay: -2.25, amp: 72, yc: 190 },
+  { color: '#8A55B5', opacity: 0.13, dur: 20, delay: -6.6,  amp: 48, yc: 210 },
+  { color: '#C39BD3', opacity: 0.07, dur: 27, delay: -9.0,  amp: 35, yc: 220 },
+]
+
+function DiagonalWaves() {
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none select-none" aria-hidden>
+      <div style={{
+        position: 'absolute',
+        bottom: '-20%',
+        left: '-30%',
+        width: '180%',
+        height: '80%',
+        transform: 'rotate(-28deg)',
+        transformOrigin: 'bottom left',
+      }}>
+        {WAVE_LAYERS.map((w, i) => (
+          <svg
+            key={i}
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox={`0 0 ${PERIOD * 4} 400`}
+            preserveAspectRatio="none"
+            style={{
+              position: 'absolute',
+              bottom: `${i * 18}px`,
+              left: 0,
+              width: `${PERIOD * 4}px`,
+              height: '400px',
+              fill: w.color,
+              opacity: w.opacity,
+              animation: `velvet-wave ${w.dur}s linear infinite`,
+              animationDelay: `${w.delay}s`,
+              willChange: 'transform',
+            }}
+          >
+            <path d={buildWavePath(w.amp, w.yc)} />
+          </svg>
+        ))}
+      </div>
+      <style>{`
+        @keyframes velvet-wave {
+          from { transform: translateX(0); }
+          to   { transform: translateX(-${PERIOD}px); }
+        }
+      `}</style>
+    </div>
+  )
+}
+
 const initialLogin = { error: null }
 const initialReset = { error: null, sent: false }
 
@@ -60,6 +124,8 @@ export function LoginForm() {
       className="relative min-h-screen flex flex-col items-center justify-center p-4 overflow-hidden"
       style={{ background: BG }}
     >
+      <DiagonalWaves />
+
       {/* Watermark — canto inferior direito, parcialmente cortado */}
       <svg
         viewBox={VIEWBOX}
