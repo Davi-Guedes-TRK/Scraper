@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
         (sum(valor_anuncio) FILTER (WHERE valor_anuncio > 0))::int AS valor_medio_geral,
         (sum(valor_anuncio) FILTER (WHERE (telefone_contato IS NOT NULL OR outros_contatos IS NOT NULL) AND valor_anuncio > 0))::int AS valor_medio_leads,
         (sum(valor_anuncio) FILTER (WHERE (visita_agendada IS NOT NULL OR visita_entrada IS NOT NULL OR obs_visita IS NOT NULL) AND valor_anuncio > 0))::int AS valor_medio_visitados,
-        (sum(valor_anuncio) FILTER (WHERE fase_atual IN ('Fechado Comercialmente','Captação Realizada ✅','Ônus Solicitada','Matricula Solicitada') AND valor_anuncio > 0))::int AS valor_medio_captados,
+        (sum(valor_anuncio) FILTER (WHERE fase_atual IN ('Fechado Comercialmente','Captação Realizada ✅') AND valor_anuncio > 0))::int AS valor_medio_captados,
         round(avg(leads_dias)      FILTER (WHERE leads_dias      BETWEEN 0.01 AND 365))::int AS dias_leads,
         round(avg(em_contato_dias) FILTER (WHERE em_contato_dias BETWEEN 0.01 AND 365))::int AS dias_contato,
         round(avg(visita_dias)     FILTER (WHERE visita_dias     BETWEEN 0.01 AND 365))::int AS dias_visita,
@@ -137,7 +137,7 @@ export async function GET(req: NextRequest) {
       SELECT
         COALESCE(pessoa_origem, 'Sem origem') AS pessoa,
         count(*)::int AS oportunidades,
-        count(*) FILTER (WHERE fase_atual IN ('Fechado Comercialmente','Captação Realizada ✅','Ônus Solicitada','Matricula Solicitada'))::int AS captados,
+        count(*) FILTER (WHERE fase_atual IN ('Fechado Comercialmente','Captação Realizada ✅'))::int AS captados,
         count(*) FILTER (WHERE fase_atual = 'Não Captado ❌')::int AS perdidos
       FROM pipefy_captacoes
       WHERE criado_em >= ${desde} AND criado_em < (${ate}::date + INTERVAL '1 day')
