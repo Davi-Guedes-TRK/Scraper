@@ -163,9 +163,9 @@ app.post('/api/extrair-pistas', async (req, res) => {
     const result = await model.generateContent(`${SYSTEM_PROMPT}\n\nDescrição:\n${descricao.slice(0, 4000)}`)
     const raw = result.response.text()
 
-    const match = raw.match(/\{[\s\S]*\}/)
-    if (!match) throw new Error('Resposta não contém JSON válido')
-    const pistas = JSON.parse(match[0])
+    const start = raw.indexOf('{'); const end = raw.lastIndexOf('}')
+    if (start === -1 || end <= start) throw new Error('Resposta não contém JSON válido')
+    const pistas = JSON.parse(raw.slice(start, end + 1))
 
     res.json({ pistas })
   } catch (err) {
@@ -247,9 +247,9 @@ Retorne SOMENTE um JSON válido sem markdown:
 
     const result = await model.generateContent(parts)
     const raw = result.response.text()
-    const match = raw.match(/\{[\s\S]*\}/)
-    if (!match) throw new Error('Resposta não contém JSON válido')
-    const pistas = JSON.parse(match[0])
+    const start = raw.indexOf('{'); const end = raw.lastIndexOf('}')
+    if (start === -1 || end <= start) throw new Error('Resposta não contém JSON válido')
+    const pistas = JSON.parse(raw.slice(start, end + 1))
     res.json({ pistas })
   } catch (err) {
     console.error('[Gemini Vision]', err.message)

@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
 
     const ext = EXT_POR_MIME[file.type] ?? 'png'
     const slugRua = rua.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
-    const path = `${slugRua || 'rua'}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`
+    const path = `${slugRua || 'rua'}/${Date.now()}-${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}.${ext}`
 
     const supabase = await createClient()
     const buffer = new Uint8Array(await file.arrayBuffer())

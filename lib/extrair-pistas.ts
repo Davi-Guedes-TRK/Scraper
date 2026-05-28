@@ -142,9 +142,9 @@ function getModel() {
 }
 
 function parseJson(raw: string): Pistas | null {
-  const match = raw.match(/\{[\s\S]*\}/)
-  if (!match) return null
-  try { return JSON.parse(match[0]) } catch { return null }
+  const start = raw.indexOf('{'); const end = raw.lastIndexOf('}')
+  if (start === -1 || end <= start) return null
+  try { return JSON.parse(raw.slice(start, end + 1)) } catch { return null }
 }
 
 export async function extractFromText(descricao: string): Promise<Pistas | null> {

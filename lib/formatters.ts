@@ -39,9 +39,9 @@ export const allImgs = (imagens: string | null | undefined): string[] => {
 
 export function parseLatLng(url: string | null | undefined): { lat: number; lng: number } | null {
   if (!url) return null
-  let m = url.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/)
+  let m = url.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/)
   if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) }
-  m = url.match(/[?&]q=(-?\d+\.?\d*),(-?\d+\.?\d*)/)
+  m = url.match(/[?&]q=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/)
   if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) }
   return null
 }
