@@ -99,10 +99,12 @@ export function MatriculaModal({ item, onClose }: Props) {
 
   return (
     <div
+      role="presentation"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
       onClick={onClose}
     >
       <div
+        role="presentation"
         className="bg-white border border-[#d0d7de] rounded-lg w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]"
         onClick={e => e.stopPropagation()}
       >

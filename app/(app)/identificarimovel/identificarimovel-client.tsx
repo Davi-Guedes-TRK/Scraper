@@ -58,7 +58,7 @@ export function IdentificarImovelClient() {
     fetch('/api/referencias-visuais')
       .then(r => r.json())
       .then((d: { referencias?: { rua: string }[] }) => {
-        const ruas = Array.from(new Set((d.referencias ?? []).map(r => r.rua))).sort()
+        const ruas = Array.from(new Set((d.referencias ?? []).map(r => r.rua))).sort((a, b) => a.localeCompare(b))
         setRuasDisponiveis(ruas)
       })
       .catch(() => {})

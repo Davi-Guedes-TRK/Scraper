@@ -187,7 +187,7 @@ export function Navbar() {
       {/* Navegação */}
       <nav
         className="flex-1 py-3 flex flex-col gap-1 overflow-y-auto overflow-x-hidden"
-        style={{ padding: collapsed ? '0.75rem 0.5rem' : '0.75rem 0.5rem' }}
+        style={{ padding: '0.75rem 0.5rem' }}
       >
         {NAV_GROUPS.map((group, gi) => {
           const groupKey = group.label ?? `__ungrouped_${gi}`

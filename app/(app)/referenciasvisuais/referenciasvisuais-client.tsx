@@ -224,7 +224,7 @@ export function ReferenciasVisuaisClient() {
   }
 
   const ruasUnicas = useMemo(
-    () => Array.from(new Set(referencias.map(r => r.rua))).sort(),
+    () => Array.from(new Set(referencias.map(r => r.rua))).sort((a, b) => a.localeCompare(b)),
     [referencias],
   )
 
