@@ -3,8 +3,8 @@ import { Providers } from '@/components/providers'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'ELO · Sistema Imobiliário',
-  description: 'Painel de Captação ELO',
+  title: 'Velvet · Sistema Imobiliário',
+  description: 'Painel de Captação Velvet',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

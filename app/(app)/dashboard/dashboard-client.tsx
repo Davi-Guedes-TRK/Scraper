@@ -114,7 +114,7 @@ export function DashboardClient({
           <div>
             <p className="eyebrow text-muted-foreground mb-0.5">Painel de Captação</p>
             <h2 className="text-sm font-bold text-foreground font-display tracking-tight">
-              Operação TRK · Lago Sul
+              Operação Velvet · Lago Sul
             </h2>
           </div>
           <Link

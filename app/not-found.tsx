@@ -1,6 +1,6 @@
 import Link from 'next/link'
 
-export const metadata = { title: 'Página não encontrada · TRK Imóveis' }
+export const metadata = { title: 'Página não encontrada · Velvet' }
 
 export default function NotFound() {
   return (

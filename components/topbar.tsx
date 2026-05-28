@@ -15,11 +15,12 @@ const TITLES: Record<string, string> = {
   '/extracaopistas': 'Extração de Pistas',
   '/visitas': 'Roteiro de Visitas',
   '/relatorio': 'Cartório',
+  '/analitico': 'Analítico',
 }
 
 function titleFor(pathname: string) {
   const hit = Object.keys(TITLES).find(p => pathname.startsWith(p))
-  return hit ? TITLES[hit] : 'TRK Imóveis'
+  return hit ? TITLES[hit] : 'Velvet'
 }
 
 function useOutside(onClose: () => void) {

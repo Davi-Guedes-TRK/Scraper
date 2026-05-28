@@ -4,7 +4,7 @@ import { PORTALS, portalKeys } from '@/lib/portals'
 import { withCache } from '@/lib/redis'
 import { DashboardClient } from './dashboard-client'
 
-export const metadata = { title: 'Dashboard · TRK Imóveis' }
+export const metadata = { title: 'Dashboard · Velvet' }
 
 async function getDashboardData() {
   const supabase = await createClient()

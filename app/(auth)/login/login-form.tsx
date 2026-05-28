@@ -210,7 +210,7 @@ export function LoginForm() {
           className="text-center text-[10px] font-medium mt-6 tracking-widest"
           style={{ color: 'rgba(195,155,211,0.45)' }}
         >
-          © 2026 TRK Imóveis
+          © 2026 Velvet
         </p>
       </div>
     </div>
