@@ -15,7 +15,7 @@ PIPE_ID      = 307179010
 
 def load_session():
     # CI: decodifica do env
-    b64 = os.getenv("PIPEFY_SESSION_B64")
+    b64 = os.getenv("PIPEFY_SESSION_B64", "").strip().lstrip('﻿').strip()
     if b64:
         SESSION_FILE.parent.mkdir(parents=True, exist_ok=True)
         SESSION_FILE.write_bytes(base64.b64decode(b64))
