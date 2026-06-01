@@ -2,13 +2,24 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { timeAgo } from '@/lib/formatters'
+import { LANCAMENTO_FONTES, lancamentoFontes } from '@/lib/portals'
 
+// Monitorados na UI (incluindo os que rodam só via GH Actions)
+const PORTALS_LOCACAO = [
+  { key: 'dfimoveis',   label: 'DFImóveis' },
+  { key: 'olx',         label: 'OLX Brasil' },
+  { key: 'vivareal',    label: 'Viva Real' },
+  { key: 'zap',         label: 'ZAP' },
+  { key: 'chavesnamao', label: 'Chaves na Mão' },
+] as const
+
+// Disponíveis no disparo manual (têm scraper acessível via /api/scrapers/run)
 const PORTALS = [
   { key: 'dfimoveis', label: 'DFImóveis' },
   { key: 'olx',       label: 'OLX Brasil' },
 ] as const
 
-type PortalDef = typeof PORTALS[number]
+type PortalDef = { key: string; label: string }
 
 const CIDADES = [
   'todos','brasilia','lago-sul','park-sul','park-way','asa-sul','asa-norte',
@@ -58,33 +69,33 @@ function LogsModal({ title, logs, loading, onClose }: {
 }) {
   return (
     <div role="button" tabIndex={0} className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose} onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}>
-      <div className="bg-white border border-[#d0d7de] rounded-lg w-full max-w-2xl shadow-xl" onClick={e => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#d0d7de]">
-          <h2 className="text-[#1f2328] font-semibold">{title}</h2>
-          <button onClick={onClose} className="text-[#656d76] hover:text-[#1f2328] text-xl leading-none">✕</button>
+      <div className="rounded-lg w-full max-w-2xl shadow-xl border border-border" style={{ background: 'var(--card)' }} onClick={e => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <h2 className="text-foreground font-semibold">{title}</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-xl leading-none">✕</button>
         </div>
         <div className="p-5 max-h-96 overflow-y-auto">
           {loading ? (
             <div className="flex flex-col gap-2">
               {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="h-12 rounded-lg animate-pulse bg-[#f6f8fa]" />
+                <div key={i} className="h-12 rounded-lg animate-pulse bg-muted" />
               ))}
             </div>
           ) : logs.length === 0 ? (
-            <p className="text-center py-8 text-[#656d76] text-sm">Nenhum log registrado.</p>
+            <p className="text-center py-8 text-muted-foreground text-sm">Nenhum log registrado.</p>
           ) : (
             <div className="flex flex-col gap-2">
               {logs.map(log => (
-                <div key={log.id} className="bg-[#f6f8fa] border border-[#d0d7de] rounded-lg p-3 flex items-start gap-3">
+                <div key={log.id} className="bg-muted border border-border rounded-lg p-3 flex items-start gap-3">
                   <span className={`w-2 h-2 mt-1.5 rounded-full flex-shrink-0 ${
                     log.status === 'ativo' ? 'bg-green-500' : log.status === 'erro' ? 'bg-red-500' : 'bg-slate-400'
                   }`} />
                   <div className="flex-1 min-w-0">
-                    <span className="text-xs text-[#656d76] font-mono">{new Date(log.created_at).toLocaleString('pt-BR')}</span>
+                    <span className="text-xs text-muted-foreground font-mono">{new Date(log.created_at).toLocaleString('pt-BR')}</span>
                     {log.total_coletado > 0 && (
                       <span className="ml-2 text-xs text-green-600">+{log.total_coletado} imóveis</span>
                     )}
-                    <p className="text-xs text-[#656d76] mt-1 break-words">{log.mensagem}</p>
+                    <p className="text-xs text-muted-foreground mt-1 break-words">{log.mensagem}</p>
                   </div>
                 </div>
               ))}
@@ -137,45 +148,45 @@ function PortalCard({ portal }: { portal: PortalDef }) {
 
   return (
     <>
-      <div className="bg-white border border-[#d0d7de] rounded-lg p-5 shadow-sm">
+      <div className="card rounded-lg p-5">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <h3 className="font-semibold text-[#1f2328]">{portal.label}</h3>
+            <h3 className="font-semibold text-foreground">{portal.label}</h3>
             {!statsLoading && stats && (
               <span className="flex items-center gap-1.5">
                 <span className={`w-2 h-2 rounded-full ${STATUS_DOT[stats.status] ?? 'bg-slate-400'}`} />
-                <span className="text-xs text-[#656d76] capitalize">{stats.status}</span>
+                <span className="text-xs text-muted-foreground capitalize">{stats.status}</span>
               </span>
             )}
           </div>
-          <button onClick={openLogs} className="text-xs text-trk-blue hover:underline transition-colors">
+          <button onClick={openLogs} className="text-xs text-primary hover:underline transition-colors">
             Ver logs
           </button>
         </div>
 
         {statsLoading ? (
           <div className="grid grid-cols-3 gap-3">
-            {[1,2,3].map(i => <div key={i} className="h-14 rounded-lg animate-pulse bg-[#f6f8fa]" />)}
+            {[1,2,3].map(i => <div key={i} className="h-14 rounded-lg animate-pulse bg-muted" />)}
           </div>
         ) : (
           <div className="grid grid-cols-3 gap-3">
             <div className="flex flex-col gap-1">
-              <span className="text-xs text-[#656d76]">Último registro</span>
-              <span className="text-sm text-[#1f2328]">{stats?.ultimoRegistro ? timeAgo(stats.ultimoRegistro) : '—'}</span>
+              <span className="text-xs text-muted-foreground">Última coleta</span>
+              <span className="text-sm text-foreground">{stats?.ultimoRegistro ? timeAgo(stats.ultimoRegistro) : '—'}</span>
             </div>
             <div className="flex flex-col gap-1">
-              <span className="text-xs text-[#656d76]">Hoje</span>
-              <span className="text-2xl font-bold text-[#1f2328]">{stats?.countToday ?? '—'}</span>
+              <span className="text-xs text-muted-foreground">Hoje</span>
+              <span className="text-2xl font-bold text-foreground tabular">{stats?.countToday ?? '—'}</span>
             </div>
             <div className="flex flex-col gap-1">
-              <span className="text-xs text-[#656d76]">Últimos 3 dias</span>
-              <span className="text-2xl font-bold text-green-600">{stats?.count3d ?? '—'}</span>
+              <span className="text-xs text-muted-foreground">Últimos 3 dias</span>
+              <span className="text-2xl font-bold text-green-600 tabular">{stats?.count3d ?? '—'}</span>
             </div>
           </div>
         )}
 
         {stats?.ultimoLog?.mensagem && (
-          <p className="mt-3 text-xs text-[#656d76] truncate">{stats.ultimoLog.mensagem}</p>
+          <p className="mt-3 text-xs text-muted-foreground truncate">{stats.ultimoLog.mensagem}</p>
         )}
       </div>
 
@@ -251,16 +262,16 @@ function RunPanel() {
   const isDFI = portal === 'dfimoveis'
   const isOLX = portal === 'olx'
 
-  const sel = 'bg-[#f6f8fa] border border-[#d0d7de] text-[#1f2328] text-sm rounded-lg px-3 py-2 outline-none focus:border-trk-blue w-full disabled:opacity-40'
+  const sel = 'bg-muted border border-border text-foreground text-sm rounded-lg px-3 py-2 outline-none focus:border-primary w-full disabled:opacity-40'
   const pill = (active: boolean) => `text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors disabled:opacity-40 ${
     active
-      ? 'border-trk-blue bg-trk-blue/10 text-trk-blue'
-      : 'border-[#d0d7de] text-[#656d76] hover:text-[#1f2328] hover:border-[#8c959f]'
+      ? 'border-primary bg-primary/10 text-primary'
+      : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/40'
   }`
 
   return (
-    <div className="bg-white border border-[#d0d7de] rounded-lg overflow-hidden shadow-sm">
-      <div className="p-5 grid grid-cols-1 lg:grid-cols-2 gap-6 border-b border-[#d0d7de]">
+    <div className="card rounded-lg overflow-hidden">
+      <div className="p-5 grid grid-cols-1 lg:grid-cols-2 gap-6 border-b border-border">
         {/* Coluna esquerda */}
         <div className="flex flex-col gap-5">
           <div className="flex flex-col gap-2">
@@ -368,7 +379,7 @@ function RunPanel() {
       </div>
 
       {/* Ações */}
-      <div className="px-5 py-4 flex items-center justify-between gap-4 border-b border-[#d0d7de]">
+      <div className="px-5 py-4 flex items-center justify-between gap-4 border-b border-border">
         {running ? (
           <span className="text-xs text-[#656d76]">Coletando…</span>
         ) : !fastMode ? (() => {
@@ -393,16 +404,16 @@ function RunPanel() {
 
       {/* Terminal */}
       <div>
-        <div className="px-4 py-2 border-b border-[#d0d7de] bg-[#f6f8fa] flex items-center justify-between">
-          <span className="text-xs text-[#656d76] font-mono">output</span>
+        <div className="px-4 py-2 border-b border-border flex items-center justify-between" style={{ background: 'var(--secondary)' }}>
+          <span className="text-xs text-muted-foreground font-mono">output</span>
           <div className="flex gap-3">
             <button onClick={() => { if (logs.length) navigator.clipboard.writeText(logs.join('\n')).then(() => toast('Logs copiados', 'success')) }}
               disabled={!logs.length}
-              className="text-xs text-[#656d76] hover:text-[#1f2328] disabled:opacity-30 transition-colors">
+              className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors">
               copiar
             </button>
             <button onClick={() => { setLogs([]); setDone(null) }} disabled={!logs.length && !done}
-              className="text-xs text-[#656d76] hover:text-[#1f2328] disabled:opacity-30 transition-colors">
+              className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors">
               limpar
             </button>
           </div>
@@ -435,24 +446,96 @@ function RunPanel() {
   )
 }
 
+// ── LancamentoCard ─────────────────────────────────────────────────────────────
+type FonteStats = { fonte: string; total: number; ultimo: string | null }
+
+function LancamentoCard({ fonte, label, hex, stats }:
+  { fonte: string; label: string; hex: string; stats?: FonteStats }) {
+  const total = stats?.total ?? 0
+  const ultimo = stats?.ultimo
+  const daysSince = ultimo ? Math.floor((Date.now() - new Date(ultimo).getTime()) / 86400000) : null
+  const staleness = daysSince === null ? '' : daysSince > 7 ? 'text-red-400' : daysSince > 3 ? 'text-amber-400' : 'text-muted-foreground'
+
+  return (
+    <div className="card rounded-lg p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: hex }} />
+        <h3 className="font-semibold text-foreground text-sm">{label}</h3>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-muted-foreground">Coletados</span>
+          <span className="text-2xl font-bold text-foreground tabular">{total}</span>
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-muted-foreground">Última coleta</span>
+          <span className={`text-sm font-mono ${staleness}`}>{ultimo ? timeAgo(ultimo) : '—'}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function LancamentosSection() {
+  const [stats, setStats] = useState<FonteStats[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/empreendimentos')
+      .then(r => r.json())
+      .then((d: { stats: FonteStats[] }) => setStats(d.stats ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-[#656d76]">Lançamentos · Construtoras DF</h2>
+        <span className="text-[10px] text-[#656d76] font-mono">via GitHub Actions · 07:00 BRT</span>
+      </div>
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-28 rounded-lg animate-pulse bg-[#f6f8fa]" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {lancamentoFontes.map(key => {
+            const def = LANCAMENTO_FONTES[key]
+            const s = stats.find(x => x.fonte === key)
+            return <LancamentoCard key={key} fonte={key} label={def.label} hex={def.hex} stats={s} />
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── ScrapersClient ─────────────────────────────────────────────────────────────
 export function ScrapersClient() {
   return (
     <div className="p-6 max-w-5xl mx-auto flex flex-col gap-8">
       <div>
-        <h1 className="text-2xl font-bold text-[#1f2328]">Scrapers</h1>
-        <p className="text-[#656d76] text-sm mt-1">Monitoramento e disparo manual das coletas.</p>
+        <h1 className="text-2xl font-bold text-foreground font-display">Scrapers</h1>
+        <p className="text-muted-foreground text-sm mt-1">Monitoramento e disparo manual das coletas.</p>
       </div>
 
       <div className="flex flex-col gap-3">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-[#656d76]">Monitores</h2>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {PORTALS.map(p => <PortalCard key={p.key} portal={p} />)}
+        <div className="flex items-baseline justify-between">
+          <h2 className="eyebrow text-muted-foreground">Locação · Portais</h2>
+          <span className="text-[10px] text-muted-foreground font-mono">vivareal/zap/chaves rodam via GH Actions</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {PORTALS_LOCACAO.map(p => <PortalCard key={p.key} portal={p} />)}
         </div>
       </div>
 
+      <LancamentosSection />
+
       <div className="flex flex-col gap-3">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-[#656d76]">Disparo manual</h2>
+        <h2 className="eyebrow text-muted-foreground">Disparo manual · DFImóveis / OLX</h2>
         <RunPanel />
       </div>
     </div>

@@ -155,6 +155,28 @@ function sortItems(items: Empreendimento[], col: SortCol, dir: SortDir): Empreen
   })
 }
 
+type Tipologia = { quartos: number; area_min: number; area_max?: number | null }
+
+function TipologiasRow({ tipologias, colSpan }: { tipologias: unknown; colSpan: number }) {
+  const list = (Array.isArray(tipologias) ? tipologias : []) as Tipologia[]
+  if (!list.length) return null
+  return (
+    <tr>
+      <td colSpan={colSpan} className="px-4 pb-3 pt-0">
+        <div className="flex flex-wrap gap-1.5">
+          {list.map((t, i) => (
+            <span key={i}
+              className="text-[10px] px-2 py-0.5 rounded-full font-mono border"
+              style={{ background: 'var(--secondary)', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}>
+              {t.quartos}q · {t.area_min}{t.area_max && t.area_max !== t.area_min ? `–${t.area_max}` : ''} m²
+            </span>
+          ))}
+        </div>
+      </td>
+    </tr>
+  )
+}
+
 export function LancamentosClient() {
   const [data, setData] = useState<ApiResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -163,6 +185,7 @@ export function LancamentosClient() {
   const [status, setStatus] = useState<string | null>(null)
   const [sortCol, setSortCol] = useState<SortCol>('scraped_at')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     const ac = new AbortController()
@@ -328,10 +351,15 @@ export function LancamentosClient() {
                   <th className={thSort} onClick={() => handleSort('scraped_at')}>
                     Captado <SortIcon col="scraped_at" active={sortCol} dir={sortDir} />
                   </th>
+                  <th className={thBase} style={{ width: '32px' }} />
                 </tr>
               </thead>
               <tbody>
                 {sorted.map((item, idx) => {
+                  const rowKey = `${item.fonte}-${item.slug}`
+                  const isExpanded = expandedRows.has(rowKey)
+                  const hasTipologias = Array.isArray(item.tipologias) && (item.tipologias as unknown[]).length > 0
+
                   const area = item.area_min_m2 && item.area_max_m2 && item.area_min_m2 !== item.area_max_m2
                     ? `${item.area_min_m2}–${item.area_max_m2} m²`
                     : item.area_min_m2 ? `${item.area_min_m2} m²` : '—'
@@ -344,52 +372,77 @@ export function LancamentosClient() {
                     ? `${item.vagas_min}–${item.vagas_max}`
                     : item.vagas_min ?? item.vagas_max ?? '—'
 
+                  const rowBg = idx % 2 === 1 ? 'color-mix(in srgb, var(--secondary) 30%, transparent)' : 'transparent'
+
                   return (
-                    <tr
-                      key={`${item.fonte}-${item.slug}`}
-                      onClick={() => item.url && window.open(item.url, '_blank')}
-                      className="border-b border-border/40 last:border-0 transition-colors"
-                      style={{
-                        background: idx % 2 === 1 ? 'var(--secondary)/30' : 'transparent',
-                        cursor: item.url ? 'pointer' : 'default',
-                      }}
-                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent)')}
-                      onMouseLeave={e => (e.currentTarget.style.background = idx % 2 === 1 ? 'color-mix(in srgb, var(--secondary) 30%, transparent)' : 'transparent')}
-                    >
-                      <td className="px-3 py-3 min-w-[200px]">
-                        <div className="font-medium text-foreground text-[13px] leading-tight mb-1">
-                          {item.nome ?? item.slug}
-                        </div>
-                        <FonteBadge fonte={item.fonte} />
-                      </td>
-                      <td className="px-3 py-3">
-                        <StatusBadge status={item.status} />
-                      </td>
-                      <td className="px-3 py-3 text-[12px] text-muted-foreground font-mono whitespace-nowrap">
-                        {item.bairro ?? '—'}
-                      </td>
-                      <td className="px-3 py-3 text-[12px] font-mono whitespace-nowrap text-foreground">
-                        {area}
-                      </td>
-                      <td className="px-3 py-3 text-[12px] font-mono text-center text-foreground">
-                        {item.total_unidades ?? '—'}
-                      </td>
-                      <td className="px-3 py-3 text-[12px] font-mono text-center text-foreground">
-                        {item.suites_max ?? '—'}
-                      </td>
-                      <td className="px-3 py-3 text-[12px] font-mono text-center text-foreground">
-                        {vagas}
-                      </td>
-                      <td className="px-3 py-3 text-[12px] font-mono whitespace-nowrap text-foreground">
-                        {preco}
-                      </td>
-                      <td className="px-3 py-3">
-                        <MiniProgress item={item} />
-                      </td>
-                      <td className="px-3 py-3 text-[11px] font-mono text-muted-foreground whitespace-nowrap">
-                        {item.scraped_at ? timeAgo(item.scraped_at) : '—'}
-                      </td>
-                    </tr>
+                    <>
+                      <tr
+                        key={rowKey}
+                        onClick={() => item.url && window.open(item.url, '_blank')}
+                        className="border-b border-border/40 transition-colors"
+                        style={{ background: rowBg, cursor: item.url ? 'pointer' : 'default' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = isExpanded ? 'var(--accent)/40' : rowBg)}
+                      >
+                        <td className="px-3 py-3 min-w-[200px]">
+                          <div className="font-medium text-foreground text-[13px] leading-tight mb-1">
+                            {item.nome ?? item.slug}
+                          </div>
+                          <FonteBadge fonte={item.fonte} />
+                        </td>
+                        <td className="px-3 py-3">
+                          <StatusBadge status={item.status} />
+                        </td>
+                        <td className="px-3 py-3 text-[12px] text-muted-foreground font-mono whitespace-nowrap">
+                          {item.bairro ?? '—'}
+                        </td>
+                        <td className="px-3 py-3 text-[12px] font-mono whitespace-nowrap text-foreground">
+                          {area}
+                        </td>
+                        <td className="px-3 py-3 text-[12px] font-mono text-center text-foreground">
+                          {item.total_unidades ?? '—'}
+                        </td>
+                        <td className="px-3 py-3 text-[12px] font-mono text-center text-foreground">
+                          {item.suites_max ?? '—'}
+                        </td>
+                        <td className="px-3 py-3 text-[12px] font-mono text-center text-foreground">
+                          {vagas}
+                        </td>
+                        <td className="px-3 py-3 text-[12px] font-mono whitespace-nowrap text-foreground">
+                          {preco}
+                        </td>
+                        <td className="px-3 py-3">
+                          <MiniProgress item={item} />
+                        </td>
+                        <td className="px-3 py-3 text-[11px] font-mono text-muted-foreground whitespace-nowrap">
+                          {item.scraped_at ? timeAgo(item.scraped_at) : '—'}
+                        </td>
+                        <td className="px-1 py-3">
+                          {hasTipologias && (
+                            <button
+                              onClick={e => {
+                                e.stopPropagation()
+                                setExpandedRows(prev => {
+                                  const next = new Set(prev)
+                                  next.has(rowKey) ? next.delete(rowKey) : next.add(rowKey)
+                                  return next
+                                })
+                              }}
+                              className="w-5 h-5 flex items-center justify-center rounded text-muted-foreground hover:text-foreground transition-colors"
+                              title="Ver tipologias"
+                            >
+                              <svg className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                                fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                      {isExpanded && hasTipologias && (
+                        <TipologiasRow key={`${rowKey}-tip`} tipologias={item.tipologias} colSpan={11} />
+                      )}
+                    </>
                   )
                 })}
               </tbody>

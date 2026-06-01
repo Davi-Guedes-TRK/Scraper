@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { LogoMark, LogoHorizontal } from './logo'
 import { useNewPropertiesCtx } from './new-properties-provider'
 
@@ -45,6 +45,15 @@ const NAV_GROUPS = [
         icon: (
           <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 12h4l3-9 4 18 3-9h4" />
+          </svg>
+        ),
+      },
+      {
+        href: '/lancamentos',
+        label: 'Lançamentos',
+        icon: (
+          <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 21h18M5 21V7l7-4 7 4v14M9 9h1M14 9h1M9 13h1M14 13h1M9 17h1M14 17h1" />
           </svg>
         ),
       },
@@ -140,11 +149,22 @@ export function Navbar() {
 
   const [collapsed, setCollapsed] = useState(false)
   const [groupsCollapsed, setGroupsCollapsed] = useState<Record<string, boolean>>({})
+  const [badgePulse, setBadgePulse] = useState(false)
+  const prevCount = useRef(0)
 
   useEffect(() => {
     setCollapsed(localStorage.getItem(STORAGE_KEY_COLLAPSED) === '1')
     setGroupsCollapsed(loadGroupsState())
   }, [])
+
+  useEffect(() => {
+    if (count > prevCount.current) {
+      setBadgePulse(true)
+      const t = setTimeout(() => setBadgePulse(false), 1200)
+      return () => clearTimeout(t)
+    }
+    prevCount.current = count
+  }, [count])
 
   useEffect(() => {
     if (pathname === '/triagem') markSeen()
@@ -243,7 +263,7 @@ export function Navbar() {
                         {!collapsed && <span className="flex-1 text-[13px] truncate">{item.label}</span>}
                         {showBadge && !collapsed && (
                           <span
-                            className="min-w-[16px] h-4 text-[9px] font-bold rounded-full flex items-center justify-center px-1 leading-none font-mono"
+                            className={`min-w-[16px] h-4 text-[9px] font-bold rounded-full flex items-center justify-center px-1 leading-none font-mono transition-transform ${badgePulse ? 'animate-bounce' : ''}`}
                             style={{ background: 'var(--foreground)', color: 'var(--background)' }}
                           >
                             {count > 99 ? '99+' : count}
