@@ -27,22 +27,28 @@ jobs:
           PIPEFY_SESSION_B64: ${{ secrets.PIPEFY_SESSION_B64 }}
         run: python scripts/pipefy_token_refresh.py
 
-      - name: Atualizar PIPEFY_TOKEN no Vercel
+      - name: Atualizar PIPEFY_TOKEN no Vercel (API REST)
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          ORG_ID:       ${{ secrets.VERCEL_ORG_ID }}
+          ENV_ID:       ${{ secrets.PIPEFY_TOKEN_ENV_ID }}
           PROJECT_ID:   prj_kx2bwqph4Z7mxw0eiJ2vyLMFQvkb
           NEW_TOKEN:    ${{ steps.refresh.outputs.token }}
         run: |
-          npm i -g vercel@latest
-          # Remove e re-adiciona com o novo valor
-          echo "y" | vercel env rm PIPEFY_TOKEN production --token "$VERCEL_TOKEN" || true
-          printf '%s' "$NEW_TOKEN" | vercel env add PIPEFY_TOKEN production --token "$VERCEL_TOKEN"
-          echo "[OK] PIPEFY_TOKEN atualizado no Vercel"
+          curl -sf -X PATCH \
+            "https://api.vercel.com/v10/projects/$PROJECT_ID/env/$ENV_ID" \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"value\": \"$NEW_TOKEN\"}" \
+          | python3 -c "import sys,json; d=json.load(sys.stdin); print('[OK] env atualizado:', d.get('key','?'))"
 
       - name: Re-deploy para aplicar novo token
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          PROJECT_ID:   prj_kx2bwqph4Z7mxw0eiJ2vyLMFQvkb
         run: |
-          vercel --prod --token "$VERCEL_TOKEN" --yes
-          echo "[OK] Deploy disparado"
+          curl -sf -X POST \
+            "https://api.vercel.com/v13/deployments" \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"name\":\"erp-trk\",\"project\":\"$PROJECT_ID\",\"target\":\"production\"}" \
+          | python3 -c "import sys,json; d=json.load(sys.stdin); print('[OK] deploy:', d.get('url','?'))"
