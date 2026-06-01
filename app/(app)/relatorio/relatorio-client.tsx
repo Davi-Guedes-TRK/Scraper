@@ -27,6 +27,7 @@ type Imovel = {
   tipo_anunciante?: string | null
   tipo_imovel?: string | null
   creci?: string | null
+  numero_matricula?: string | null
 }
 
 // ── Toast ──────────────────────────────────────────────────────────────────────
@@ -128,6 +129,229 @@ function EditEnderecoModal({ item, current, onSave, onClose }: {
   )
 }
 
+// ── Cartório text parser ───────────────────────────────────────────────────────
+type ParsedEntry = { address: string; matricula: string; score: number }
+
+function parseCartorioEntries(text: string): Array<Omit<ParsedEntry, 'score'>> {
+  // Match " - DIGITS" — space before dash is required (avoids compound-word dashes).
+  // No lookahead: just find every occurrence and split the text around them.
+  const re = / -\s*(\d+)/g
+  const entries: Array<{ address: string; matricula: string }> = []
+  let lastEnd = 0
+  let match: RegExpExecArray | null
+  while ((match = re.exec(text)) !== null) {
+    const addressPart = text.slice(lastEnd, match.index).trim()
+    if (addressPart) entries.push({ address: addressPart, matricula: match[1] })
+    lastEnd = match.index + match[0].length
+  }
+  return entries
+}
+
+function scoreAddress(candidate: string, reference: string): number {
+  // Score only the tail of the candidate (real address is always at the end).
+  // Compare by the SET of numbers present — format-agnostic and robust.
+  const tail = candidate.slice(-120)
+  const numSet = (s: string) =>
+    new Set((s.match(/\d+/g) ?? []).map(n => String(parseInt(n, 10))))
+  const c = numSet(tail), r = numSet(reference)
+  let matches = 0
+  r.forEach(n => { if (c.has(n)) matches++ })
+  return matches
+}
+
+// ── MatriculaQueueModal ───────────────────────────────────────────────────────
+function MatriculaQueueModal({ queue, onSave, onDesistir, onClose }: {
+  queue: Imovel[]
+  onSave: (item: Imovel, matricula: string) => Promise<void>
+  onDesistir: (item: Imovel) => Promise<void>
+  onClose: () => void
+}) {
+  const [idx, setIdx] = useState(0)
+  const [value, setValue] = useState('')
+  const [saving, setSaving] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const item = queue[idx]
+  const done = idx >= queue.length
+
+  const advance = () => {
+    setIdx(i => i + 1)
+    setValue('')
+    setTimeout(() => inputRef.current?.focus(), 30)
+  }
+
+  const save = async () => {
+    if (!value.trim() || saving) return
+    setSaving(true)
+    await onSave(item, value.trim())
+    setSaving(false)
+    advance()
+  }
+
+  const desistir = async () => {
+    if (saving) return
+    setSaving(true)
+    await onDesistir(item)
+    setSaving(false)
+    advance()
+  }
+
+  const backdrop = (
+    <div role="button" tabIndex={0}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      onClick={onClose} onKeyDown={e => { if (e.key === 'Escape') onClose() }} />
+  )
+
+  if (done) return (
+    <>
+      {backdrop}
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+        <div className="rounded-xl w-full max-w-sm shadow-2xl p-8 text-center pointer-events-auto"
+          style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+          <p className="text-lg font-bold text-foreground mb-1">Tudo preenchido</p>
+          <p className="text-sm text-muted-foreground mb-6">
+            {queue.length} imóvel{queue.length !== 1 ? 'is' : ''} processado{queue.length !== 1 ? 's' : ''}
+          </p>
+          <button onClick={onClose}
+            className="text-sm font-semibold px-6 py-2.5 rounded-lg text-white bg-primary hover:bg-primary-h transition-colors">
+            Fechar
+          </button>
+        </div>
+      </div>
+    </>
+  )
+
+  return (
+    <>
+      {backdrop}
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+        <div className="rounded-xl w-full max-w-md shadow-2xl overflow-hidden pointer-events-auto"
+          style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
+          onKeyDown={e => e.stopPropagation()}>
+
+          {/* Progress bar */}
+          <div className="h-1" style={{ background: 'var(--muted)' }}>
+            <div className="h-1 transition-all duration-300"
+              style={{ width: `${(idx / queue.length) * 100}%`, background: 'var(--foreground)' }} />
+          </div>
+
+          {/* Header */}
+          <div className="px-5 py-3 flex items-center justify-between"
+            style={{ borderBottom: '1px solid var(--border)' }}>
+            <span className="text-xs font-mono text-muted-foreground">{idx + 1} / {queue.length}</span>
+            <button onClick={onClose}
+              className="text-muted-foreground hover:text-foreground p-1 transition-colors">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="px-5 pt-5 pb-4 flex flex-col gap-4">
+            {/* Address */}
+            <div>
+              <p className="text-xl font-bold text-foreground leading-snug">{formatEndereco(item)}</p>
+              <div className="flex items-center gap-3 mt-2">
+                <PortalBadge portal={item.portal} />
+                {item.maps_link && (
+                  <a href={item.maps_link} target="_blank" rel="noreferrer"
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                    Maps ↗
+                  </a>
+                )}
+                <a href={item.link} target="_blank" rel="noreferrer"
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  anúncio ↗
+                </a>
+              </div>
+            </div>
+
+            {/* Input */}
+            <input
+              ref={inputRef}
+              type="text"
+              value={value}
+              onChange={e => setValue(e.target.value.replace(/\D/g, ''))}
+              placeholder="Número da matrícula"
+              autoFocus
+              onKeyDown={e => { if (e.key === 'Enter') save() }}
+              className="w-full rounded-lg px-4 py-3 text-lg font-mono text-foreground outline-none focus:ring-2 ring-foreground/20 transition-all"
+              style={{ background: 'var(--secondary)', border: '1px solid var(--border)' }}
+            />
+
+            {/* Actions */}
+            <div className="flex gap-2">
+              <button onClick={desistir} disabled={saving}
+                className="flex-1 text-sm text-muted-foreground hover:text-foreground border border-border hover:border-foreground/20 px-3 py-2.5 rounded-lg transition-colors disabled:opacity-40">
+                Sem matrícula / Desistimos
+              </button>
+              <button onClick={save} disabled={saving || !value.trim()}
+                className="flex-1 text-sm font-semibold text-white bg-primary hover:bg-primary-h disabled:opacity-40 disabled:cursor-not-allowed px-4 py-2.5 rounded-lg transition-colors">
+                {saving ? 'Salvando…' : 'Salvar →'}
+              </button>
+            </div>
+            <p className="text-[10px] text-center text-muted-foreground/40">Enter para salvar</p>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ── MatriculaModal ─────────────────────────────────────────────────────────────
+function MatriculaModal({ item, onSave, onClose }: {
+  item: Imovel
+  onSave: (item: Imovel, matricula: string) => Promise<void>
+  onClose: () => void
+}) {
+  const [value, setValue] = useState(item.numero_matricula && item.numero_matricula !== 'N/A' ? item.numero_matricula : '')
+  const [saving, setSaving] = useState(false)
+
+  const save = async () => {
+    if (!value.trim()) return
+    setSaving(true)
+    await onSave(item, value.trim())
+    setSaving(false)
+  }
+
+  return (
+    <div role="button" tabIndex={0}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      onClick={onClose} onKeyDown={e => { if (e.key === 'Escape') onClose() }}>
+      <div className="rounded-xl w-full max-w-sm shadow-2xl overflow-hidden"
+        style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
+        onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
+        <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
+          <p className="font-semibold text-foreground text-sm">{formatEndereco(item)}</p>
+        </div>
+        <div className="p-5 flex flex-col gap-4">
+          <input
+            type="text"
+            value={value}
+            onChange={e => setValue(e.target.value.replace(/\D/g, ''))}
+            placeholder="Número da matrícula"
+            autoFocus
+            onKeyDown={e => { if (e.key === 'Enter') save() }}
+            className="w-full rounded-lg px-4 py-3 text-lg font-mono text-foreground outline-none focus:ring-2 ring-foreground/20 transition-all"
+            style={{ background: 'var(--secondary)', border: '1px solid var(--border)' }}
+          />
+          <div className="flex gap-2">
+            <button onClick={onClose}
+              className="flex-1 text-sm text-muted-foreground hover:text-foreground border border-border px-4 py-2.5 rounded-lg transition-colors">
+              Cancelar
+            </button>
+            <button onClick={save} disabled={saving || !value.trim()}
+              className="flex-1 text-sm font-semibold text-white bg-primary hover:bg-primary-h disabled:opacity-40 disabled:cursor-not-allowed px-4 py-2.5 rounded-lg transition-colors">
+              {saving ? 'Salvando…' : 'Salvar'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── RelatorioClient ────────────────────────────────────────────────────────────
 export function RelatorioClient() {
   const { toasts, toast } = useToast()
@@ -137,6 +361,15 @@ export function RelatorioClient() {
   const [copied, setCopied] = useState(false)
   const [whatsappText, setWhatsappText] = useState('')
   const [editItem, setEditItem] = useState<Imovel | null>(null)
+  const [matriculaItem, setMatriculaItem] = useState<Imovel | null>(null)
+  const [queueOpen, setQueueOpen] = useState(false)
+
+  const queue = useMemo(
+    () => items
+      .filter(i => i.status_solicitacao === 'enviado' && !i.numero_matricula)
+      .sort((a, b) => new Date(b.coletado_em ?? 0).getTime() - new Date(a.coletado_em ?? 0).getTime()),
+    [items],
+  )
 
   useEffect(() => {
     async function load() {
@@ -222,7 +455,7 @@ export function RelatorioClient() {
         'Localização': item.maps_link ?? '',
         'Endereço do Imóvel': formatEndereco(item),
         'Links de anúncio': item.link ?? '',
-        'Matrícula': '',
+        'Matrícula': item.numero_matricula ?? '',
         'Valor de anúncio': parsePreco(item.preco) ? fmtBRL(parsePreco(item.preco)) : item.preco ?? '',
         'Nome do Proprietário': part ? (item.nome_anunciante ?? '') : '',
         'Idade': '',
@@ -252,6 +485,55 @@ export function RelatorioClient() {
       toast('Texto copiado!', 'success')
       setTimeout(() => setCopied(false), 2000)
     })
+  }
+
+  const saveMatricula = async (item: Imovel, matricula: string) => {
+    try {
+      const res = await fetch('/api/relatorio', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'matricula', link: item.link, portal: item.portal, numero_matricula: matricula }),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        toast(`Erro: ${d.error ?? res.status}`, 'error')
+        return
+      }
+    } catch (err) {
+      toast(`Erro: ${err instanceof Error ? err.message : 'desconhecido'}`, 'error')
+      return
+    }
+    setItems(prev => prev.map(i => i.link === item.link ? { ...i, numero_matricula: matricula } : i))
+    setMatriculaItem(null)
+    toast('Matrícula salva', 'success')
+  }
+
+  const handleQueueSave = async (item: Imovel, matricula: string) => {
+    const res = await fetch('/api/relatorio', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'matricula', link: item.link, portal: item.portal, numero_matricula: matricula }),
+    })
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}))
+      toast(`Erro: ${d.error ?? res.status}`, 'error')
+      return
+    }
+    setItems(prev => prev.map(i => i.link === item.link ? { ...i, numero_matricula: matricula } : i))
+  }
+
+  const handleDesistir = async (item: Imovel) => {
+    const res = await fetch('/api/relatorio', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'matricula', link: item.link, portal: item.portal, numero_matricula: 'N/A' }),
+    })
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}))
+      toast(`Erro: ${d.error ?? res.status}`, 'error')
+      return
+    }
+    setItems(prev => prev.map(i => i.link === item.link ? { ...i, numero_matricula: 'N/A' } : i))
   }
 
   const saveEndereco = async (item: Imovel, newEndereco: string) => {
@@ -285,6 +567,13 @@ export function RelatorioClient() {
           <p className="text-[#656d76] text-sm mt-1">Imóveis aprovados e visitados · solicitação de matrícula e ônus reais</p>
         </div>
         <div className="flex gap-2">
+          <button onClick={() => setQueueOpen(true)} disabled={!queue.length}
+            className={`${btn} border border-[#d0d7de] text-[#1f2328] hover:border-[#8c959f] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2`}>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+            </svg>
+            Preencher matrículas{queue.length ? ` (${queue.length})` : ''}
+          </button>
           <button onClick={exportExcel}
             className={`${btn} border border-[#d0d7de] text-[#1f2328] hover:border-[#8c959f] flex items-center gap-2`}>
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
@@ -348,6 +637,7 @@ export function RelatorioClient() {
                 <th className="px-4 py-2.5 text-left">Valor</th>
                 <th className="px-4 py-2.5 text-left">Data</th>
                 <th className="px-4 py-2.5 text-left">Status</th>
+                <th className="px-4 py-2.5 text-left">Matrícula</th>
               </tr>
             </thead>
             <tbody>
@@ -395,6 +685,30 @@ export function RelatorioClient() {
                   </td>
                   <td className="px-4 py-2.5 text-[#656d76]">{formatDate(item.coletado_em)}</td>
                   <td className="px-4 py-2.5"><StatusBadge status={item.status_solicitacao} /></td>
+                  <td className="px-4 py-2.5">
+                    {item.numero_matricula === 'N/A' ? (
+                      <button
+                        onClick={e => { e.stopPropagation(); setMatriculaItem(item) }}
+                        className="text-xs italic text-muted-foreground hover:text-foreground transition-colors"
+                        title="Editar matrícula">
+                        desistimos
+                      </button>
+                    ) : item.numero_matricula ? (
+                      <button
+                        onClick={e => { e.stopPropagation(); setMatriculaItem(item) }}
+                        className="font-mono text-xs font-semibold text-foreground hover:text-trk-blue transition-colors"
+                        title="Editar matrícula">
+                        {item.numero_matricula}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={e => { e.stopPropagation(); setMatriculaItem(item) }}
+                        className="text-xs text-muted-foreground hover:text-foreground border border-dashed border-border hover:border-foreground/30 px-2 py-0.5 rounded transition-colors"
+                        title="Inserir matrícula">
+                        + matrícula
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -411,6 +725,21 @@ export function RelatorioClient() {
           current={formatEndereco(editItem)}
           onSave={saveEndereco}
           onClose={() => setEditItem(null)}
+        />
+      )}
+      {matriculaItem && (
+        <MatriculaModal
+          item={matriculaItem}
+          onSave={saveMatricula}
+          onClose={() => setMatriculaItem(null)}
+        />
+      )}
+      {queueOpen && (
+        <MatriculaQueueModal
+          queue={queue}
+          onSave={handleQueueSave}
+          onDesistir={handleDesistir}
+          onClose={() => setQueueOpen(false)}
         />
       )}
       <ToastStack toasts={toasts} />

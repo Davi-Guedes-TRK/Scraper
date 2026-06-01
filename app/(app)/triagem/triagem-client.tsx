@@ -147,6 +147,28 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
   const [zoomIdx, setZoomIdx] = useState(0)
   const [matriculaOpen, setMatriculaOpen] = useState(false)
   const [descricao, setDescricao] = useState<string | null>(null)
+  const [resolving, setResolving] = useState(false)
+
+  const MAPS_RE = /maps\.app\.goo\.gl\/|(?:www\.)?google\.com\/maps/
+
+  const handleMapsLinkChange = async (val: string) => {
+    setMapsLink(val)
+    if (!MAPS_RE.test(val)) return
+    setResolving(true)
+    try {
+      const res = await fetch('/api/resolve-maps', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: val }),
+      })
+      if (!res.ok) return
+      const data: { endereco: string | null; mapsLink: string } = await res.json()
+      if (data.mapsLink) setMapsLink(data.mapsLink)
+      if (data.endereco && !endereco.trim()) setEndereco(data.endereco)
+    } catch { /* ignore */ } finally {
+      setResolving(false)
+    }
+  }
 
   useEffect(() => {
     setDescricao(null)
@@ -323,9 +345,19 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
             </div>
           </div>
 
-          <input type="url" value={mapsLink} onChange={e => setMapsLink(e.target.value)}
-            placeholder="Link Google Maps (opcional)"
-            className="w-full bg-muted border border-border text-foreground text-xs rounded-lg px-3 py-1.5 outline-none focus:border-foreground/50 placeholder-muted-foreground/50 transition-colors" />
+          <div className="relative">
+            <input type="url" value={mapsLink} onChange={e => handleMapsLinkChange(e.target.value)}
+              placeholder="Link Google Maps (opcional)"
+              className="w-full bg-muted border border-border text-foreground text-xs rounded-lg px-3 py-1.5 outline-none focus:border-foreground/50 placeholder-muted-foreground/50 transition-colors pr-7" />
+            {resolving && (
+              <span className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
+                <svg className="w-3 h-3 animate-spin text-muted-foreground" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                </svg>
+              </span>
+            )}
+          </div>
 
           {/* keyboard hints */}
           <div className="flex gap-3 flex-wrap">

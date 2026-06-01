@@ -1,0 +1,25 @@
+name: Sync Chaves na Mão → Banco
+
+on:
+  schedule:
+    - cron: '0 11 * * *'   # 08:00 BRT
+  workflow_dispatch:
+
+jobs:
+  chaves-sync:
+    name: Chaves na Mão — locação DF
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar dependências
+        run: pip install requests beautifulsoup4 psycopg2-binary
+
+      - name: Sincronizar
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python scripts/chaves_sync.py

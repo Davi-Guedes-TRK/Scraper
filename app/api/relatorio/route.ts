@@ -21,13 +21,15 @@ type RelatorioRow = {
   tipo_anunciante: string | null
   tipo_imovel: string | null
   creci: string | null
+  numero_matricula: string | null
 }
 
 export async function GET() {
   const rows = await sql<RelatorioRow[]>`
     SELECT link, portal, titulo, bairro, cidade, preco, coletado_em, descricao,
            pistas_ia, status_solicitacao, endereco, maps_link, visitado_em,
-           nome_anunciante, telefone, tipo_anunciante, tipo_imovel, creci
+           nome_anunciante, telefone, tipo_anunciante, tipo_imovel, creci,
+           numero_matricula
     FROM imoveis_todos
     WHERE status_triagem = 'aprovado' OR visitado_em IS NOT NULL
     ORDER BY coletado_em DESC
@@ -39,6 +41,7 @@ export async function GET() {
 type PatchBody =
   | { action: 'status_solicitacao'; byPortal: Record<string, string[]>; status: string }
   | { action: 'endereco'; link: string; portal: string; endereco: string }
+  | { action: 'matricula'; link: string; portal: string; numero_matricula: string }
 
 export async function PATCH(req: NextRequest) {
   let body: PatchBody
@@ -78,6 +81,23 @@ export async function PATCH(req: NextRequest) {
       await sql.unsafe(
         `UPDATE public."${portalTable(body.portal)}" SET endereco=$1 WHERE link=$2`,
         [body.endereco, body.link],
+      )
+    } catch (err) {
+      return Response.json({ error: err instanceof Error ? err.message : 'Erro no banco' }, { status: 500 })
+    }
+    return Response.json({ ok: true })
+  }
+
+  if (body.action === 'matricula') {
+    if (!body.link || !body.portal || body.numero_matricula === undefined) {
+      return Response.json({ error: 'link, portal e numero_matricula obrigatórios' }, { status: 400 })
+    }
+    if (!portalKeys.includes(body.portal)) return Response.json({ error: 'portal inválido' }, { status: 400 })
+
+    try {
+      await sql.unsafe(
+        `UPDATE public."${portalTable(body.portal)}" SET numero_matricula=$1 WHERE link=$2`,
+        [body.numero_matricula, body.link],
       )
     } catch (err) {
       return Response.json({ error: err instanceof Error ? err.message : 'Erro no banco' }, { status: 500 })

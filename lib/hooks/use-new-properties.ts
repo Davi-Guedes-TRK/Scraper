@@ -4,7 +4,10 @@ import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 const STORAGE_KEY = 'triagem_last_seen'
-const PORTAL_TABLES = ['imoveis_olx', 'imoveis_dfimoveis', 'imoveis_wimoveis', 'imoveis_facebook'] as const
+const PORTAL_TABLES = [
+  'imoveis_olx', 'imoveis_dfimoveis', 'imoveis_wimoveis', 'imoveis_facebook',
+  'imoveis_vivareal', 'imoveis_zap', 'imoveis_chavesnamao',
+] as const
 
 export function useNewProperties() {
   const [count, setCount] = useState(0)

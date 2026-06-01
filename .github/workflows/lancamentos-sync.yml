@@ -1,0 +1,85 @@
+name: Sync Lançamentos DF → Banco
+
+on:
+  schedule:
+    - cron: '0 10 * * *'   # 07:00 BRT
+  workflow_dispatch:
+
+jobs:
+  paulo-octavio:
+    name: Paulo Octávio
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install requests beautifulsoup4 psycopg2-binary
+      - env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python scripts/paulo_octavio_sync.py
+
+  elar:
+    name: Elar
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install requests beautifulsoup4 psycopg2-binary
+      - env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python scripts/elar_sync.py
+
+  riva:
+    name: Riva Incorporadora
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install requests beautifulsoup4 psycopg2-binary
+      - env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python scripts/riva_sync.py
+
+  direcional:
+    name: Direcional
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install requests beautifulsoup4 psycopg2-binary
+      - env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python scripts/direcional_sync.py
+
+  greenhouse:
+    name: GreenHouse
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install requests beautifulsoup4 psycopg2-binary
+      - env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python scripts/greenhouse_sync.py
+
+  lotus-cidade:
+    name: Lotus Cidade
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install requests beautifulsoup4 psycopg2-binary
+      - env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python scripts/lotus_sync.py

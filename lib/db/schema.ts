@@ -44,12 +44,16 @@ const imoveisBase = {
   endereco: text('endereco'),
   endereco_norm: text('endereco_norm'),
   predio_id: text('predio_id'),
+  numero_matricula: text('numero_matricula'),
 }
 
-export const imoveisOlx = pgTable('imoveis_olx', imoveisBase)
-export const imoveisDfimoveis = pgTable('imoveis_dfimoveis', imoveisBase)
-export const imoveisWimoveis = pgTable('imoveis_wimoveis', imoveisBase)
-export const imoveisFacebook = pgTable('imoveis_facebook', imoveisBase)
+export const imoveisOlx         = pgTable('imoveis_olx',         imoveisBase)
+export const imoveisDfimoveis   = pgTable('imoveis_dfimoveis',   imoveisBase)
+export const imoveisWimoveis    = pgTable('imoveis_wimoveis',    imoveisBase)
+export const imoveisFacebook    = pgTable('imoveis_facebook',    imoveisBase)
+export const imoveisVivareal    = pgTable('imoveis_vivareal',    imoveisBase)
+export const imoveisZap         = pgTable('imoveis_zap',         imoveisBase)
+export const imoveisChavesnamao = pgTable('imoveis_chavesnamao', imoveisBase)
 
 export type Imovel = typeof imoveisOlx.$inferSelect
 export type NovoImovel = typeof imoveisOlx.$inferInsert

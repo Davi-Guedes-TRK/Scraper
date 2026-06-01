@@ -1,0 +1,28 @@
+name: Sync Viva Real → Banco
+
+on:
+  schedule:
+    - cron: '0 12 * * *'   # 09:00 BRT
+  workflow_dispatch:
+
+jobs:
+  vivareal-sync:
+    name: Viva Real — locação DF
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar dependências
+        run: pip install requests psycopg2-binary playwright
+
+      - name: Instalar Chromium (fallback Playwright)
+        run: playwright install chromium --with-deps
+
+      - name: Sincronizar
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python scripts/vivareal_sync.py
