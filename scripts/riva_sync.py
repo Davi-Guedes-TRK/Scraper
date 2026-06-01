@@ -25,6 +25,7 @@ HEADERS = {
 _SKIP = {
     "ac","al","am","ap","ba","ce","df","es","go","ma","mg","ms","mt",
     "pa","pb","pe","pi","pr","rj","rn","ro","rr","rs","sc","se","sp","to",
+    "distrito-federal","sao-paulo","rio-de-janeiro","minas-gerais","bahia",
     "imoveis","empreendimentos","lancamentos","contato","sobre","blog","",
 }
 
@@ -126,8 +127,12 @@ def scrape(slug: str, url: str) -> dict | None:
         status = "pronto"
 
     bairro = None
-    for b in ["Lago Sul","Lago Norte","Asa Sul","Asa Norte","Noroeste","Sudoeste","Park Way","Park Sul","Jardim Botânico","Águas Claras","Taguatinga"]:
-        if b.lower() in page_text.lower():
+    tl = page_text.lower()
+    for b in [
+        "Lago Sul","Lago Norte","Asa Sul","Asa Norte","Noroeste","Sudoeste",
+        "Park Way","Park Sul","Jardim Botânico","Águas Claras","Taguatinga",
+    ]:
+        if b.lower() in tl:
             bairro = b
             break
 
@@ -191,6 +196,10 @@ def scrape(slug: str, url: str) -> dict | None:
         if el and len(txt(el) or "") > 40:
             descricao = txt(el)
             break
+
+    if not bairro:
+        log.info("Ignorado (bairro DF não detectado): %s", slug)
+        return None
 
     return {
         "fonte": FONTE, "slug": slug, "nome": nome, "url": url,
