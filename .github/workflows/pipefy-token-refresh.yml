@@ -46,9 +46,15 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           PROJECT_ID:   prj_kx2bwqph4Z7mxw0eiJ2vyLMFQvkb
         run: |
+          # Pega o ID do último deploy de produção
+          DEPLOY_ID=$(curl -sf \
+            "https://api.vercel.com/v6/deployments?projectId=$PROJECT_ID&target=production&limit=1" \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['deployments'][0]['uid'])")
+          echo "Redeployando $DEPLOY_ID..."
           curl -sf -X POST \
-            "https://api.vercel.com/v13/deployments" \
+            "https://api.vercel.com/v12/deployments/$DEPLOY_ID/redeploy" \
             -H "Authorization: Bearer $VERCEL_TOKEN" \
             -H "Content-Type: application/json" \
-            -d "{\"name\":\"erp-trk\",\"project\":\"$PROJECT_ID\",\"target\":\"production\"}" \
-          | python3 -c "import sys,json; d=json.load(sys.stdin); print('[OK] deploy:', d.get('url','?'))"
+            -d '{"target":"production"}' \
+          | python3 -c "import sys,json; d=json.load(sys.stdin); print('[OK] redeploy:', d.get('url','?'))"
