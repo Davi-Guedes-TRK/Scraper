@@ -1,0 +1,41 @@
+name: Validar Links → Banco
+
+on:
+  schedule:
+    - cron: '0 5 * * *'   # 02:00 BRT — após todos os scrapers
+  workflow_dispatch:
+    inputs:
+      tabela:
+        description: 'Tabela específica (deixar vazio = todas)'
+        required: false
+        default: ''
+      limite:
+        description: 'Máx links por tabela'
+        required: false
+        default: '300'
+
+jobs:
+  validar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar dependências
+        run: pip install curl_cffi psycopg2-binary
+
+      - name: Validar links
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          TABELA="${{ github.event.inputs.tabela }}"
+          LIMITE="${{ github.event.inputs.limite || '300' }}"
+          if [ -n "$TABELA" ]; then
+            python scripts/validar_links.py --tabela "$TABELA" --limite "$LIMITE"
+          else
+            python scripts/validar_links.py --limite "$LIMITE"
+          fi
