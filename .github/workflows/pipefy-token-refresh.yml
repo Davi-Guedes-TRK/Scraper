@@ -1,0 +1,48 @@
+name: Renovar Token Pipefy
+
+on:
+  schedule:
+    - cron: '0 9 */2 * *'   # a cada 2 dias às 06:00 BRT (token dura 3 dias)
+  workflow_dispatch:          # permite rodar manualmente pela aba Actions
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar dependências
+        run: pip install playwright
+
+      - name: Instalar Chromium
+        run: playwright install chromium --with-deps
+
+      - name: Renovar token (headless)
+        id: refresh
+        env:
+          PIPEFY_SESSION_B64: ${{ secrets.PIPEFY_SESSION_B64 }}
+        run: python scripts/pipefy_token_refresh.py
+
+      - name: Atualizar PIPEFY_TOKEN no Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          ORG_ID:       ${{ secrets.VERCEL_ORG_ID }}
+          PROJECT_ID:   prj_kx2bwqph4Z7mxw0eiJ2vyLMFQvkb
+          NEW_TOKEN:    ${{ steps.refresh.outputs.token }}
+        run: |
+          npm i -g vercel@latest
+          # Remove e re-adiciona com o novo valor
+          echo "y" | vercel env rm PIPEFY_TOKEN production --token "$VERCEL_TOKEN" || true
+          printf '%s' "$NEW_TOKEN" | vercel env add PIPEFY_TOKEN production --token "$VERCEL_TOKEN"
+          echo "[OK] PIPEFY_TOKEN atualizado no Vercel"
+
+      - name: Re-deploy para aplicar novo token
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          vercel --prod --token "$VERCEL_TOKEN" --yes
+          echo "[OK] Deploy disparado"

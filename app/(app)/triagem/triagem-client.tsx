@@ -747,7 +747,29 @@ export function TriagemClient() {
 
   const handleApprove = async (item: Imovel, data: { endereco: string; mapsLink: string }) => {
     const ok = await updateStatus(item, 'aprovado', { endereco: data.endereco || undefined, maps_link: data.mapsLink || undefined })
-    if (ok) setReviewItem(null)
+    if (!ok) return
+    setReviewItem(null)
+    // Cria card no Pipefy em background — não bloqueia UI
+    fetch('/api/pipefy/card', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        endereco:        data.endereco,
+        maps_link:       data.mapsLink || undefined,
+        link:            item.link,
+        preco:           item.preco,
+        area_m2:         item.area_m2,
+        bairro:          item.bairro,
+        tipo_imovel:     item.tipo_imovel,
+        nome_anunciante: item.nome_anunciante,
+      }),
+    }).then(r => r.json()).then((d: { ok?: boolean; card_id?: string; url?: string; error?: string }) => {
+      if (d.ok && d.url) {
+        toast(`Card Pipefy criado — #${d.card_id}`, 'success')
+      } else if (d.error) {
+        toast(`Pipefy: ${d.error}`, 'error')
+      }
+    }).catch(() => { /* silencioso — triagem já foi atualizada */ })
   }
   const handleVisitar = async (item: Imovel, data: { endereco: string; mapsLink: string }) => {
     const ok = await updateStatus(item, 'para_visitar', { endereco: data.endereco || undefined, maps_link: data.mapsLink || undefined })
