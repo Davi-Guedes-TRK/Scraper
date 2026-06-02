@@ -6,6 +6,14 @@ import Link from 'next/link'
 export default function AppError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error('[app] erro de rota:', error)
+    // ChunkLoadError = deploy novo trocou os hashes dos chunks e o navegador tem o app antigo em cache.
+    // Recarrega sozinho (até 2x, com guarda p/ não entrar em loop) pra pegar o build novo.
+    const isChunk = error?.name === 'ChunkLoadError'
+      || /ChunkLoadError|Failed to load chunk|Loading (chunk|CSS chunk)/i.test(error?.message || '')
+    if (isChunk && typeof window !== 'undefined') {
+      const n = Number(sessionStorage.getItem('chunk-reloads') || '0')
+      if (n < 2) { sessionStorage.setItem('chunk-reloads', String(n + 1)); window.location.reload() }
+    }
   }, [error])
 
   return (
