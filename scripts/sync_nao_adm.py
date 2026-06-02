@@ -40,7 +40,9 @@ WHERE i.situacao = 'Inativo' AND i.situacao_detalhe = 'Negociado'
   AND i.preco_locacao > 0   -- locação ou venda/locação (exclui imóveis só de venda)
   AND regexp_replace(i.codigo_imovel, '[0-9].*$', '') IN ('VK', 'LK', 'GY', 'CL')
   AND p.telefone_1 IS NOT NULL AND BTRIM(p.telefone_1) <> ''
-  -- "não administramos": exclui quem tem a característica ADMINISTRADORA (= com adm no cadastro)
+  -- "não administramos": COM adm = tem código no Imobiliar (codigo_legado, ex. 'IM1826')
+  -- ou a característica ADMINISTRADORA no cadastro. Excluímos os dois.
+  AND (i.codigo_legado IS NULL OR BTRIM(i.codigo_legado) = '')
   AND NOT EXISTS (
     SELECT 1 FROM nido_imoveis_caracteristicas c
     WHERE c.codigo_imovel = i.codigo_imovel AND c.descricao = 'ADMINISTRADORA'
