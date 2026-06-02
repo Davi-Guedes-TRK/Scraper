@@ -20,6 +20,34 @@ type Lead = {
 const TIPOS = ['Apartamento', 'Casa', 'Comercial', 'Terreno', 'Kitnet', 'Outro']
 type Toast = { id: number; msg: string; type: 'ok' | 'err' }
 
+// Comprime/redimensiona a foto no cliente — fotos de celular têm 8–12 MP e estouram
+// a memória do navegador ao subir cruas. Reduz pra ~1600px JPEG (de MBs p/ ~200–400 KB).
+async function compressImage(file: File, maxDim = 1600, quality = 0.72): Promise<Blob> {
+  let bmp: ImageBitmap | null = null
+  let img: HTMLImageElement | null = null
+  try {
+    bmp = await createImageBitmap(file, { imageOrientation: 'from-image' })
+  } catch {
+    const url = URL.createObjectURL(file)
+    try {
+      img = await new Promise<HTMLImageElement>((res, rej) => {
+        const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('decode')); i.src = url
+      })
+    } finally { URL.revokeObjectURL(url) }
+  }
+  const w = bmp ? bmp.width : img!.naturalWidth
+  const h = bmp ? bmp.height : img!.naturalHeight
+  const scale = Math.min(1, maxDim / Math.max(w, h))
+  const dw = Math.max(1, Math.round(w * scale)), dh = Math.max(1, Math.round(h * scale))
+  const canvas = document.createElement('canvas'); canvas.width = dw; canvas.height = dh
+  const ctx = canvas.getContext('2d'); if (!ctx) throw new Error('canvas indisponível')
+  ctx.drawImage((bmp ?? img)!, 0, 0, dw, dh)
+  bmp?.close()
+  const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/jpeg', quality))
+  if (!blob) throw new Error('falha ao comprimir')
+  return blob
+}
+
 export function InLocoClient() {
   const [supabase] = useState(() => createClient())
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null)
@@ -63,14 +91,14 @@ export function InLocoClient() {
     finally { setGeocoding(false) }
   }, [toast])
 
-  // Foto -> Supabase Storage (bucket "in-loco")
+  // Foto -> comprime no celular -> Supabase Storage (bucket "in-loco")
   const onPhoto = async (file: File) => {
-    setFotoPreview(URL.createObjectURL(file))
     setUploading(true)
     try {
-      const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg'
-      const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
-      const { error } = await supabase.storage.from('in-loco').upload(path, file, { contentType: file.type || 'image/jpeg' })
+      const blob = await compressImage(file)
+      setFotoPreview(URL.createObjectURL(blob))
+      const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`
+      const { error } = await supabase.storage.from('in-loco').upload(path, blob, { contentType: 'image/jpeg' })
       if (error) throw error
       const { data } = supabase.storage.from('in-loco').getPublicUrl(path)
       setFotoUrl(data.publicUrl)
