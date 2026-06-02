@@ -162,9 +162,10 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
         body: JSON.stringify({ url: val }),
       })
       if (!res.ok) return
-      const data: { endereco: string | null; mapsLink: string } = await res.json()
+      const data: { endereco: string | null; mapsLink: string; source?: 'geoportal' | 'maps' | null } = await res.json()
       if (data.mapsLink) setMapsLink(data.mapsLink)
-      if (data.endereco && !endereco.trim()) setEndereco(data.endereco)
+      // Geoportal = endereço oficial do DF -> sobrescreve o palpite das pistas; place-name só preenche se vazio
+      if (data.endereco && (data.source === 'geoportal' || !endereco.trim())) setEndereco(data.endereco)
     } catch { /* ignore */ } finally {
       setResolving(false)
     }
