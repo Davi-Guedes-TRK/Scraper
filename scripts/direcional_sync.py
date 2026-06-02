@@ -117,7 +117,7 @@ def scrape(slug: str, url: str) -> dict | None:
                 break
     if pct_obras is None and status == "pronto":
         pct_obras = 100.0
-    if pct_obras == 100.0:
+    if pct_obras >= 100.0:
         status = "pronto"
 
     bairro = None
