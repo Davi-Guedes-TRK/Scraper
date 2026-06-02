@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 
 export async function GET() {
   const rows = await sql`
-    SELECT id, lat, lng, endereco, telefone, tipo_imovel, obs, status, criado_em
+    SELECT id, lat, lng, endereco, telefone, tipo_imovel, obs, foto_url, status, criado_em
     FROM leads_in_loco
     ORDER BY criado_em DESC
     LIMIT 100
@@ -26,8 +26,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const r = await sql`
-      INSERT INTO leads_in_loco (lat, lng, endereco, endereco_fonte, telefone, tipo_imovel, obs)
-      VALUES (${lat}, ${lng}, ${endereco}, ${str(b.fonte)}, ${str(b.telefone)}, ${str(b.tipo_imovel)}, ${str(b.obs)})
+      INSERT INTO leads_in_loco (lat, lng, endereco, endereco_fonte, telefone, tipo_imovel, obs, foto_url)
+      VALUES (${lat}, ${lng}, ${endereco}, ${str(b.fonte)}, ${str(b.telefone)}, ${str(b.tipo_imovel)}, ${str(b.obs)}, ${str(b.foto_url)})
       RETURNING id
     `
     return NextResponse.json({ ok: true, id: r[0].id })
