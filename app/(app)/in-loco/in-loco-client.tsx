@@ -52,6 +52,53 @@ async function compressImage(file: File, maxDim = 1280, quality = 0.7): Promise<
   return blob
 }
 
+// Lê GPS do EXIF do JPEG original (sem lib). Retorna null se a foto não tiver geotag.
+// (A compressão por canvas apaga o EXIF, então isto roda no arquivo original, antes.)
+async function readExifGps(file: File): Promise<{ lat: number; lng: number } | null> {
+  try {
+    const buf = await file.slice(0, 256 * 1024).arrayBuffer()
+    const v = new DataView(buf)
+    if (v.getUint16(0) !== 0xFFD8) return null // não é JPEG
+    let off = 2, tiff = -1
+    while (off + 4 <= v.byteLength) {
+      const marker = v.getUint16(off)
+      if ((marker & 0xFF00) !== 0xFF00) break
+      const size = v.getUint16(off + 2)
+      if (marker === 0xFFE1 && v.getUint32(off + 4) === 0x45786966) { tiff = off + 10; break } // "Exif"
+      off += 2 + size
+    }
+    if (tiff < 0) return null
+    const le = v.getUint16(tiff) === 0x4949
+    if (v.getUint16(tiff + 2, le) !== 0x002A) return null
+    const entries = (ifdOff: number) => {
+      const m = new Map<number, { valOff: number; count: number }>()
+      const base = tiff + ifdOff
+      if (base + 2 > v.byteLength) return m
+      const n = v.getUint16(base, le)
+      for (let i = 0; i < n; i++) {
+        const e = base + 2 + i * 12
+        if (e + 12 > v.byteLength) break
+        m.set(v.getUint16(e, le), { count: v.getUint32(e + 4, le), valOff: e + 8 })
+      }
+      return m
+    }
+    const gpsPtr = entries(v.getUint32(tiff + 4, le)).get(0x8825)
+    if (!gpsPtr) return null
+    const gps = entries(v.getUint32(gpsPtr.valOff, le))
+    const ref = (tag: number) => { const e = gps.get(tag); return e ? String.fromCharCode(v.getUint8(e.valOff)).toUpperCase() : '' }
+    const dms = (tag: number): number | null => {
+      const e = gps.get(tag)
+      if (!e || e.count < 3) return null
+      const o = tiff + v.getUint32(e.valOff, le)
+      const rat = (k: number) => { const num = v.getUint32(o + k, le), den = v.getUint32(o + k + 4, le); return den ? num / den : 0 }
+      return rat(0) + rat(8) / 60 + rat(16) / 3600
+    }
+    const lat = dms(2), lng = dms(4)
+    if (lat === null || lng === null) return null
+    return { lat: ref(1) === 'S' ? -lat : lat, lng: ref(3) === 'W' ? -lng : lng }
+  } catch { return null }
+}
+
 export function InLocoClient() {
   const [supabase] = useState(() => createClient())
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null)
@@ -63,6 +110,7 @@ export function InLocoClient() {
   const [fotoUrl, setFotoUrl] = useState<string | null>(null)
   const [fotoPreview, setFotoPreview] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [locSource, setLocSource] = useState<'exif' | 'gps' | null>(null)
   const [locating, setLocating] = useState(false)
   const [geocoding, setGeocoding] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -98,6 +146,9 @@ export function InLocoClient() {
   // Foto -> comprime no celular -> Supabase Storage (bucket "in-loco")
   const onPhoto = async (file: File) => {
     setUploading(true)
+    // prioridade: GPS do EXIF da própria foto (lido do original, antes de comprimir)
+    const exif = await readExifGps(file)
+    if (exif) { setCoords(exif); setLocSource('exif'); geocode(exif.lat, exif.lng); toast('Localização lida da foto 📷') }
     try {
       const blob = await compressImage(file)
       setFotoPreview(URL.createObjectURL(blob))
@@ -117,7 +168,7 @@ export function InLocoClient() {
     if (!('geolocation' in navigator)) { toast('Sem GPS neste dispositivo', 'err'); return }
     setLocating(true); setFonte(null)
     navigator.geolocation.getCurrentPosition(
-      pos => { const { latitude: lat, longitude: lng } = pos.coords; setCoords({ lat, lng }); setLocating(false); geocode(lat, lng) },
+      pos => { const { latitude: lat, longitude: lng } = pos.coords; setCoords({ lat, lng }); setLocSource('gps'); setLocating(false); geocode(lat, lng) },
       err => { setLocating(false); toast(err.code === 1 ? 'Permissão de localização negada' : 'Não consegui o GPS', 'err') },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
     )
@@ -128,7 +179,7 @@ export function InLocoClient() {
 
   const limpar = () => {
     setCoords(null); setEndereco(''); setFonte(null); setTelefone(''); setTipo(''); setObs('')
-    setFotoUrl(null); setFotoPreview(null)
+    setFotoUrl(null); setFotoPreview(null); setLocSource(null)
   }
 
   const salvar = async () => {
@@ -196,6 +247,7 @@ export function InLocoClient() {
         <>
           <MatriculaMap lat={coords.lat} lng={coords.lng} onDragEnd={onPinDrag} />
           <p className="text-[11px] text-muted-foreground -mt-2 text-center">
+            {locSource === 'exif' ? '📷 local da foto · ' : locSource === 'gps' ? '📍 sua localização · ' : ''}
             Arraste o pino pro imóvel certo (mesmo do outro lado da rua). {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}
           </p>
         </>
