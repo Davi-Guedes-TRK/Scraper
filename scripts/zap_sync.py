@@ -12,6 +12,8 @@ from psycopg2.extras import execute_values
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
+CIDADE_PADRAO = "Brasília"
+
 PORTAL   = "zap"
 BASE_URL = "https://www.zapimoveis.com.br"
 GLUE_API = "https://glue-api.zapimoveis.com.br/v2/listings"
@@ -37,7 +39,7 @@ PAGE_SIZE = 100
 def fetch_page_api(bairro: str, offset: int) -> dict | None:
     params = {
         "addressNeighborhood": bairro,
-        "addressCity":         "Brasília",
+        "addressCity":         CIDADE_PADRAO,
         "addressState":        "Distrito Federal",
         "addressCountry":      "Brasil",
         "business":            "RENTAL",
@@ -71,7 +73,7 @@ def parse_listing_api(item: dict) -> dict | None:
 
     address = listing.get("address", {})
     bairro  = address.get("neighborhood") or address.get("zone") or ""
-    cidade  = address.get("city", "Brasília")
+    cidade  = address.get("city", CIDADE_PADRAO)
     estado  = address.get("stateAcronym", "DF")
     lat     = address.get("point", {}).get("lat")
     lng     = address.get("point", {}).get("lon")
@@ -183,7 +185,7 @@ def fetch_with_playwright(bairro: str) -> list[dict]:
                     rows.append({
                         "link": link, "id_anuncio": lid, "titulo": titulo,
                         "preco": preco, "bairro": bairro,
-                        "cidade": "Brasília", "estado": "DF",
+                        "cidade": CIDADE_PADRAO, "estado": "DF",
                         "dados_brutos": {"source": "playwright"},
                     })
                 except Exception:
@@ -265,7 +267,7 @@ def upsert(conn, rows: list[dict]):
         r.get("preco"), r.get("area_m2"),
         r.get("quartos"), r.get("suites"), r.get("vagas"), r.get("banheiros"),
         r.get("tipo_imovel"), r.get("tipo"),
-        r.get("bairro"), r.get("cidade", "Brasília"), r.get("estado", "DF"),
+        r.get("bairro"), r.get("cidade", CIDADE_PADRAO), r.get("estado", "DF"),
         r.get("endereco"), r.get("descricao"),
         r.get("telefone"), r.get("nome_anunciante"), r.get("tipo_anunciante"), r.get("creci"),
         r.get("imagens"), r.get("lat"), r.get("lng"),
