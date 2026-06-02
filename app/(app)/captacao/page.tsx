@@ -2,6 +2,7 @@ import sql from '@/lib/db'
 import { CaptacaoClient, type Lead } from './captacao-client'
 
 export const metadata = { title: 'Alugamos, não Administramos · Velvet' }
+export const dynamic = 'force-dynamic'
 
 // Lê do Supabase (tabela materializada do Nido/dw_trk por scripts/sync_nao_adm.py).
 // Via `sql` (postgres direto, server-side) — não depende de policy RLS.

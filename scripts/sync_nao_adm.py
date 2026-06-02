@@ -37,6 +37,7 @@ SELECT i.codigo_imovel,
 FROM nido_imoveis i
 JOIN nido_pessoas p ON p.codigo_pessoa = i.codigo_proprietario
 WHERE i.situacao = 'Inativo' AND i.situacao_detalhe = 'Negociado'
+  AND i.preco_locacao > 0   -- locação ou venda/locação (exclui imóveis só de venda)
   AND regexp_replace(i.codigo_imovel, '[0-9].*$', '') IN ('VK', 'LK', 'GY', 'CL')
   AND p.telefone_1 IS NOT NULL AND BTRIM(p.telefone_1) <> ''
 ORDER BY i.data_atualizacao DESC;
