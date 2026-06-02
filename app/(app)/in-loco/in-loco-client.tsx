@@ -22,12 +22,16 @@ type Toast = { id: number; msg: string; type: 'ok' | 'err' }
 
 // Comprime/redimensiona a foto no cliente — fotos de celular têm 8–12 MP e estouram
 // a memória do navegador ao subir cruas. Reduz pra ~1600px JPEG (de MBs p/ ~200–400 KB).
-async function compressImage(file: File, maxDim = 1600, quality = 0.72): Promise<Blob> {
+async function compressImage(file: File, maxDim = 1280, quality = 0.7): Promise<Blob> {
+  // Decodifica JÁ reduzido (resize no decode) p/ não estourar a memória do celular com fotos de 8–12 MP.
   let bmp: ImageBitmap | null = null
   let img: HTMLImageElement | null = null
   try {
-    bmp = await createImageBitmap(file, { imageOrientation: 'from-image' })
+    bmp = await createImageBitmap(file, { resizeWidth: maxDim, resizeQuality: 'medium', imageOrientation: 'from-image' })
   } catch {
+    try { bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }) } catch { bmp = null }
+  }
+  if (!bmp) {
     const url = URL.createObjectURL(file)
     try {
       img = await new Promise<HTMLImageElement>((res, rej) => {
