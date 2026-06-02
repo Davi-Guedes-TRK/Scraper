@@ -1,27 +1,26 @@
-import { createClient } from '@/lib/supabase/server'
-import { CaptacaoClient, type Target } from './captacao-client'
+import sql from '@/lib/db'
+import { CaptacaoClient, type Lead } from './captacao-client'
 
-export const metadata = { title: 'Captação · Velvet' }
+export const metadata = { title: 'Alugamos, não Administramos · Velvet' }
 
-// Lê do Supabase (tabela materializada do dw_trk pelo scripts/sync_captacao.py).
-// RLS: a policy "captacao_targets_read_authenticated" libera o role authenticated,
-// e o (app)/layout já redireciona quem não está logado.
-async function getTargets(): Promise<Target[]> {
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('captacao_targets')
-    .select('*')
-    .order('score', { ascending: false })
-    .limit(500)
-
-  if (error) {
-    console.error('[captacao] erro ao buscar alvos:', error.message)
+// Lê do Supabase (tabela materializada do Nido/dw_trk por scripts/sync_nao_adm.py).
+// Via `sql` (postgres direto, server-side) — não depende de policy RLS.
+async function getLeads(): Promise<Lead[]> {
+  try {
+    return await sql<Lead[]>`
+      SELECT codigo_imovel, proprietario, telefone, tipo_imovel, bairro, cidade,
+             endereco, area_util, valor_locacao, dias_inativo, desde, lat, lng
+      FROM leads_nao_adm
+      ORDER BY valor_locacao DESC NULLS LAST
+      LIMIT 2000
+    `
+  } catch (e) {
+    console.error('[nao-adm] erro ao buscar leads:', e instanceof Error ? e.message : e)
     return []
   }
-  return (data ?? []) as Target[]
 }
 
 export default async function CaptacaoPage() {
-  const targets = await getTargets()
-  return <CaptacaoClient targets={targets} />
+  const leads = await getLeads()
+  return <CaptacaoClient leads={leads} />
 }

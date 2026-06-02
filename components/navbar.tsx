@@ -60,7 +60,7 @@ const NAV_GROUPS = [
       },
       {
         href: '/captacao',
-        label: 'Alvos de Captação',
+        label: 'Alugamos não Adm.',
         icon: (
           <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
             <circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3.2" />

@@ -5,7 +5,7 @@ import { NumberTicker } from './number-ticker'
 
 export type StatTileProps = {
   label: string
-  value: number
+  value: number | string
   sublabel?: string
   accent?: string
   href?: string
@@ -25,7 +25,9 @@ export function StatTile({ label, value, sublabel, accent = '#6e4d34', href, sha
       </div>
 
       <div className="flex items-end justify-between gap-2">
-        <NumberTicker value={value} className="text-[22px] font-extrabold font-display tabular text-foreground leading-none" />
+        {typeof value === 'number'
+          ? <NumberTicker value={value} className="text-[22px] font-extrabold font-display tabular text-foreground leading-none" />
+          : <span className="text-[22px] font-extrabold font-display tabular text-foreground leading-none">{value}</span>}
         {typeof delta === 'number' && (
           <span
             className="text-[11px] font-bold font-mono flex items-center gap-0.5 mb-0.5"
