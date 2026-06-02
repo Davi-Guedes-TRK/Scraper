@@ -58,7 +58,7 @@ export function CaptacaoClient({ leads }: { leads: Lead[] }) {
       if (bairro !== ALL && l.bairro !== bairro) return false
       if (tipo !== ALL && l.tipo_imovel !== tipo) return false
       if (needle) {
-        const hay = `${l.proprietario ?? ''} ${l.endereco ?? ''} ${l.bairro ?? ''} ${l.telefone ?? ''}`.toLowerCase()
+        const hay = `${l.codigo_imovel} ${l.proprietario ?? ''} ${l.endereco ?? ''} ${l.bairro ?? ''} ${l.telefone ?? ''}`.toLowerCase()
         if (!hay.includes(needle)) return false
       }
       return true
@@ -130,7 +130,7 @@ function Row({ l }: { l: Lead }) {
       </div>
       <div className="min-w-0">
         <p className="text-[13px] text-foreground truncate">{[l.tipo_imovel, l.bairro].filter(Boolean).join(' · ') || '—'}</p>
-        <p className="text-[11px] text-muted-foreground truncate font-mono">{l.endereco}{l.area_util ? ` · ${Math.round(Number(l.area_util))} m²` : ''}</p>
+        <p className="text-[11px] text-muted-foreground truncate font-mono"><span className="text-foreground/80 font-semibold">{l.codigo_imovel}</span>{l.endereco ? ` · ${l.endereco}` : ''}{l.area_util ? ` · ${Math.round(Number(l.area_util))} m²` : ''}</p>
       </div>
       <div className="text-right">
         <p className="text-[13px] font-bold font-mono text-foreground tabular">{l.valor_locacao ? fmtBRL(Number(l.valor_locacao)) : '—'}</p>
