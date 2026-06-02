@@ -62,6 +62,7 @@ const STATUS_MAP: Record<string, { label: string; cls: string }> = {
   pendente:  { label: 'Pendente',   cls: 'bg-amber-50 text-amber-700 border-amber-200' },
   enviado:   { label: 'Enviado',    cls: 'bg-blue-50 text-blue-700 border-blue-200' },
   recebido:  { label: 'Recebido',   cls: 'bg-green-50 text-green-700 border-green-200' },
+  completo:  { label: 'Completo',   cls: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
 }
 
 function StatusBadge({ status }: { status: string | null | undefined }) {
@@ -353,6 +354,37 @@ function MatriculaModal({ item, onSave, onClose }: {
 }
 
 // ── RelatorioClient ────────────────────────────────────────────────────────────
+// ── ActionsMenu — agrupa as ações secundárias num menu (limpa a topbar) ──────────
+function ActionsMenu({ items }: { items: Array<{ label: string; onClick: () => void; disabled?: boolean; danger?: boolean }> }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="relative">
+      <button onClick={() => setOpen(o => !o)} aria-expanded={open}
+        className="text-sm font-medium px-4 py-2 rounded-lg border border-[#d0d7de] text-[#1f2328] hover:border-[#8c959f] transition-colors flex items-center gap-1.5">
+        Ações
+        <svg className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 mt-1 z-50 w-56 rounded-lg border border-[#d0d7de] bg-white shadow-lg py-1 overflow-hidden">
+            {items.map(it => (
+              <button key={it.label} disabled={it.disabled}
+                onClick={() => { setOpen(false); it.onClick() }}
+                className={`w-full text-left px-3 py-2 text-sm disabled:opacity-40 disabled:cursor-not-allowed transition-colors ${it.danger ? 'text-red-600 hover:bg-red-50' : 'text-[#1f2328] hover:bg-[#f6f8fa]'}`}>
+                {it.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ── RelatorioClient ────────────────────────────────────────────────────────────
 export function RelatorioClient() {
   const { toasts, toast } = useToast()
   const [items, setItems] = useState<Imovel[]>([])
@@ -363,6 +395,10 @@ export function RelatorioClient() {
   const [editItem, setEditItem] = useState<Imovel | null>(null)
   const [matriculaItem, setMatriculaItem] = useState<Imovel | null>(null)
   const [queueOpen, setQueueOpen] = useState(false)
+  const [pipefyLog, setPipefyLog] = useState<string | null>(null)
+  const [pipefyRunning, setPipefyRunning] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const queue = useMemo(
     () => items
@@ -557,6 +593,57 @@ export function RelatorioClient() {
     toast('Endereço atualizado', 'success')
   }
 
+  // Roda o preenchedor do Pipefy (preview, não envia) via /api/pipefy/preencher e mostra o log
+  const testarPipefy = async () => {
+    setPipefyRunning(true)
+    setPipefyLog('Rodando preenchimento (preview, não envia)…\n\nAbrindo o form "SEC | Ônus" com a sessão salva e preenchendo tudo menos os 2 campos NIDO.')
+    try {
+      const res = await fetch('/api/pipefy/preencher', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'preview' }),
+      })
+      const d = await res.json().catch(() => ({}))
+      setPipefyLog(d.log || d.error || `HTTP ${res.status}`)
+      if (!res.ok) toast(`Falha no preenchimento: ${d.error ?? res.status}`, 'error')
+      else toast('Preview concluído — veja o log', 'success')
+    } catch (err) {
+      setPipefyLog(`Erro ao chamar o preenchedor: ${err instanceof Error ? err.message : 'desconhecido'}`)
+      toast('Erro ao chamar o preenchedor', 'error')
+    } finally {
+      setPipefyRunning(false)
+    }
+  }
+
+  // Descarta (soft: status_triagem='descartado') os selecionados — saem do relatório, reversível pela Triagem
+  const confirmDelete = async () => {
+    if (!selected.size) return
+    setDeleting(true)
+    const byPortal: Record<string, string[]> = {}
+    items.filter(i => selected.has(i.link)).forEach(i => {
+      if (!byPortal[i.portal]) byPortal[i.portal] = []
+      byPortal[i.portal].push(i.link)
+    })
+    try {
+      const res = await fetch('/api/relatorio', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ byPortal }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) { toast(`Erro ao descartar: ${d.error ?? res.status}`, 'error'); return }
+      const n = selected.size
+      setItems(prev => prev.filter(i => !selected.has(i.link)))
+      setSelected(new Set())
+      setDeleteOpen(false)
+      toast(`${n} imóvel${n !== 1 ? 'is' : ''} descartado${n !== 1 ? 's' : ''}`, 'success')
+    } catch (err) {
+      toast(`Erro ao descartar: ${err instanceof Error ? err.message : 'desconhecido'}`, 'error')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const btn = 'text-sm font-medium px-4 py-2 rounded-lg transition-colors'
 
   return (
@@ -566,32 +653,19 @@ export function RelatorioClient() {
           <h1 className="text-2xl font-bold text-[#1f2328]">Relatório para Cartório</h1>
           <p className="text-[#656d76] text-sm mt-1">Imóveis aprovados e visitados · solicitação de matrícula e ônus reais</p>
         </div>
-        <div className="flex gap-2">
-          <button onClick={() => setQueueOpen(true)} disabled={!queue.length}
-            className={`${btn} border border-[#d0d7de] text-[#1f2328] hover:border-[#8c959f] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2`}>
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-            </svg>
-            Preencher matrículas{queue.length ? ` (${queue.length})` : ''}
-          </button>
-          <button onClick={exportExcel}
-            className={`${btn} border border-[#d0d7de] text-[#1f2328] hover:border-[#8c959f] flex items-center gap-2`}>
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 7.5h18M3 12h18M3 16.5h18M7.5 3v18" />
-            </svg>
-            Exportar Excel
-          </button>
-          <button onClick={generateWhatsApp}
-            className={`${btn} bg-green-600 hover:bg-green-500 text-white flex items-center gap-2`}>
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
-              <path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.555 4.116 1.529 5.843L.057 23.571a.5.5 0 00.622.622l5.728-1.472A11.947 11.947 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22a9.95 9.95 0 01-5.098-1.398l-.361-.215-3.742.962.998-3.634-.236-.374A9.96 9.96 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
-            </svg>
-            Gerar WhatsApp
-          </button>
+        <div className="flex items-center gap-2">
+          <ActionsMenu
+            items={[
+              { label: queue.length ? `Preencher matrículas (${queue.length})` : 'Preencher matrículas', onClick: () => setQueueOpen(true), disabled: !queue.length },
+              { label: pipefyRunning ? 'Testando Pipefy…' : 'Testar Pipefy (preview)', onClick: testarPipefy, disabled: pipefyRunning },
+              { label: 'Exportar Excel', onClick: exportExcel },
+              { label: 'Gerar texto WhatsApp', onClick: generateWhatsApp },
+              { label: 'Descartar selecionados', onClick: () => setDeleteOpen(true), disabled: !selected.size, danger: true },
+            ]}
+          />
           <button onClick={() => markSelected('enviado')} disabled={!selected.size}
             className={`${btn} bg-primary hover:bg-primary-h disabled:opacity-40 disabled:cursor-not-allowed text-white`}>
-            Marcar enviado ({selected.size})
+            Marcar enviado{selected.size ? ` (${selected.size})` : ''}
           </button>
         </div>
       </div>
@@ -741,6 +815,65 @@ export function RelatorioClient() {
           onDesistir={handleDesistir}
           onClose={() => setQueueOpen(false)}
         />
+      )}
+      {pipefyLog !== null && (
+        <div role="button" tabIndex={0}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={() => { if (!pipefyRunning) setPipefyLog(null) }}
+          onKeyDown={e => { if (e.key === 'Escape' && !pipefyRunning) setPipefyLog(null) }}>
+          <div className="rounded-xl w-full max-w-2xl shadow-2xl overflow-hidden"
+            style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
+            onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
+            <div className="px-5 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border)' }}>
+              <p className="font-semibold text-foreground text-sm flex items-center gap-2">
+                {pipefyRunning && (
+                  <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-20" />
+                    <path d="M22 12a10 10 0 00-10-10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                  </svg>
+                )}
+                Log do preenchimento — Pipefy “SEC | Ônus” (preview)
+              </p>
+              <button onClick={() => setPipefyLog(null)} disabled={pipefyRunning}
+                className="text-muted-foreground hover:text-foreground p-1 transition-colors disabled:opacity-40">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <pre className="text-xs font-mono whitespace-pre-wrap p-4 max-h-[60vh] overflow-auto text-foreground leading-relaxed"
+              style={{ background: 'var(--secondary)' }}>{pipefyLog}</pre>
+            <div className="px-5 py-2.5 text-[11px] text-muted-foreground" style={{ borderTop: '1px solid var(--border)' }}>
+              Preview não envia nada. Para criar os cards de verdade, rode no terminal: <span className="font-mono">python scripts/pipefy_portal_fill.py --from-db --submit</span>
+            </div>
+          </div>
+        </div>
+      )}
+      {deleteOpen && (
+        <div role="button" tabIndex={0}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={() => { if (!deleting) setDeleteOpen(false) }}
+          onKeyDown={e => { if (e.key === 'Escape' && !deleting) setDeleteOpen(false) }}>
+          <div className="bg-white border border-[#d0d7de] rounded-lg w-full max-w-sm shadow-xl"
+            onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-[#d0d7de]">
+              <h2 className="text-[#1f2328] font-semibold text-base">Descartar imóveis?</h2>
+            </div>
+            <div className="p-5 text-sm text-[#656d76]">
+              <b className="text-[#1f2328]">{selected.size}</b> imóvel{selected.size !== 1 ? 'is' : ''} sai{selected.size !== 1 ? 'em' : ''} do relatório (status “descartado”). É <b className="text-[#1f2328]">reversível</b> — dá pra reaprovar pela Triagem.
+            </div>
+            <div className="flex gap-2 px-5 py-4 border-t border-[#d0d7de]">
+              <button onClick={() => setDeleteOpen(false)} disabled={deleting}
+                className="flex-1 text-sm text-[#656d76] hover:text-[#1f2328] border border-[#d0d7de] hover:border-[#8c959f] px-4 py-2.5 rounded-lg transition-colors disabled:opacity-40">
+                Cancelar
+              </button>
+              <button onClick={confirmDelete} disabled={deleting}
+                className="flex-1 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed px-4 py-2.5 rounded-lg transition-colors">
+                {deleting ? 'Descartando…' : `Descartar ${selected.size}`}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       <ToastStack toasts={toasts} />
     </div>

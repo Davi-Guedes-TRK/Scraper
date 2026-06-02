@@ -40,6 +40,35 @@ const NAV_GROUPS = [
     label: 'Captação',
     items: [
       {
+        href: '/triagem',
+        label: 'Portais',
+        icon: (
+          <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h10M4 18h7" />
+          </svg>
+        ),
+      },
+      {
+        href: '/in-loco',
+        label: 'In Loco',
+        icon: (
+          <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+            <circle cx="12" cy="11" r="2.5" />
+          </svg>
+        ),
+      },
+      {
+        href: '/captacao',
+        label: 'Alvos de Captação',
+        icon: (
+          <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+            <circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3.2" />
+            <path strokeLinecap="round" d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+          </svg>
+        ),
+      },
+      {
         href: '/scrapers',
         label: 'Scrapers',
         icon: (
@@ -60,17 +89,8 @@ const NAV_GROUPS = [
     ],
   },
   {
-    label: 'Triagem',
+    label: 'Processamento',
     items: [
-      {
-        href: '/triagem',
-        label: 'Fila de Triagem',
-        icon: (
-          <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h10M4 18h7" />
-          </svg>
-        ),
-      },
       {
         href: '/extracaopistas',
         label: 'Extração de Pistas',

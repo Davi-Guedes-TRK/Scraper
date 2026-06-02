@@ -31,7 +31,8 @@ export async function GET() {
            nome_anunciante, telefone, tipo_anunciante, tipo_imovel, creci,
            numero_matricula
     FROM imoveis_todos
-    WHERE status_triagem = 'aprovado' OR visitado_em IS NOT NULL
+    WHERE (status_triagem = 'aprovado' OR visitado_em IS NOT NULL)
+      AND status_triagem IS DISTINCT FROM 'descartado'
     ORDER BY coletado_em DESC
     LIMIT 1000
   `
@@ -106,4 +107,31 @@ export async function PATCH(req: NextRequest) {
   }
 
   return Response.json({ error: 'action inválida' }, { status: 400 })
+}
+
+export async function DELETE(req: NextRequest) {
+  let body: { byPortal?: Record<string, string[]> }
+  try {
+    body = await req.json()
+  } catch {
+    return Response.json({ error: 'Body inválido' }, { status: 400 })
+  }
+
+  const byPortal = body.byPortal ?? {}
+  const portals = Object.keys(byPortal).filter(p => portalKeys.includes(p) && byPortal[p]?.length)
+  if (!portals.length) return Response.json({ error: 'nada para descartar' }, { status: 400 })
+
+  // Soft delete: marca status_triagem='descartado' (convenção do projeto; reversível).
+  // Não deleta a linha nem mexe em visitado_em (coluna ausente em algumas tabelas-base).
+  try {
+    const results = await Promise.all(
+      portals.map(p =>
+        sql.unsafe(`UPDATE public."${portalTable(p)}" SET status_triagem = 'descartado' WHERE link = ANY($1)`, [byPortal[p]]),
+      ),
+    )
+    const descartados = results.reduce((n, r) => n + ((r as unknown as { count?: number }).count ?? 0), 0)
+    return Response.json({ ok: true, descartados })
+  } catch (err) {
+    return Response.json({ error: err instanceof Error ? err.message : 'Erro no banco' }, { status: 500 })
+  }
 }
