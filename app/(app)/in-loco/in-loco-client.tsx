@@ -212,7 +212,7 @@ export function InLocoClient() {
 
       {/* 1. foto */}
       <label className="rounded-xl overflow-hidden cursor-pointer block" style={{ border: '1px solid var(--border)' }}>
-        <input type="file" accept="image/*" capture="environment" className="hidden"
+        <input type="file" accept="image/*" className="hidden"
           onChange={e => { const f = e.target.files?.[0]; if (f) onPhoto(f) }} />
         {fotoPreview ? (
           <div className="relative">
@@ -228,7 +228,8 @@ export function InLocoClient() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
               <circle cx="12" cy="13" r="3" />
             </svg>
-            <span className="text-xs font-medium">Tirar foto do imóvel</span>
+            <span className="text-xs font-medium">Foto do imóvel</span>
+            <span className="text-[10px] text-muted-foreground/60">câmera ou galeria (galeria mantém o GPS da foto)</span>
           </div>
         )}
       </label>
