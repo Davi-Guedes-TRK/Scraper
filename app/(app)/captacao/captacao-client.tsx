@@ -48,6 +48,12 @@ export function CaptacaoClient({ leads }: { leads: Lead[] }) {
   const [q, setQ] = useState('')
   const [bairro, setBairro] = useState(ALL)
   const [tipo, setTipo] = useState(ALL)
+  const [fechados, setFechados] = useState<Set<string>>(new Set())
+  const toggle = (k: string) => setFechados(prev => {
+    const next = new Set(prev)
+    if (next.has(k)) next.delete(k); else next.add(k)
+    return next
+  })
 
   const bairros = useMemo(() => Array.from(new Set(leads.map(l => l.bairro).filter(Boolean) as string[])).sort(), [leads])
   const tipos = useMemo(() => Array.from(new Set(leads.map(l => l.tipo_imovel).filter(Boolean) as string[])).sort(), [leads])
@@ -69,23 +75,24 @@ export function CaptacaoClient({ leads }: { leads: Lead[] }) {
     let soma = 0, n = 0, antigos = 0
     for (const l of filtered) {
       if (l.valor_locacao) { soma += Number(l.valor_locacao); n++ }
-      if ((l.dias_inativo ?? 0) >= 365) antigos++
+      if ((l.dias_inativo ?? 0) >= 1460) antigos++
     }
     return { total: filtered.length, medio: n ? Math.round(soma / n) : 0, bairros: new Set(filtered.map(l => l.bairro).filter(Boolean)).size, antigos }
   }, [filtered])
 
   const blocos = useMemo(() => {
     const defs: { key: string; label: string; accent: string; hint?: string }[] = [
-      { key: '0-3', label: 'Até 3 meses', accent: 'var(--border)' },
-      { key: '3-6', label: '3 a 6 meses', accent: 'var(--border)' },
-      { key: '6-12', label: '6 a 12 meses', accent: 'var(--border)' },
-      { key: '12+', label: '12 meses ou mais', accent: '#c08a3e', hint: 'contrato provável perto da renovação — prioridade' },
+      { key: '0-12', label: 'Até 12 meses', accent: 'var(--border)' },
+      { key: '12-24', label: '12 a 24 meses', accent: 'var(--border)' },
+      { key: '24-36', label: '24 a 36 meses', accent: 'var(--border)' },
+      { key: '36-48', label: '36 a 48 meses', accent: 'var(--border)' },
+      { key: '48+', label: '48 meses ou mais', accent: '#c08a3e', hint: 'contrato já ciclou — win-back forte' },
       { key: 'sem', label: 'Sem data', accent: 'var(--border)' },
     ]
     const groups = new Map<string, Lead[]>()
     for (const l of filtered) {
       const d = l.dias_inativo
-      const k = d == null ? 'sem' : d < 90 ? '0-3' : d < 180 ? '3-6' : d < 365 ? '6-12' : '12+'
+      const k = d == null ? 'sem' : d < 365 ? '0-12' : d < 730 ? '12-24' : d < 1095 ? '24-36' : d < 1460 ? '36-48' : '48+'
       ;(groups.get(k) ?? groups.set(k, []).get(k)!).push(l)
     }
     return defs
@@ -110,7 +117,7 @@ export function CaptacaoClient({ leads }: { leads: Lead[] }) {
         <StatTile label="Leads na lista" value={kpis.total} accent="#6e4d34" sublabel="dono já alugou conosco" />
         <StatTile label="Aluguel médio" value={kpis.medio ? fmtBRL(kpis.medio) : '—'} accent="#5d7a43" sublabel="última locação fechada" />
         <StatTile label="Bairros" value={kpis.bairros} accent="#0ea5e9" sublabel="cobertura" />
-        <StatTile label="12+ meses" value={kpis.antigos} accent="#c08a3e" sublabel="contrato provável vencendo" />
+        <StatTile label="48+ meses" value={kpis.antigos} accent="#c08a3e" sublabel="win-back forte" />
       </div>
 
       <div className="flex flex-wrap items-center gap-2 mb-3">
@@ -124,25 +131,39 @@ export function CaptacaoClient({ leads }: { leads: Lead[] }) {
         <p className="text-sm text-muted-foreground text-center py-12">Nenhum lead com esses filtros.</p>
       ) : (
         <div className="flex flex-col gap-3">
-          {blocos.map(b => (
-            <div key={b.key} className="card rounded-xl overflow-hidden">
-              <div className="flex items-baseline justify-between px-4 py-2.5 gap-3" style={{ borderBottom: '1px solid var(--border)', borderLeft: `3px solid ${b.accent}`, background: 'var(--secondary)' }}>
-                <div className="min-w-0">
-                  <span className="text-[13px] font-semibold text-foreground">{b.label}</span>
-                  {b.hint && <span className="text-[11px] text-muted-foreground ml-2">· {b.hint}</span>}
-                </div>
-                <span className="text-[11px] text-muted-foreground font-mono whitespace-nowrap">{b.leads.length} imóveis · média {b.medio ? fmtBRL(b.medio) : '—'}</span>
+          {blocos.map(b => {
+            const aberto = !fechados.has(b.key)
+            return (
+              <div key={b.key} className="card rounded-xl overflow-hidden">
+                <button
+                  onClick={() => toggle(b.key)}
+                  className="w-full flex items-center justify-between px-4 py-2.5 gap-3 text-left hover:bg-accent/30 transition-colors"
+                  style={{ borderBottom: aberto ? '1px solid var(--border)' : 'none', borderLeft: `3px solid ${b.accent}`, background: 'var(--secondary)' }}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <svg className={`w-3.5 h-3.5 text-muted-foreground shrink-0 transition-transform ${aberto ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                    <span className="text-[13px] font-semibold text-foreground">{b.label}</span>
+                    {b.hint && <span className="text-[11px] text-muted-foreground hidden sm:inline truncate">· {b.hint}</span>}
+                  </div>
+                  <span className="text-[11px] text-muted-foreground font-mono whitespace-nowrap">{b.leads.length} imóveis · média {b.medio ? fmtBRL(b.medio) : '—'}</span>
+                </button>
+                {aberto && (
+                  <>
+                    <div className="grid grid-cols-[1.4fr_1.6fr_auto_auto_auto] gap-3 px-4 py-1.5 text-[10px] eyebrow text-muted-foreground" style={{ borderBottom: '1px solid var(--border)' }}>
+                      <span>Proprietário</span>
+                      <span>Imóvel</span>
+                      <span className="text-right">Aluguel</span>
+                      <span className="text-right">Inativo há</span>
+                      <span className="text-right">Ação</span>
+                    </div>
+                    {b.leads.map(l => <Row key={l.codigo_imovel} l={l} />)}
+                  </>
+                )}
               </div>
-              <div className="grid grid-cols-[1.4fr_1.6fr_auto_auto_auto] gap-3 px-4 py-1.5 text-[10px] eyebrow text-muted-foreground" style={{ borderBottom: '1px solid var(--border)' }}>
-                <span>Proprietário</span>
-                <span>Imóvel</span>
-                <span className="text-right">Aluguel</span>
-                <span className="text-right">Inativo há</span>
-                <span className="text-right">Ação</span>
-              </div>
-              {b.leads.map(l => <Row key={l.codigo_imovel} l={l} />)}
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
