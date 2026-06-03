@@ -12,7 +12,6 @@ const TITLES: Record<string, string> = {
   '/dashboard': 'Dashboard',
   '/scrapers': 'Scrapers',
   '/triagem': 'Fila de Triagem',
-  '/extracaopistas': 'Extração de Pistas',
   '/visitas': 'Roteiro de Visitas',
   '/relatorio': 'Cartório',
   '/analitico': 'Analítico',

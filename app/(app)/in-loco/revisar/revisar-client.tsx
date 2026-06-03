@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
-import { detectRegiao } from '@/lib/oficios'
 
 const MatriculaMap = dynamic(() => import('../../triagem/matricula-map').then(m => m.MatriculaMap), {
   ssr: false, loading: () => <div className="rounded-lg bg-muted animate-pulse" style={{ height: 240 }} />,
@@ -63,17 +62,6 @@ export function RevisarClient() {
     await supabase.from('leads_in_loco').update(p).eq('id', id); await load()
   }, [supabase, load])
 
-  const pedirMatricula = useCallback(async (endereco: string | null) => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { error } = await supabase.from('cartorio_processos').insert({
-      responsavel: user.id, regiao: detectRegiao(endereco), status: 'pendente',
-      observacao: `In Loco — ${endereco ?? 'sem endereço'}`,
-    })
-    if (error) toast('Erro ao criar processo', 'err'); else toast('Enviado pro Meu Cartório ✓')
-    await load()
-  }, [supabase, toast, load])
-
   const tabCls = (on: boolean) => `px-3 h-8 rounded-lg text-[12px] font-medium transition-colors ${on ? 'text-foreground' : 'text-muted-foreground'}`
   const tabStyle = (on: boolean) => on ? { background: 'var(--accent)' } : { border: '1px solid var(--border)' }
 
@@ -94,7 +82,7 @@ export function RevisarClient() {
           <CardRevisao
             key={c.id} c={c} dup={dupes.has(c.id)} expanded={expandedId === c.id}
             onToggle={() => setExpandedId(id => (id === c.id ? null : c.id))}
-            onPatch={patch} onPedir={pedirMatricula} onDone={() => setExpandedId(null)}
+            onPatch={patch} onDone={() => setExpandedId(null)}
           />
         ))
       )}
@@ -114,10 +102,9 @@ const STATUS_BADGE: Record<string, { label: string; bg: string }> = {
   descartado: { label: 'descartado', bg: '#8a8a8a' },
 }
 
-function CardRevisao({ c, dup, expanded, onToggle, onPatch, onPedir, onDone }: {
+function CardRevisao({ c, dup, expanded, onToggle, onPatch, onDone }: {
   c: Cap; dup: boolean; expanded: boolean; onToggle: () => void
   onPatch: (id: number, p: Partial<Cap>) => Promise<void>
-  onPedir: (endereco: string | null) => Promise<void>
   onDone: () => void
 }) {
   const [end, setEnd] = useState(c.endereco ?? '')
@@ -148,7 +135,6 @@ function CardRevisao({ c, dup, expanded, onToggle, onPatch, onPedir, onDone }: {
   const salvar = () => run(async () => { await onPatch(c.id, campos()) })
   const concluir = () => run(async () => { await onPatch(c.id, { ...campos(), status: 'revisado' }); onDone() })
   const descartar = () => run(async () => { await onPatch(c.id, { status: 'descartado' }); onDone() })
-  const pedir = () => run(async () => { await onPatch(c.id, { ...campos(), status: 'revisado' }); await onPedir(end.trim() || null); onDone() })
 
   return (
     <div className="card rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
@@ -185,13 +171,11 @@ function CardRevisao({ c, dup, expanded, onToggle, onPatch, onPedir, onDone }: {
           </div>
           <textarea value={obs} onChange={e => setObs(e.target.value)} rows={2} placeholder="Observações (placa Imobiliária X, prédio antigo…)" className={`${inputCls} resize-none`} style={inputStyle} />
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <button onClick={salvar} disabled={busy} className="h-10 rounded-lg text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40" style={{ border: '1px solid var(--border)' }}>Salvar</button>
             <button onClick={concluir} disabled={busy} className="h-10 rounded-lg text-[13px] font-semibold text-white disabled:opacity-40" style={{ background: '#5d7a43' }}>Concluir ✓</button>
-            <button onClick={pedir} disabled={busy} className="h-10 rounded-lg text-[13px] font-semibold text-white disabled:opacity-40" style={{ background: '#6e4d34' }}>Pedir matrícula</button>
             <button onClick={descartar} disabled={busy} className="h-10 rounded-lg text-[13px] font-medium text-muted-foreground hover:text-red-600 transition-colors disabled:opacity-40" style={{ border: '1px solid var(--border)' }}>Descartar</button>
           </div>
-          <p className="text-[10px] text-muted-foreground/70 text-center -mt-1">"Pedir matrícula" cria um processo no seu Meu Cartório já agrupado pelo ofício da região.</p>
         </div>
       )}
     </div>
