@@ -1,29 +1,13 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 
-const MatriculaMap = dynamic(() => import('../triagem/matricula-map').then(m => m.MatriculaMap), {
-  ssr: false,
-  loading: () => <div className="rounded-lg bg-muted animate-pulse" style={{ height: 280 }} />,
-})
-
-type Lead = {
-  id: number
-  lat: number | null; lng: number | null
-  endereco: string | null; telefone: string | null
-  tipo_imovel: string | null; obs: string | null
-  foto_url: string | null; criado_em: string | null
-}
-
-const TIPOS = ['Apartamento', 'Casa', 'Comercial', 'Terreno', 'Kitnet', 'Outro']
+const TIPOS = ['Casa', 'Apartamento', 'Comercial', 'Terreno', 'Outro']
 type Toast = { id: number; msg: string; type: 'ok' | 'err' }
 
-// Comprime/redimensiona a foto no cliente — fotos de celular têm 8–12 MP e estouram
-// a memória do navegador ao subir cruas. Reduz pra ~1600px JPEG (de MBs p/ ~200–400 KB).
+// ───────────────────────── foto: comprime no celular (fotos de 8–12 MP estouram a memória) ──
 async function compressImage(file: File, maxDim = 1280, quality = 0.7): Promise<Blob> {
-  // Decodifica JÁ reduzido (resize no decode) p/ não estourar a memória do celular com fotos de 8–12 MP.
   let bmp: ImageBitmap | null = null
   let img: HTMLImageElement | null = null
   try {
@@ -52,19 +36,18 @@ async function compressImage(file: File, maxDim = 1280, quality = 0.7): Promise<
   return blob
 }
 
-// Lê GPS do EXIF do JPEG original (sem lib). Retorna null se a foto não tiver geotag.
-// (A compressão por canvas apaga o EXIF, então isto roda no arquivo original, antes.)
+// GPS do EXIF do JPEG (fallback quando o GPS ao vivo ainda não fixou). Sem lib.
 async function readExifGps(file: File): Promise<{ lat: number; lng: number } | null> {
   try {
     const buf = await file.slice(0, 256 * 1024).arrayBuffer()
     const v = new DataView(buf)
-    if (v.getUint16(0) !== 0xFFD8) return null // não é JPEG
+    if (v.getUint16(0) !== 0xFFD8) return null
     let off = 2, tiff = -1
     while (off + 4 <= v.byteLength) {
       const marker = v.getUint16(off)
       if ((marker & 0xFF00) !== 0xFF00) break
       const size = v.getUint16(off + 2)
-      if (marker === 0xFFE1 && v.getUint32(off + 4) === 0x45786966) { tiff = off + 10; break } // "Exif"
+      if (marker === 0xFFE1 && v.getUint32(off + 4) === 0x45786966) { tiff = off + 10; break }
       off += 2 + size
     }
     if (tiff < 0) return null
@@ -99,213 +82,204 @@ async function readExifGps(file: File): Promise<{ lat: number; lng: number } | n
   } catch { return null }
 }
 
+// ───────────────────────── fila offline (IndexedDB) — captura nunca falha por falta de sinal ──
+const IDB_NAME = 'inloco', IDB_STORE = 'fila'
+type QItem = { cid: string; blob: Blob; lat: number | null; lng: number | null; tipo: string; createdAt: number }
+
+function openDB(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, 1)
+    req.onupgradeneeded = () => { if (!req.result.objectStoreNames.contains(IDB_STORE)) req.result.createObjectStore(IDB_STORE, { keyPath: 'cid' }) }
+    req.onsuccess = () => resolve(req.result)
+    req.onerror = () => reject(req.error)
+  })
+}
+function tx<T>(db: IDBDatabase, mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const req = fn(db.transaction(IDB_STORE, mode).objectStore(IDB_STORE))
+    req.onsuccess = () => resolve(req.result as T)
+    req.onerror = () => reject(req.error)
+  })
+}
+const qAdd = async (i: QItem) => tx(await openDB(), 'readwrite', s => s.put(i))
+const qAll = async (): Promise<QItem[]> => tx<QItem[]>(await openDB(), 'readonly', s => s.getAll())
+const qDel = async (cid: string) => tx(await openDB(), 'readwrite', s => s.delete(cid))
+
+type Captura = {
+  cid: string
+  status: 'fila' | 'enviado'
+  preview: string
+  endereco: string | null
+  tipo: string | null
+  lat: number | null; lng: number | null
+  createdAt: number
+}
+
 export function InLocoClient() {
   const [supabase] = useState(() => createClient())
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null)
-  const [endereco, setEndereco] = useState('')
-  const [fonte, setFonte] = useState<string | null>(null)
-  const [telefone, setTelefone] = useState('')
+  const [userId, setUserId] = useState<string | null>(null)
+  const coordsRef = useRef<{ lat: number; lng: number; acc: number } | null>(null)
+  const [gpsAcc, setGpsAcc] = useState<number | null>(null)
   const [tipo, setTipo] = useState('')
-  const [obs, setObs] = useState('')
-  const [fotoUrl, setFotoUrl] = useState<string | null>(null)
-  const [fotoPreview, setFotoPreview] = useState<string | null>(null)
-  const [uploading, setUploading] = useState(false)
-  const [locSource, setLocSource] = useState<'exif' | 'gps' | null>(null)
-  const [locating, setLocating] = useState(false)
-  const [geocoding, setGeocoding] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [recent, setRecent] = useState<Lead[]>([])
+  const [filaCount, setFilaCount] = useState(0)
+  const [syncing, setSyncing] = useState(false)
+  const [capturas, setCapturas] = useState<Captura[]>([])
   const [toasts, setToasts] = useState<Toast[]>([])
+  const fileRef = useRef<HTMLInputElement>(null)
+  const syncingRef = useRef(false)
   const tid = useRef(0)
 
   const toast = useCallback((msg: string, type: Toast['type'] = 'ok') => {
     const id = ++tid.current
     setToasts(t => [...t, { id, msg, type }])
-    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3500)
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3000)
   }, [])
 
-  const loadRecent = useCallback(() => {
-    fetch('/api/in-loco').then(r => r.ok ? r.json() : []).then(setRecent).catch(() => {})
+  // GPS ao vivo (pré-aquecido) — pino fica pronto na hora da foto
+  useEffect(() => {
+    if (!('geolocation' in navigator)) return
+    const id = navigator.geolocation.watchPosition(
+      pos => { coordsRef.current = { lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy }; setGpsAcc(pos.coords.accuracy) },
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 },
+    )
+    return () => navigator.geolocation.clearWatch(id)
   }, [])
-  useEffect(() => { loadRecent() }, [loadRecent])
 
-  const geocode = useCallback(async (lat: number, lng: number) => {
-    setGeocoding(true)
+  useEffect(() => { supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null)) }, [supabase])
+
+  const refresh = useCallback(async () => {
+    const q = await qAll().catch(() => [] as QItem[])
+    setFilaCount(q.length)
+    const fila: Captura[] = q.map(i => ({ cid: i.cid, status: 'fila', preview: URL.createObjectURL(i.blob), endereco: null, tipo: i.tipo || null, lat: i.lat, lng: i.lng, createdAt: i.createdAt }))
+    const { data } = await supabase.from('leads_in_loco')
+      .select('id, lat, lng, endereco, tipo_imovel, foto_url, criado_em')
+      .order('criado_em', { ascending: false }).limit(50)
+    const enviados: Captura[] = (data ?? []).map((r: Record<string, unknown>) => ({
+      cid: `db-${r.id}`, status: 'enviado', preview: (r.foto_url as string) ?? '',
+      endereco: (r.endereco as string) ?? null, tipo: (r.tipo_imovel as string) ?? null,
+      lat: (r.lat as number) ?? null, lng: (r.lng as number) ?? null,
+      createdAt: r.criado_em ? new Date(r.criado_em as string).getTime() : 0,
+    }))
+    setCapturas([...fila, ...enviados].sort((a, b) => b.createdAt - a.createdAt))
+  }, [supabase])
+
+  const sync = useCallback(async () => {
+    if (syncingRef.current || typeof navigator === 'undefined' || !navigator.onLine || !userId) return
+    syncingRef.current = true; setSyncing(true)
     try {
-      const res = await fetch('/api/in-loco/geo', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lat, lng }),
-      })
-      const d = await res.json().catch(() => ({}))
-      if (res.ok && d.endereco) { setEndereco(d.endereco); setFonte(d.fonte) }
-      else { setFonte(null); toast(d.error ?? 'Sem endereço aqui — ajuste o pino ou digite', 'err') }
-    } catch { toast('Erro ao buscar endereço', 'err') }
-    finally { setGeocoding(false) }
-  }, [toast])
+      for (const item of await qAll()) {
+        try {
+          const path = `${item.cid}.jpg`
+          const up = await supabase.storage.from('in-loco').upload(path, item.blob, { contentType: 'image/jpeg', upsert: true })
+          if (up.error) throw up.error
+          const foto_url = supabase.storage.from('in-loco').getPublicUrl(path).data.publicUrl
+          const ins = await supabase.from('leads_in_loco')
+            .insert({ responsavel: userId, lat: item.lat, lng: item.lng, tipo_imovel: item.tipo || null, foto_url, status: 'novo' })
+            .select('id').single()
+          if (ins.error) throw ins.error
+          if (item.lat != null && item.lng != null) {
+            try {
+              const res = await fetch('/api/in-loco/geo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lat: item.lat, lng: item.lng }) })
+              const g = await res.json().catch(() => ({}))
+              if (res.ok && g.endereco) await supabase.from('leads_in_loco').update({ endereco: g.endereco, endereco_fonte: g.fonte ?? null }).eq('id', (ins.data as { id: number }).id)
+            } catch { /* endereço resolve depois */ }
+          }
+          await qDel(item.cid)
+        } catch { break /* sem sinal/erro: deixa na fila pro próximo sync */ }
+      }
+    } finally { syncingRef.current = false; setSyncing(false); refresh() }
+  }, [supabase, userId, refresh])
 
-  // Foto -> comprime no celular -> Supabase Storage (bucket "in-loco")
+  useEffect(() => { refresh() }, [refresh])
+  useEffect(() => { if (userId) sync() }, [userId, sync])
+  useEffect(() => {
+    const on = () => sync()
+    window.addEventListener('online', on)
+    return () => window.removeEventListener('online', on)
+  }, [sync])
+
   const onPhoto = async (file: File) => {
-    setUploading(true)
-    // prioridade: GPS do EXIF da própria foto (lido do original, antes de comprimir)
-    const exif = await readExifGps(file)
-    if (exif) { setCoords(exif); setLocSource('exif'); geocode(exif.lat, exif.lng); toast('Localização lida da foto 📷') }
     try {
       const blob = await compressImage(file)
-      setFotoPreview(URL.createObjectURL(blob))
-      const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`
-      const { error } = await supabase.storage.from('in-loco').upload(path, blob, { contentType: 'image/jpeg' })
-      if (error) throw error
-      const { data } = supabase.storage.from('in-loco').getPublicUrl(path)
-      setFotoUrl(data.publicUrl)
-      toast('Foto enviada ✓')
-    } catch (e) {
-      setFotoUrl(null)
-      toast(`Erro ao enviar foto${e instanceof Error ? `: ${e.message}` : ''}`, 'err')
-    } finally { setUploading(false) }
+      let lat = coordsRef.current?.lat ?? null
+      let lng = coordsRef.current?.lng ?? null
+      if (lat == null) { const ex = await readExifGps(file); if (ex) { lat = ex.lat; lng = ex.lng } }
+      const cid = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`
+      await qAdd({ cid, blob, lat, lng, tipo, createdAt: Date.now() })
+      toast(lat == null ? 'Capturado ✓ (sem GPS — ajuste depois)' : 'Capturado ✓')
+      await refresh()
+      sync()
+    } catch { toast('Erro ao processar a foto', 'err') }
   }
-
-  const pegarLocalizacao = () => {
-    if (!('geolocation' in navigator)) { toast('Sem GPS neste dispositivo', 'err'); return }
-    setLocating(true); setFonte(null)
-    navigator.geolocation.getCurrentPosition(
-      pos => { const { latitude: lat, longitude: lng } = pos.coords; setCoords({ lat, lng }); setLocSource('gps'); setLocating(false); geocode(lat, lng) },
-      err => { setLocating(false); toast(err.code === 1 ? 'Permissão de localização negada' : 'Não consegui o GPS', 'err') },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
-    )
-  }
-
-  // arrastar o pino para o imóvel certo (ex.: do outro lado da rua) -> re-geocodifica
-  const onPinDrag = (lat: number, lng: number) => { setCoords({ lat, lng }); geocode(lat, lng) }
-
-  const limpar = () => {
-    setCoords(null); setEndereco(''); setFonte(null); setTelefone(''); setTipo(''); setObs('')
-    setFotoUrl(null); setFotoPreview(null); setLocSource(null)
-  }
-
-  const salvar = async () => {
-    if (!endereco.trim()) { toast('Endereço é obrigatório', 'err'); return }
-    setSaving(true)
-    try {
-      const res = await fetch('/api/in-loco', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          lat: coords?.lat ?? null, lng: coords?.lng ?? null, endereco: endereco.trim(),
-          fonte, telefone: telefone.trim(), tipo_imovel: tipo, obs: obs.trim(), foto_url: fotoUrl,
-        }),
-      })
-      const d = await res.json().catch(() => ({}))
-      if (!res.ok) { toast(`Erro ao salvar: ${d.error ?? res.status}`, 'err'); return }
-      toast('Imóvel salvo ✓'); limpar(); loadRecent()
-    } catch { toast('Erro ao salvar', 'err') }
-    finally { setSaving(false) }
-  }
-
-  const inputCls = 'w-full rounded-lg px-3 py-2.5 text-sm text-foreground outline-none focus:ring-2 ring-ring/30 transition-all'
-  const inputStyle = { background: 'var(--secondary)', border: '1px solid var(--border)' }
 
   return (
-    <div className="p-4 sm:p-6 max-w-md mx-auto flex flex-col gap-4">
+    <div className="p-4 max-w-md mx-auto flex flex-col gap-4">
       <div>
         <h1 className="text-2xl font-bold text-foreground font-display tracking-tight">In Loco</h1>
-        <p className="text-muted-foreground text-sm mt-0.5">Foto + localização no local → endereço. Arraste o pino pro imóvel certo.</p>
+        <p className="text-muted-foreground text-sm mt-0.5">Tire a foto — salva na hora com o GPS, <strong className="text-foreground">mesmo sem sinal</strong>. O endereço resolve sozinho depois.</p>
       </div>
 
-      {/* 1. foto */}
-      <label className="rounded-xl overflow-hidden cursor-pointer block" style={{ border: '1px solid var(--border)' }}>
-        <input type="file" accept="image/*" className="hidden"
-          onChange={e => { const f = e.target.files?.[0]; if (f) onPhoto(f) }} />
-        {fotoPreview ? (
-          <div className="relative">
-            <img src={fotoPreview} alt="imóvel" className="w-full h-44 object-cover" />
-            <span className="absolute bottom-2 right-2 text-[10px] px-2 py-1 rounded-full text-white"
-              style={{ background: uploading ? 'rgba(0,0,0,.6)' : fotoUrl ? 'rgba(22,163,74,.9)' : 'rgba(220,38,38,.9)' }}>
-              {uploading ? 'enviando…' : fotoUrl ? 'foto ok ✓' : 'falhou'}
-            </span>
-          </div>
-        ) : (
-          <div className="h-32 flex flex-col items-center justify-center gap-1 text-muted-foreground" style={{ background: 'var(--secondary)' }}>
-            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-              <circle cx="12" cy="13" r="3" />
-            </svg>
-            <span className="text-xs font-medium">Foto do imóvel</span>
-            <span className="text-[10px] text-muted-foreground/60">câmera ou galeria (galeria mantém o GPS da foto)</span>
-          </div>
-        )}
-      </label>
+      {/* tipo (opcional, fica marcado pras próximas) */}
+      <div className="flex flex-wrap gap-1.5">
+        {TIPOS.map(t => (
+          <button key={t} onClick={() => setTipo(tipo === t ? '' : t)}
+            className="px-3 h-8 rounded-full text-[12px] font-medium transition-colors"
+            style={tipo === t
+              ? { background: 'var(--primary)', color: '#fff' }
+              : { background: 'var(--secondary)', border: '1px solid var(--border)', color: 'var(--muted-foreground)' }}>
+            {t}
+          </button>
+        ))}
+      </div>
 
-      {/* 2. localização */}
-      <button onClick={pegarLocalizacao} disabled={locating || geocoding}
-        className="w-full h-12 rounded-xl font-semibold text-white text-sm flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+      {/* BOTÃO CAPTURAR */}
+      <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden"
+        onChange={e => { const f = e.target.files?.[0]; if (f) onPhoto(f); e.target.value = '' }} />
+      <button onClick={() => fileRef.current?.click()}
+        className="w-full h-32 rounded-2xl font-bold text-white text-lg flex flex-col items-center justify-center gap-2 transition-transform active:scale-[0.98]"
         style={{ background: 'var(--primary)' }}>
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><circle cx="12" cy="11" r="3" />
+        <svg className="w-9 h-9" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+          <circle cx="12" cy="13" r="3.2" />
         </svg>
-        {locating ? 'Pegando GPS…' : geocoding ? 'Buscando endereço…' : coords ? 'Pegar localização de novo' : 'Pegar localização'}
+        Capturar imóvel{tipo ? ` · ${tipo}` : ''}
       </button>
 
-      {coords && (
-        <>
-          <MatriculaMap lat={coords.lat} lng={coords.lng} onDragEnd={onPinDrag} />
-          <p className="text-[11px] text-muted-foreground -mt-2 text-center">
-            {locSource === 'exif' ? '📷 local da foto · ' : locSource === 'gps' ? '📍 sua localização · ' : ''}
-            Arraste o pino pro imóvel certo (mesmo do outro lado da rua). {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}
-          </p>
-        </>
-      )}
-
-      {/* 3. dados */}
-      <div className="flex flex-col gap-3 rounded-xl p-4" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-        <div>
-          <label className="text-[11px] font-semibold text-foreground flex items-center gap-2 mb-1">
-            Endereço <span className="text-destructive">*</span>
-            {fonte && <span className="text-[9px] font-normal px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">{fonte}</span>}
-          </label>
-          <input value={endereco} onChange={e => setEndereco(e.target.value)} placeholder="Pegue o GPS / ajuste o pino ou digite" className={inputCls} style={inputStyle} />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-[11px] font-semibold text-foreground block mb-1">Telefone</label>
-            <input value={telefone} onChange={e => setTelefone(e.target.value)} type="tel" placeholder="da placa" className={inputCls} style={inputStyle} />
-          </div>
-          <div>
-            <label className="text-[11px] font-semibold text-foreground block mb-1">Tipo</label>
-            <select value={tipo} onChange={e => setTipo(e.target.value)} className={inputCls} style={inputStyle}>
-              <option value="">—</option>
-              {TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </div>
-        </div>
-        <div>
-          <label className="text-[11px] font-semibold text-foreground block mb-1">Observações</label>
-          <textarea value={obs} onChange={e => setObs(e.target.value)} rows={2} placeholder="ex: placa Imobiliária X, prédio antigo…" className={`${inputCls} resize-none`} style={inputStyle} />
-        </div>
-        <div className="flex gap-2 pt-1">
-          <button onClick={limpar} disabled={saving} className="px-4 h-11 rounded-lg text-sm font-medium text-muted-foreground border border-border hover:text-foreground transition-colors disabled:opacity-40">Limpar</button>
-          <button onClick={salvar} disabled={saving || uploading || !endereco.trim()} className="flex-1 h-11 rounded-lg text-sm font-semibold text-white disabled:opacity-40 transition-colors" style={{ background: 'var(--primary)' }}>
-            {saving ? 'Salvando…' : 'Salvar imóvel'}
-          </button>
-        </div>
+      {/* status GPS + fila */}
+      <div className="flex items-center justify-between text-[11px] -mt-1 px-1">
+        <span className="text-muted-foreground">
+          {gpsAcc == null ? '📍 buscando GPS…' : `📍 GPS pronto · ±${Math.round(gpsAcc)} m`}
+        </span>
+        <span className="font-mono" style={{ color: filaCount ? 'var(--primary)' : 'var(--muted-foreground)' }}>
+          {syncing ? 'enviando…' : filaCount ? `${filaCount} na fila` : 'tudo enviado ✓'}
+        </span>
       </div>
 
-      {/* 4. recentes */}
-      {recent.length > 0 && (
+      {/* minhas capturas */}
+      {capturas.length > 0 && (
         <div className="flex flex-col gap-2">
-          <p className="eyebrow text-muted-foreground/50">Capturados recentemente ({recent.length})</p>
-          {recent.slice(0, 20).map(l => (
-            <div key={l.id} className="rounded-lg overflow-hidden flex items-center gap-3" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-              {l.foto_url
-                ? <img src={l.foto_url} alt="" className="w-14 h-14 object-cover flex-shrink-0" />
-                : <div className="w-14 h-14 flex-shrink-0 flex items-center justify-center text-muted-foreground/30" style={{ background: 'var(--muted)' }}>
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><circle cx="12" cy="13" r="3" /></svg>
-                  </div>}
-              <div className="min-w-0 py-2 pr-2">
-                <p className="text-sm text-foreground font-medium leading-snug truncate">{l.endereco}</p>
+          <p className="eyebrow text-muted-foreground/50">Minhas capturas ({capturas.length})</p>
+          {capturas.map(c => (
+            <div key={c.cid} className="rounded-lg overflow-hidden flex items-center gap-3" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+              {c.preview
+                ? <img src={c.preview} alt="" className="w-16 h-16 object-cover flex-shrink-0" />
+                : <div className="w-16 h-16 flex-shrink-0" style={{ background: 'var(--muted)' }} />}
+              <div className="min-w-0 py-2 pr-2 flex-1">
+                <p className="text-sm text-foreground font-medium leading-snug truncate">
+                  {c.endereco || (c.status === 'fila' ? 'Na fila…' : 'Endereço pendente')}
+                </p>
                 <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
-                  {[l.tipo_imovel, l.telefone].filter(Boolean).join(' · ') || '—'}
-                  {l.lat && l.lng && <> · <a className="text-primary hover:underline" target="_blank" rel="noreferrer" href={`https://www.google.com/maps?q=${l.lat},${l.lng}`}>mapa ↗</a></>}
+                  {c.tipo ? <span>{c.tipo}</span> : null}
+                  {c.tipo && c.lat && c.lng ? ' · ' : null}
+                  {c.lat && c.lng ? <a className="text-primary hover:underline" target="_blank" rel="noreferrer" href={`https://www.google.com/maps?q=${c.lat},${c.lng}`}>mapa ↗</a> : null}
+                  {!c.tipo && !(c.lat && c.lng) ? '—' : null}
                 </p>
               </div>
+              <span className="text-[9px] px-2 py-1 rounded-full mr-2 flex-shrink-0 text-white"
+                style={{ background: c.status === 'fila' ? '#c08a3e' : '#5d7a43' }}>
+                {c.status === 'fila' ? 'na fila' : 'enviado'}
+              </span>
             </div>
           ))}
         </div>
