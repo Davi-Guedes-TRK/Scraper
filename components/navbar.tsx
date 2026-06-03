@@ -34,6 +34,16 @@ const NAV_GROUPS = [
           </svg>
         ),
       },
+      {
+        href: '/analitico/funil-inquilinos',
+        label: 'Funil de Inquilinos',
+        icon: (
+          <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+            <circle cx="9" cy="8" r="3" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 20a6 6 0 0112 0M16 7.5a3 3 0 010 5M21 20a6 6 0 00-3.6-5.5" />
+          </svg>
+        ),
+      },
     ],
   },
   {
