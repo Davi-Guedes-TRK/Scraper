@@ -128,8 +128,13 @@ export async function GET(req: NextRequest) {
 
     // Anúncios ativos no mercado (imoveis_todos) nas regiões do funil. cidade = RA (slug);
     // normaliza (sem acento/caixa/separador) pra casar "lago-sul" com "Lago Sul" do Pipefy.
+    // DEDUP: conta IMÓVEL único, não anúncio cru — o mesmo imóvel aparece em 2 portais.
+    // Chave = título normalizado + fingerprint físico (área/quartos/vagas). ~717 (ref. parceiro ~729).
     sql`
-      SELECT count(*)::int AS total
+      SELECT count(DISTINCT (
+               lower(regexp_replace(translate(it.titulo, 'ÁÀÂÃÉÊÍÓÔÕÚÜÇáàâãéêíóôõúüç', 'AAAAEEIOOOUUCaaaaeeiooouuc'), '[^A-Za-z0-9]', '', 'g')),
+               it.area_m2, it.quartos, it.vagas
+             ))::int AS total
       FROM imoveis_todos it
       WHERE it.ativo
         AND lower(regexp_replace(translate(it.cidade, 'ÁÀÂÃÉÊÍÓÔÕÚÜÇáàâãéêíóôõúüç', 'AAAAEEIOOOUUCaaaaeeiooouuc'), '[^A-Za-z0-9]', '', 'g')) IN (
