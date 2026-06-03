@@ -30,6 +30,7 @@ type Data = {
   porBairro: PorBairro[]; porTipo: PorTipo[]; porMes: PorMes[]
   origem: Origem[]
   anunciosAtivos: number
+  anunciosValor: number
   bairros: string[]; tipos: string[]
 }
 
@@ -103,10 +104,10 @@ function PanelCard({ title, children, className = '' }: { title: string; childre
 }
 
 // Funil horizontal com valores financeiros por etapa
-function FunilVisual({ stats, anuncios }: { stats: Stats; anuncios: number }) {
+function FunilVisual({ stats, anuncios, anunciosValor }: { stats: Stats; anuncios: number; anunciosValor: number }) {
   const max = Math.max(anuncios, stats.oportunidades, 1)
   const stages = [
-    { label: 'Anúncios Ativos', value: anuncios, color: C.anuncios, valor: null, time: null },
+    { label: 'Anúncios Ativos', value: anuncios, color: C.anuncios, valor: anunciosValor, time: null },
     { label: 'Oportunidades', value: stats.oportunidades, color: C.oportunidades, valor: stats.valor_geral, time: stats.dias_oportunidades },
     { label: 'Qualificadas', value: stats.qualificados, color: C.leads, valor: stats.valor_qualificados, time: stats.dias_qualificacao },
     { label: 'Negociação', value: stats.negociacao, color: C.visitados, valor: stats.valor_negociacao, time: stats.dias_negociacao },
@@ -389,7 +390,7 @@ export function FunilClient() {
       </div>
 
       {/* Row 1 — Funil visual com valores */}
-      {s && <FunilVisual stats={s} anuncios={data?.anunciosAtivos ?? 0} />}
+      {s && <FunilVisual stats={s} anuncios={data?.anunciosAtivos ?? 0} anunciosValor={data?.anunciosValor ?? 0} />}
 
       {/* Row 2 — Origem da oportunidade */}
       <PanelCard title="Origem da Oportunidade">

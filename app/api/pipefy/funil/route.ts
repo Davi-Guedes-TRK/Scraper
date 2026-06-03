@@ -129,21 +129,27 @@ export async function GET(req: NextRequest) {
 
     // Anúncios ativos no mercado (imoveis_todos) nas regiões do funil. cidade = RA (slug);
     // normaliza (sem acento/caixa/separador) pra casar "lago-sul" com "Lago Sul" do Pipefy.
-    // DEDUP: conta IMÓVEL único, não anúncio cru — o mesmo imóvel aparece em 2 portais.
-    // Chave = título normalizado + fingerprint físico (área/quartos/vagas). ~717 (ref. parceiro ~729).
+    // DEDUP por imóvel único (título normalizado + área/quartos/vagas) — o mesmo imóvel
+    // aparece em 2 portais. Retorna CONTAGEM (~717) e SOMA do preço (preco é texto BR -> parse).
     sql`
-      SELECT count(DISTINCT (
-               lower(regexp_replace(translate(it.titulo, 'ÁÀÂÃÉÊÍÓÔÕÚÜÇáàâãéêíóôõúüç', 'AAAAEEIOOOUUCaaaaeeiooouuc'), '[^A-Za-z0-9]', '', 'g')),
-               it.area_m2, it.quartos, it.vagas
-             ))::int AS total
-      FROM imoveis_todos it
-      WHERE it.ativo
-        AND lower(regexp_replace(translate(it.cidade, 'ÁÀÂÃÉÊÍÓÔÕÚÜÇáàâãéêíóôõúüç', 'AAAAEEIOOOUUCaaaaeeiooouuc'), '[^A-Za-z0-9]', '', 'g')) IN (
-          SELECT lower(regexp_replace(translate(bairro, 'ÁÀÂÃÉÊÍÓÔÕÚÜÇáàâãéêíóôõúüç', 'AAAAEEIOOOUUCaaaaeeiooouuc'), '[^A-Za-z0-9]', '', 'g'))
-          FROM pipefy_captacoes
-          WHERE bairro IS NOT NULL
-            AND (${bairro} = 'Todos' OR bairro = ${bairro})
-        )
+      SELECT count(*)::int AS total, COALESCE(sum(p), 0)::float8 AS valor
+      FROM (
+        SELECT DISTINCT ON (
+                 lower(regexp_replace(translate(it.titulo, 'ÁÀÂÃÉÊÍÓÔÕÚÜÇáàâãéêíóôõúüç', 'AAAAEEIOOOUUCaaaaeeiooouuc'), '[^A-Za-z0-9]', '', 'g')),
+                 it.area_m2, it.quartos, it.vagas)
+               nullif(regexp_replace(split_part(it.preco, ',', 1), '[^0-9]', '', 'g'), '')::numeric AS p
+        FROM imoveis_todos it
+        WHERE it.ativo
+          AND lower(regexp_replace(translate(it.cidade, 'ÁÀÂÃÉÊÍÓÔÕÚÜÇáàâãéêíóôõúüç', 'AAAAEEIOOOUUCaaaaeeiooouuc'), '[^A-Za-z0-9]', '', 'g')) IN (
+            SELECT lower(regexp_replace(translate(bairro, 'ÁÀÂÃÉÊÍÓÔÕÚÜÇáàâãéêíóôõúüç', 'AAAAEEIOOOUUCaaaaeeiooouuc'), '[^A-Za-z0-9]', '', 'g'))
+            FROM pipefy_captacoes
+            WHERE bairro IS NOT NULL
+              AND (${bairro} = 'Todos' OR bairro = ${bairro})
+          )
+        ORDER BY
+          lower(regexp_replace(translate(it.titulo, 'ÁÀÂÃÉÊÍÓÔÕÚÜÇáàâãéêíóôõúüç', 'AAAAEEIOOOUUCaaaaeeiooouuc'), '[^A-Za-z0-9]', '', 'g')),
+          it.area_m2, it.quartos, it.vagas, it.preco DESC NULLS LAST
+      ) d
     `,
   ])
 
@@ -158,6 +164,7 @@ export async function GET(req: NextRequest) {
     porMes:         porMesRows,
     origem:         origemRows,
     anunciosAtivos: (anunciosRow[0] as { total: number })?.total ?? 0,
+    anunciosValor:  (anunciosRow[0] as { valor: number })?.valor ?? 0,
     bairros:        ['Todos', ...(f?.bairros ?? [])],
     tipos:          ['Todos', ...(f?.tipos   ?? [])],
   })
