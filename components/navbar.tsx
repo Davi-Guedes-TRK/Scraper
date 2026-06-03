@@ -148,6 +148,15 @@ const NAV_GROUPS = [
     label: 'Documentos',
     items: [
       {
+        href: '/cartorio',
+        label: 'Meu Cartório',
+        icon: (
+          <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM6 21v-1a6 6 0 0112 0v1" />
+          </svg>
+        ),
+      },
+      {
         href: '/relatorio',
         label: 'Cartório',
         icon: (
