@@ -25,6 +25,6 @@ jobs:
       - name: Sincronizar
         env:
           PIPEFY_TOKEN: ${{ secrets.PIPEFY_TOKEN }}
-          PIPEFY_PIPE_ID: ${{ secrets.PIPEFY_PIPE_ID }}
+          PIPEFY_PIPE_ID: '307179010'   # COM - Oportunidades (fixo; não depende mais de secret)
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: python scripts/pipefy_sync.py
