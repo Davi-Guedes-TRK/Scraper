@@ -256,6 +256,8 @@ export function InLocoClient() {
         </span>
       </div>
 
+      <a href="/in-loco/revisar" className="text-[12px] text-primary hover:underline text-center -mt-2">Revisar / completar capturas →</a>
+
       {/* minhas capturas */}
       {capturas.length > 0 && (
         <div className="flex flex-col gap-2">

@@ -59,3 +59,13 @@ export function envioLink(oficio: Oficio, matriculas: string[]): string | null {
   }
   return `tel:${oficio.contato.replace(/[^\d+]/g, '')}`
 }
+
+const REGIOES_CANON = OFICIOS.flatMap(o => o.regioes.map(r => ({ canon: r, key: norm(r) })))
+
+/** Acha uma região conhecida dentro de um texto de endereço (ex.: do geocode). */
+export function detectRegiao(texto: string | null | undefined): string | null {
+  if (!texto) return null
+  const q = norm(texto)
+  for (const { canon, key } of REGIOES_CANON) if (q.includes(key)) return canon
+  return null
+}
