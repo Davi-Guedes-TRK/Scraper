@@ -3,6 +3,10 @@ import sql from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
+// Funil do pipe "COM - Oportunidades" (307179010):
+// Informações Básicas → Qualificação → Negociação → Captado / Não Captado.
+// Stages do funil usam a 1ª entrada na fase (phases_history) para refletir progressão real.
+
 function resolverDesde(range: string): string {
   const d = new Date()
   if (range === '7d')  { d.setDate(d.getDate() - 7);   return d.toISOString().slice(0, 10) }
@@ -17,7 +21,6 @@ export async function GET(req: NextRequest) {
   const bairro = searchParams.get('bairro')      ?? 'Todos'
   const tipo   = searchParams.get('tipo_imovel') ?? 'Todos'
 
-  // range customizado tem prioridade; caso contrário usa preset
   const desdeParam = searchParams.get('desde')
   const ateParam   = searchParams.get('ate')
   const desde = desdeParam || resolverDesde(searchParams.get('range') ?? 'tudo')
@@ -28,19 +31,18 @@ export async function GET(req: NextRequest) {
     sql`
       SELECT
         count(*)::int AS oportunidades,
-        count(*) FILTER (WHERE telefone_contato IS NOT NULL OR outros_contatos IS NOT NULL)::int AS leads,
-        count(*) FILTER (WHERE visita_agendada IS NOT NULL OR visita_entrada IS NOT NULL OR obs_visita IS NOT NULL)::int AS visitados,
-        count(*) FILTER (WHERE fase_atual IN ('Fechado Comercialmente', 'Captação Realizada ✅'))::int AS captados,
-        round(count(*) FILTER (WHERE fase_atual = 'Não Captado ❌') * 100.0 / NULLIF(count(*), 0), 1)::float AS taxa_perda,
-        count(*) FILTER (WHERE fase_atual NOT IN ('Não Captado ❌','Captação Realizada ✅','Fechado Comercialmente','Matricula Solicitada','Ônus Solicitada','Locado / Retirado'))::int AS em_andamento,
-        (sum(valor_anuncio) FILTER (WHERE valor_anuncio > 0))::int AS valor_medio_geral,
-        (sum(valor_anuncio) FILTER (WHERE (telefone_contato IS NOT NULL OR outros_contatos IS NOT NULL) AND valor_anuncio > 0))::int AS valor_medio_leads,
-        (sum(valor_anuncio) FILTER (WHERE (visita_agendada IS NOT NULL OR visita_entrada IS NOT NULL OR obs_visita IS NOT NULL) AND valor_anuncio > 0))::int AS valor_medio_visitados,
-        (sum(valor_anuncio) FILTER (WHERE fase_atual IN ('Fechado Comercialmente','Captação Realizada ✅') AND valor_anuncio > 0))::int AS valor_medio_captados,
-        round(avg(leads_dias)      FILTER (WHERE leads_dias      BETWEEN 0.01 AND 365))::int AS dias_leads,
-        round(avg(em_contato_dias) FILTER (WHERE em_contato_dias BETWEEN 0.01 AND 365))::int AS dias_contato,
-        round(avg(visita_dias)     FILTER (WHERE visita_dias     BETWEEN 0.01 AND 365))::int AS dias_visita,
-        round(avg(fechado_dias)    FILTER (WHERE fechado_dias    BETWEEN 0.01 AND 365))::int AS dias_fechado
+        count(*) FILTER (WHERE qualificacao_entrada IS NOT NULL)::int AS qualificados,
+        count(*) FILTER (WHERE negociacao_entrada IS NOT NULL)::int AS negociacao,
+        count(*) FILTER (WHERE fase_atual = 'Captado')::int AS captados,
+        round(count(*) FILTER (WHERE fase_atual = 'Não Captado') * 100.0 / NULLIF(count(*), 0), 1)::float AS taxa_perda,
+        count(*) FILTER (WHERE fase_atual NOT IN ('Captado', 'Não Captado'))::int AS em_andamento,
+        round(avg(valor_estimado) FILTER (WHERE valor_estimado > 0))::int AS valor_geral,
+        round(avg(valor_estimado) FILTER (WHERE qualificacao_entrada IS NOT NULL AND valor_estimado > 0))::int AS valor_qualificados,
+        round(avg(valor_estimado) FILTER (WHERE negociacao_entrada IS NOT NULL AND valor_estimado > 0))::int AS valor_negociacao,
+        round(avg(valor_estimado) FILTER (WHERE fase_atual = 'Captado' AND valor_estimado > 0))::int AS valor_captados,
+        round(avg(qualificacao_dias) FILTER (WHERE qualificacao_dias BETWEEN 0.01 AND 365))::int AS dias_qualificacao,
+        round(avg(negociacao_dias)   FILTER (WHERE negociacao_dias   BETWEEN 0.01 AND 365))::int AS dias_negociacao,
+        round(avg(captado_dias)      FILTER (WHERE captado_dias      BETWEEN 0.01 AND 365))::int AS dias_captado
       FROM pipefy_captacoes
       WHERE criado_em >= ${desde} AND criado_em < (${ate}::date + INTERVAL '1 day')
         AND (${bairro} = 'Todos' OR bairro = ${bairro})
@@ -48,10 +50,10 @@ export async function GET(req: NextRequest) {
     `,
 
     sql`
-      SELECT COALESCE(motivo_nao_captacao, 'Sem registro') AS motivo, count(*)::int AS total
+      SELECT COALESCE(NULLIF(BTRIM(motivo_nao_captacao), ''), 'Sem registro') AS motivo, count(*)::int AS total
       FROM pipefy_captacoes
       WHERE criado_em >= ${desde} AND criado_em < (${ate}::date + INTERVAL '1 day')
-        AND fase_atual = 'Não Captado ❌'
+        AND fase_atual = 'Não Captado'
         AND (${bairro} = 'Todos' OR bairro = ${bairro})
         AND (${tipo}   = 'Todos' OR tipo_imovel = ${tipo})
       GROUP BY 1 ORDER BY 2 DESC
@@ -70,9 +72,9 @@ export async function GET(req: NextRequest) {
       SELECT
         COALESCE(bairro, 'Sem bairro') AS bairro,
         count(*)::int AS oportunidades,
-        count(*) FILTER (WHERE fase_atual = 'Não Captado ❌')::int AS perdidos,
-        count(*) FILTER (WHERE fase_atual IN ('Fechado Comercialmente', 'Captação Realizada ✅'))::int AS captados,
-        round(avg(valor_anuncio) FILTER (WHERE valor_anuncio > 0))::int AS valor_medio
+        count(*) FILTER (WHERE fase_atual = 'Não Captado')::int AS perdidos,
+        count(*) FILTER (WHERE fase_atual = 'Captado')::int AS captados,
+        round(avg(valor_estimado) FILTER (WHERE valor_estimado > 0))::int AS valor_medio
       FROM pipefy_captacoes
       WHERE criado_em >= ${desde} AND criado_em < (${ate}::date + INTERVAL '1 day')
         AND (${tipo} = 'Todos' OR tipo_imovel = ${tipo})
@@ -83,9 +85,9 @@ export async function GET(req: NextRequest) {
       SELECT
         COALESCE(tipo_imovel, 'N/D') AS tipo,
         count(*)::int AS oportunidades,
-        count(*) FILTER (WHERE fase_atual = 'Não Captado ❌')::int AS perdidos,
-        count(*) FILTER (WHERE fase_atual IN ('Fechado Comercialmente', 'Captação Realizada ✅'))::int AS captados,
-        round(avg(valor_anuncio) FILTER (WHERE valor_anuncio > 0))::int AS valor_medio
+        count(*) FILTER (WHERE fase_atual = 'Não Captado')::int AS perdidos,
+        count(*) FILTER (WHERE fase_atual = 'Captado')::int AS captados,
+        round(avg(valor_estimado) FILTER (WHERE valor_estimado > 0))::int AS valor_medio
       FROM pipefy_captacoes
       WHERE criado_em >= ${desde} AND criado_em < (${ate}::date + INTERVAL '1 day')
         AND (${bairro} = 'Todos' OR bairro = ${bairro})
@@ -96,8 +98,8 @@ export async function GET(req: NextRequest) {
       SELECT
         to_char(date_trunc('month', criado_em), 'YYYY-MM') AS mes,
         count(*)::int AS oportunidades,
-        count(*) FILTER (WHERE fase_atual IN ('Fechado Comercialmente', 'Captação Realizada ✅'))::int AS captados,
-        round(avg(valor_anuncio) FILTER (WHERE valor_anuncio > 0))::int AS ticket_medio
+        count(*) FILTER (WHERE fase_atual = 'Captado')::int AS captados,
+        round(avg(valor_estimado) FILTER (WHERE valor_estimado > 0))::int AS ticket_medio
       FROM pipefy_captacoes
       WHERE criado_em >= ${desde} AND criado_em < (${ate}::date + INTERVAL '1 day')
         AND (${bairro} = 'Todos' OR bairro = ${bairro})
@@ -107,17 +109,9 @@ export async function GET(req: NextRequest) {
 
     sql`
       SELECT
-        CASE
-          WHEN links_anuncio ILIKE '%dfimoveis%' THEN 'DFImóveis'
-          WHEN links_anuncio ILIKE '%wimoveis%'  THEN 'WImóveis'
-          WHEN links_anuncio ILIKE '%olx%'       THEN 'OLX'
-          WHEN links_anuncio ILIKE '%facebook%'  THEN 'Facebook'
-          WHEN links_anuncio ILIKE '%nidos%'     THEN 'Nidos'
-          WHEN links_anuncio IS NOT NULL          THEN 'Outro'
-          ELSE 'Sem link'
-        END AS origem,
+        COALESCE(NULLIF(BTRIM(origem_oportunidade), ''), 'Sem origem') AS origem,
         count(*)::int AS total,
-        count(*) FILTER (WHERE fase_atual IN ('Fechado Comercialmente', 'Captação Realizada ✅'))::int AS captados
+        count(*) FILTER (WHERE fase_atual = 'Captado')::int AS captados
       FROM pipefy_captacoes
       WHERE criado_em >= ${desde} AND criado_em < (${ate}::date + INTERVAL '1 day')
         AND (${bairro} = 'Todos' OR bairro = ${bairro})
@@ -125,7 +119,6 @@ export async function GET(req: NextRequest) {
       GROUP BY 1 ORDER BY 2 DESC
     `,
 
-    // filtros sempre sem corte de data (mostrar todas as opções disponíveis)
     sql`
       SELECT
         array_agg(DISTINCT bairro      ORDER BY bairro)      FILTER (WHERE bairro      IS NOT NULL) AS bairros,
@@ -135,10 +128,10 @@ export async function GET(req: NextRequest) {
 
     sql`
       SELECT
-        COALESCE(pessoa_origem, 'Sem origem') AS pessoa,
+        COALESCE(NULLIF(BTRIM(responsaveis), ''), criador, 'Sem responsável') AS pessoa,
         count(*)::int AS oportunidades,
-        count(*) FILTER (WHERE fase_atual IN ('Fechado Comercialmente','Captação Realizada ✅'))::int AS captados,
-        count(*) FILTER (WHERE fase_atual = 'Não Captado ❌')::int AS perdidos
+        count(*) FILTER (WHERE fase_atual = 'Captado')::int AS captados,
+        count(*) FILTER (WHERE fase_atual = 'Não Captado')::int AS perdidos
       FROM pipefy_captacoes
       WHERE criado_em >= ${desde} AND criado_em < (${ate}::date + INTERVAL '1 day')
         AND (${bairro} = 'Todos' OR bairro = ${bairro})

@@ -10,12 +10,12 @@ import { fmtBRL } from '@/lib/formatters'
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
 type Stats = {
-  oportunidades: number; leads: number; visitados: number
+  oportunidades: number; qualificados: number; negociacao: number
   captados: number; taxa_perda: number; em_andamento: number
-  valor_medio_geral: number | null; valor_medio_leads: number | null
-  valor_medio_visitados: number | null; valor_medio_captados: number | null
-  dias_leads: number | null; dias_contato: number | null
-  dias_visita: number | null; dias_fechado: number | null
+  valor_geral: number | null; valor_qualificados: number | null
+  valor_negociacao: number | null; valor_captados: number | null
+  dias_qualificacao: number | null; dias_negociacao: number | null
+  dias_captado: number | null
 }
 type Motivo = { motivo: string; total: number }
 type Fase = { fase: string; cards: number }
@@ -48,28 +48,18 @@ const C = {
 const DONUT_COLORS = ['#ef4444', '#f97316', '#eab308', '#06b6d4', '#8b5cf6', '#ec4899', '#6366f1', '#22c55e', '#14b8a6']
 
 const FASES_CORES: Record<string, string> = {
-  'Leads': '#8b5cf6',
-  'Em Contato': '#06b6d4',
-  'Lead Completo': '#6366f1',
-  'Para Visitar': '#f59e0b',
-  'Visita': '#f59e0b',
-  'Captação Realizada ✅': '#22c55e',
-  'Avaliação': '#f97316',
-  'Fechado Comercialmente': '#16a34a',
-  'Matricula Solicitada': '#10b981',
-  'Ônus Solicitada': '#10b981',
-  'Não Captado ❌': '#ef4444',
-  'Locado / Retirado': '#94a3b8',
+  'Informações Básicas': '#8b5cf6',
+  'Qualificação': '#06b6d4',
+  'Negociação': '#f59e0b',
+  'Captado': '#22c55e',
+  'Não Captado': '#ef4444',
 }
 
 const ORIGEM_CORES: Record<string, string> = {
-  'DFImóveis': '#0ea5e9',
-  'WImóveis': '#22c55e',
-  'OLX': '#f97316',
-  'Facebook': '#3b82f6',
-  'Nidos': '#8b5cf6',
-  'Outro': '#a78bfa',
-  'Sem link': '#94a3b8',
+  'Portal': '#0ea5e9',
+  'Placas/Procura Externa': '#f97316',
+  'Captado por Corretor': '#22c55e',
+  'Sem origem': '#94a3b8',
 }
 
 const RANGE_OPTS = [
@@ -115,10 +105,10 @@ function PanelCard({ title, children, className = '' }: { title: string; childre
 function FunilVisual({ stats }: { stats: Stats }) {
   const max = stats.oportunidades || 1
   const stages = [
-    { label: 'Oportunidades', value: stats.oportunidades, color: C.oportunidades, valor: stats.valor_medio_geral, time: null },
-    { label: 'c/ Contato', value: stats.leads, color: C.leads, valor: stats.valor_medio_leads, time: stats.dias_leads },
-    { label: 'Visitados', value: stats.visitados, color: C.visitados, valor: stats.valor_medio_visitados, time: stats.dias_visita },
-    { label: 'Captados', value: stats.captados, color: C.captados, valor: stats.valor_medio_captados, time: stats.dias_fechado },
+    { label: 'Oportunidades', value: stats.oportunidades, color: C.oportunidades, valor: stats.valor_geral, time: null },
+    { label: 'Qualificadas', value: stats.qualificados, color: C.leads, valor: stats.valor_qualificados, time: stats.dias_qualificacao },
+    { label: 'Negociação', value: stats.negociacao, color: C.visitados, valor: stats.valor_negociacao, time: stats.dias_negociacao },
+    { label: 'Captadas', value: stats.captados, color: C.captados, valor: stats.valor_captados, time: stats.dias_captado },
   ]
 
   return (
@@ -429,7 +419,7 @@ export function FunilClient() {
 
       {/* Row 2 — Origem por portal + Origem por pessoa */}
       <div className="grid gap-2.5" style={{ gridTemplateColumns: '3fr 2fr' }}>
-        <PanelCard title="Origem por Portal">
+        <PanelCard title="Origem da Oportunidade">
           {data?.origem?.length
             ? <OrigemChart data={data.origem} />
             : <p className="text-xs text-muted-foreground py-6 text-center px-3">Sem dados</p>}
