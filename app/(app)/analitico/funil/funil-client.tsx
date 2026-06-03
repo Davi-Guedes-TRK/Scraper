@@ -23,19 +23,20 @@ type PorBairro = { bairro: string; oportunidades: number; perdidos: number; capt
 type PorTipo = { tipo: string; oportunidades: number; perdidos: number; captados: number; valor_medio: number | null }
 type PorMes = { mes: string; oportunidades: number; captados: number; ticket_medio: number | null }
 type Origem = { origem: string; total: number; captados: number }
-type PorResponsavel = { pessoa: string; oportunidades: number; captados: number; perdidos: number }
 
 type Data = {
   stats: Stats
   motivos: Motivo[]; fases: Fase[]
   porBairro: PorBairro[]; porTipo: PorTipo[]; porMes: PorMes[]
-  origem: Origem[]; porResponsavel: PorResponsavel[]
+  origem: Origem[]
+  anunciosAtivos: number
   bairros: string[]; tipos: string[]
 }
 
 // ── Paleta ────────────────────────────────────────────────────────────────────
 
 const C = {
+  anuncios: '#64748b',
   oportunidades: '#6366f1',
   leads: '#8b5cf6',
   visitados: '#f59e0b',
@@ -102,9 +103,10 @@ function PanelCard({ title, children, className = '' }: { title: string; childre
 }
 
 // Funil horizontal com valores financeiros por etapa
-function FunilVisual({ stats }: { stats: Stats }) {
-  const max = stats.oportunidades || 1
+function FunilVisual({ stats, anuncios }: { stats: Stats; anuncios: number }) {
+  const max = Math.max(anuncios, stats.oportunidades, 1)
   const stages = [
+    { label: 'Anúncios Ativos', value: anuncios, color: C.anuncios, valor: null, time: null },
     { label: 'Oportunidades', value: stats.oportunidades, color: C.oportunidades, valor: stats.valor_geral, time: null },
     { label: 'Qualificadas', value: stats.qualificados, color: C.leads, valor: stats.valor_qualificados, time: stats.dias_qualificacao },
     { label: 'Negociação', value: stats.negociacao, color: C.visitados, valor: stats.valor_negociacao, time: stats.dias_negociacao },
@@ -163,34 +165,6 @@ function FunilVisual({ stats }: { stats: Stats }) {
           </div>
         </div>
       </div>
-    </div>
-  )
-}
-
-// Origem por responsável — barra empilhada horizontal
-function PessoaChart({ data }: { data: PorResponsavel[] }) {
-  const max = Math.max(...data.map(d => d.oportunidades), 1)
-  return (
-    <div className="flex flex-col gap-1.5 px-3 pb-3">
-      {data.map(d => {
-        const pctCap = Math.round((d.captados / Math.max(1, d.oportunidades)) * 100)
-        const cc = pctCap >= 20 ? '#22c55e' : pctCap >= 10 ? '#f59e0b' : '#94a3b8'
-        return (
-          <div key={d.pessoa} className="flex items-center gap-2">
-            <span className="w-28 text-[10px] text-muted-foreground text-right truncate shrink-0">{d.pessoa}</span>
-            <div className="flex-1 h-5 rounded overflow-hidden bg-muted/30 relative">
-              <div className="h-full rounded absolute top-0 left-0 transition-all duration-700"
-                style={{ width: `${Math.max(4, (d.oportunidades / max) * 100)}%`, background: '#6366f130' }} />
-              {d.captados > 0 && (
-                <div className="h-full rounded absolute top-0 left-0 transition-all duration-700"
-                  style={{ width: `${Math.max(2, (d.captados / max) * 100)}%`, background: '#22c55e' }} />
-              )}
-            </div>
-            <span className="text-[10px] font-mono shrink-0 w-10 text-right text-muted-foreground">{d.captados}/{d.oportunidades}</span>
-            <span className="text-[10px] font-bold tabular shrink-0 w-8 text-right" style={{ color: cc }}>{pctCap}%</span>
-          </div>
-        )
-      })}
     </div>
   )
 }
@@ -415,21 +389,14 @@ export function FunilClient() {
       </div>
 
       {/* Row 1 — Funil visual com valores */}
-      {s && <FunilVisual stats={s} />}
+      {s && <FunilVisual stats={s} anuncios={data?.anunciosAtivos ?? 0} />}
 
-      {/* Row 2 — Origem por portal + Origem por pessoa */}
-      <div className="grid gap-2.5" style={{ gridTemplateColumns: '3fr 2fr' }}>
-        <PanelCard title="Origem da Oportunidade">
-          {data?.origem?.length
-            ? <OrigemChart data={data.origem} />
-            : <p className="text-xs text-muted-foreground py-6 text-center px-3">Sem dados</p>}
-        </PanelCard>
-        <PanelCard title="Origem por Responsável">
-          {data?.porResponsavel?.length
-            ? <PessoaChart data={data.porResponsavel} />
-            : <p className="text-xs text-muted-foreground py-6 text-center px-3">Sem dados</p>}
-        </PanelCard>
-      </div>
+      {/* Row 2 — Origem da oportunidade */}
+      <PanelCard title="Origem da Oportunidade">
+        {data?.origem?.length
+          ? <OrigemChart data={data.origem} />
+          : <p className="text-xs text-muted-foreground py-6 text-center px-3">Sem dados</p>}
+      </PanelCard>
 
       {/* Row 3 — Motivos + Fases */}
       <div className="grid gap-2.5" style={{ gridTemplateColumns: '11fr 13fr' }}>

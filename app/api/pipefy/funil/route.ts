@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
   const desde = desdeParam || resolverDesde(searchParams.get('range') ?? 'tudo')
   const ate   = ateParam   || new Date().toISOString().slice(0, 10)
 
-  const [statsRows, motivosRows, fasesRows, porBairroRows, porTipoRows, porMesRows, origemRows, filtrosRow, responsavelRows] = await Promise.all([
+  const [statsRows, motivosRows, fasesRows, porBairroRows, porTipoRows, porMesRows, origemRows, filtrosRow, anunciosRow] = await Promise.all([
 
     sql`
       SELECT
@@ -126,18 +126,18 @@ export async function GET(req: NextRequest) {
       FROM pipefy_captacoes
     `,
 
+    // Anúncios ativos no mercado (imoveis_todos) nas regiões do funil. cidade = RA (slug);
+    // normaliza (sem acento/caixa/separador) pra casar "lago-sul" com "Lago Sul" do Pipefy.
     sql`
-      SELECT
-        COALESCE(NULLIF(BTRIM(responsaveis), ''), criador, 'Sem responsável') AS pessoa,
-        count(*)::int AS oportunidades,
-        count(*) FILTER (WHERE fase_atual = 'Captado')::int AS captados,
-        count(*) FILTER (WHERE fase_atual = 'Não Captado')::int AS perdidos
-      FROM pipefy_captacoes
-      WHERE criado_em >= ${desde} AND criado_em < (${ate}::date + INTERVAL '1 day')
-        AND (${bairro} = 'Todos' OR bairro = ${bairro})
-        AND (${tipo}   = 'Todos' OR tipo_imovel = ${tipo})
-      GROUP BY 1 ORDER BY 2 DESC
-      LIMIT 12
+      SELECT count(*)::int AS total
+      FROM imoveis_todos it
+      WHERE it.ativo
+        AND lower(regexp_replace(translate(it.cidade, 'ÁÀÂÃÉÊÍÓÔÕÚÜÇáàâãéêíóôõúüç', 'AAAAEEIOOOUUCaaaaeeiooouuc'), '[^A-Za-z0-9]', '', 'g')) IN (
+          SELECT lower(regexp_replace(translate(bairro, 'ÁÀÂÃÉÊÍÓÔÕÚÜÇáàâãéêíóôõúüç', 'AAAAEEIOOOUUCaaaaeeiooouuc'), '[^A-Za-z0-9]', '', 'g'))
+          FROM pipefy_captacoes
+          WHERE bairro IS NOT NULL
+            AND (${bairro} = 'Todos' OR bairro = ${bairro})
+        )
     `,
   ])
 
@@ -151,7 +151,7 @@ export async function GET(req: NextRequest) {
     porTipo:        porTipoRows,
     porMes:         porMesRows,
     origem:         origemRows,
-    porResponsavel: responsavelRows,
+    anunciosAtivos: (anunciosRow[0] as { total: number })?.total ?? 0,
     bairros:        ['Todos', ...(f?.bairros ?? [])],
     tipos:          ['Todos', ...(f?.tipos   ?? [])],
   })
