@@ -27,6 +27,11 @@
 # credenciais / segredos — sessão Pipefy, tokens, capturas (NUNCA commitar)
 /credentials/
 
+# páginas HTML scrapeadas de portais (podem conter chaves/credenciais de TERCEIROS — NUNCA commitar)
+*_ad.html
+*.scraped.html
+/scraped/
+
 # python
 __pycache__/
 *.pyc
