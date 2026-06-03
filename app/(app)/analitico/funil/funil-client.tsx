@@ -14,8 +14,8 @@ type Stats = {
   captados: number; taxa_perda: number; em_andamento: number
   valor_geral: number | null; valor_qualificados: number | null
   valor_negociacao: number | null; valor_captados: number | null
-  dias_qualificacao: number | null; dias_negociacao: number | null
-  dias_captado: number | null
+  dias_oportunidades: number | null; dias_qualificacao: number | null
+  dias_negociacao: number | null; dias_captado: number | null
 }
 type Motivo = { motivo: string; total: number }
 type Fase = { fase: string; cards: number }
@@ -107,7 +107,7 @@ function FunilVisual({ stats, anuncios }: { stats: Stats; anuncios: number }) {
   const max = Math.max(anuncios, stats.oportunidades, 1)
   const stages = [
     { label: 'Anúncios Ativos', value: anuncios, color: C.anuncios, valor: null, time: null },
-    { label: 'Oportunidades', value: stats.oportunidades, color: C.oportunidades, valor: stats.valor_geral, time: null },
+    { label: 'Oportunidades', value: stats.oportunidades, color: C.oportunidades, valor: stats.valor_geral, time: stats.dias_oportunidades },
     { label: 'Qualificadas', value: stats.qualificados, color: C.leads, valor: stats.valor_qualificados, time: stats.dias_qualificacao },
     { label: 'Negociação', value: stats.negociacao, color: C.visitados, valor: stats.valor_negociacao, time: stats.dias_negociacao },
     { label: 'Captadas', value: stats.captados, color: C.captados, valor: stats.valor_captados, time: stats.dias_captado },
@@ -121,7 +121,7 @@ function FunilVisual({ stats, anuncios }: { stats: Stats; anuncios: number }) {
           const pct = prev ? Math.round((stage.value / Math.max(1, prev.value)) * 100) : null
           const barW = Math.max(6, Math.round((stage.value / max) * 100))
           const cc = pct != null ? convColor(pct) : ''
-          const avg = fmtK(stage.valor)
+          const valorFmt = fmtK(stage.valor)
 
           return (
             <Fragment key={stage.label}>
@@ -143,7 +143,7 @@ function FunilVisual({ stats, anuncios }: { stats: Stats; anuncios: number }) {
                 <p className="text-2xl font-extrabold tabular leading-none mt-0.5" style={{ color: stage.color }}>{stage.value}</p>
                 <p className="text-[11px] text-muted-foreground font-medium">{stage.label}</p>
                 <div className="flex flex-col gap-0.5 mt-0.5">
-                  {avg && <p className="text-[10px] font-mono font-semibold" style={{ color: stage.color }}>{avg}</p>}
+                  {valorFmt && <p className="text-[10px] font-mono font-semibold" style={{ color: stage.color }}>{valorFmt}</p>}
                   {stage.time != null && stage.time > 0 && (
                     <p className="text-[10px] font-mono text-muted-foreground/70">~{stage.time}d na fase</p>
                   )}

@@ -36,13 +36,14 @@ export async function GET(req: NextRequest) {
         count(*) FILTER (WHERE fase_atual = 'Captado')::int AS captados,
         round(count(*) FILTER (WHERE fase_atual = 'Não Captado') * 100.0 / NULLIF(count(*), 0), 1)::float AS taxa_perda,
         count(*) FILTER (WHERE fase_atual NOT IN ('Captado', 'Não Captado'))::int AS em_andamento,
-        round(avg(valor_estimado) FILTER (WHERE valor_estimado > 0))::int AS valor_geral,
-        round(avg(valor_estimado) FILTER (WHERE qualificacao_entrada IS NOT NULL AND valor_estimado > 0))::int AS valor_qualificados,
-        round(avg(valor_estimado) FILTER (WHERE negociacao_entrada IS NOT NULL AND valor_estimado > 0))::int AS valor_negociacao,
-        round(avg(valor_estimado) FILTER (WHERE fase_atual = 'Captado' AND valor_estimado > 0))::int AS valor_captados,
-        round(avg(qualificacao_dias) FILTER (WHERE qualificacao_dias BETWEEN 0.01 AND 365))::int AS dias_qualificacao,
-        round(avg(negociacao_dias)   FILTER (WHERE negociacao_dias   BETWEEN 0.01 AND 365))::int AS dias_negociacao,
-        round(avg(captado_dias)      FILTER (WHERE captado_dias      BETWEEN 0.01 AND 365))::int AS dias_captado
+        (sum(valor_estimado) FILTER (WHERE valor_estimado > 0))::int AS valor_geral,
+        (sum(valor_estimado) FILTER (WHERE qualificacao_entrada IS NOT NULL AND valor_estimado > 0))::int AS valor_qualificados,
+        (sum(valor_estimado) FILTER (WHERE negociacao_entrada IS NOT NULL AND valor_estimado > 0))::int AS valor_negociacao,
+        (sum(valor_estimado) FILTER (WHERE fase_atual = 'Captado' AND valor_estimado > 0))::int AS valor_captados,
+        round(avg(info_basicas_dias) FILTER (WHERE info_basicas_dias BETWEEN 0.01 AND 3650))::int AS dias_oportunidades,
+        round(avg(qualificacao_dias) FILTER (WHERE qualificacao_dias BETWEEN 0.01 AND 3650))::int AS dias_qualificacao,
+        round(avg(negociacao_dias)   FILTER (WHERE negociacao_dias   BETWEEN 0.01 AND 3650))::int AS dias_negociacao,
+        round(avg(captado_dias)      FILTER (WHERE captado_dias      BETWEEN 0.01 AND 3650))::int AS dias_captado
       FROM pipefy_captacoes
       WHERE criado_em >= ${desde} AND criado_em < (${ate}::date + INTERVAL '1 day')
         AND (${bairro} = 'Todos' OR bairro = ${bairro})
