@@ -42,3 +42,15 @@ export async function delProcesso(id: string) {
   await supabase.from('cartorio_processos').delete().eq('id', id)
   revalidatePath('/cartorio')
 }
+
+// Marca um lote como 'solicitado' (após enviar pro ofício). RLS limita aos próprios.
+export async function marcarSolicitado(ids: string[]) {
+  if (!ids.length) return
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+  await supabase.from('cartorio_processos')
+    .update({ status: 'solicitado', updated_at: new Date().toISOString() })
+    .in('id', ids)
+  revalidatePath('/cartorio')
+}
