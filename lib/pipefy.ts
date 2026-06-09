@@ -5,15 +5,16 @@ const PIPE_ID = process.env.PIPEFY_PIPE_ID ?? '307179010'
 const GQL_URL = 'https://api.pipefy.com/graphql'
 
 const BAIRRO_MAP: Record<string, string | null> = {
-  'asa-sul': 'Asa Sul', 'asa sul': 'Asa Sul',
-  'asa norte': 'Asa Norte', 'asa-norte': 'Asa Norte',
-  'lago sul': 'Lago Sul', 'lago-sul': 'Lago Sul',
-  'lago norte': 'Lago Norte', 'lago-norte': 'Lago Norte',
-  'sudoeste': 'Sudoeste', 'noroeste': 'Noroeste',
-  'park way': 'Park Way', 'park-way': 'Park Way', 'parkway': 'Park Way',
-  'park sul': 'Park Sul', 'park-sul': 'Park Sul',
+  'asa sul': 'Asa Sul',         'asa-sul': 'Asa Sul',
+  'asa norte': 'Asa Norte',     'asa-norte': 'Asa Norte',
+  'lago sul': 'Lago Sul',       'lago-sul': 'Lago Sul',
+  'lago norte': 'Lago Norte',   'lago-norte': 'Lago Norte',
+  'sudoeste': 'Sudoeste',       'noroeste': 'Noroeste',
+  'park way': 'Park Way',       'park-way': 'Park Way',       'parkway': 'Park Way',
+  'park sul': 'Park Sul',       'park-sul': 'Park Sul',
   'vila planalto': 'Vila Planalto',
-  'jardim botanico': null, 'jardim-botanico': null, 'cruzeiro': null,
+  'jardim botanico': null,      'jardim-botanico': null,
+  'cruzeiro': null,
 }
 
 const TIPO_MAP: Record<string, string> = {
@@ -95,16 +96,14 @@ export async function criarCardOportunidade(imovel: ImovelParaCard): Promise<Car
   ]
 
   const preco = num(imovel.preco)
-  if (preco)                   fields.push({ field_id: 'valor_estimado_1',        field_value: String(preco) })
+  if (preco)                   fields.push({ field_id: 'valor_estimado_1',   field_value: String(preco) })
   const area = num(imovel.area_m2)
-  if (area)                    fields.push({ field_id: 'metragem_tamanho_1',       field_value: String(area) })
-  if (imovel.link)             fields.push({ field_id: 'link_de_an_ncio',          field_value: String(imovel.link) })
-  if (imovel.maps_link)        fields.push({ field_id: 'link_de_localiza_o',       field_value: String(imovel.maps_link) })
-  if (imovel.telefone)         fields.push({ field_id: 'telefone_contato_1',       field_value: String(imovel.telefone) })
-  if (imovel.nome_anunciante)  fields.push({ field_id: 'nome_do_propriet_rio_1',   field_value: String(imovel.nome_anunciante) })
-  if (bairroNorm)              fields.push({ field_id: 'bairro_1',                 field_value: bairroNorm })
-  if (tipoNorm)                fields.push({ field_id: 'tipo_de_im_vel_1',         field_value: tipoNorm })
-  if (imovel.numero_matricula) fields.push({ field_id: 'matr_cula',                field_value: String(imovel.numero_matricula) })
+  if (area)                    fields.push({ field_id: 'metragem_tamanho_1',  field_value: String(area) })
+  if (imovel.link)             fields.push({ field_id: 'link_de_an_ncio',     field_value: String(imovel.link) })
+  if (imovel.maps_link)        fields.push({ field_id: 'link_de_localiza_o',  field_value: String(imovel.maps_link) })
+  if (bairroNorm)              fields.push({ field_id: 'bairro_1',            field_value: bairroNorm })
+  if (tipoNorm)                fields.push({ field_id: 'tipo_de_im_vel_1',    field_value: tipoNorm })
+  if (imovel.numero_matricula) fields.push({ field_id: 'matr_cula',           field_value: String(imovel.numero_matricula) })
 
   const mutation = `
     mutation CreateCard($input: CreateCardInput!) {
