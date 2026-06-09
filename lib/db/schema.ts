@@ -45,6 +45,12 @@ const imoveisBase = {
   endereco_norm: text('endereco_norm'),
   predio_id: text('predio_id'),
   numero_matricula: text('numero_matricula'),
+  // dedup por pHash de imagem
+  img_hashes: jsonb('img_hashes'),        // string[] de pHash (hex) das fotos amostradas
+  grupo_id: text('grupo_id'),             // id do cluster (mesmo imóvel em portais diferentes)
+  is_canonico: boolean('is_canonico').default(false), // linha representante do grupo
+  sem_exclusividade: boolean('sem_exclusividade'),    // grupo tem >=2 anunciantes distintos
+  grupo_meta: jsonb('grupo_meta'),        // {n, portais[], anunciantes[]} — só no canônico
 }
 
 export const imoveisOlx         = pgTable('imoveis_olx',         imoveisBase)
