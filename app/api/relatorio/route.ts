@@ -96,8 +96,13 @@ export async function PATCH(req: NextRequest) {
     if (!portalKeys.includes(body.portal)) return Response.json({ error: 'portal inválido' }, { status: 400 })
 
     try {
+      // Ao registrar uma matrícula real, o pedido foi atendido → status 'recebido'.
+      // 'N/A' (desistimos) não mexe no status.
       await sql.unsafe(
-        `UPDATE public."${portalTable(body.portal)}" SET numero_matricula=$1 WHERE link=$2`,
+        `UPDATE public."${portalTable(body.portal)}"
+            SET numero_matricula=$1,
+                status_solicitacao = CASE WHEN $1 <> 'N/A' THEN 'recebido' ELSE status_solicitacao END
+          WHERE link=$2`,
         [body.numero_matricula, body.link],
       )
     } catch (err) {

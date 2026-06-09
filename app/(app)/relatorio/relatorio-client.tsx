@@ -6,6 +6,7 @@ import { parsePreco, fmtBRL, classifyAnunciante } from '@/lib/formatters'
 import { portalTable } from '@/lib/portals'
 import { PortalBadge } from '@/components/portal-badge'
 import { oficioFor, type Oficio } from '@/lib/oficios'
+import { parseCartorioEntries, scoreAddress } from '@/lib/cartorio'
 
 type Pistas = { quadra?: string | null; conjunto?: string | null; casa_lote?: string | null }
 
@@ -131,173 +132,96 @@ function EditEnderecoModal({ item, current, onSave, onClose }: {
   )
 }
 
-// ── Cartório text parser ───────────────────────────────────────────────────────
-type ParsedEntry = { address: string; matricula: string; score: number }
 
-function parseCartorioEntries(text: string): Array<Omit<ParsedEntry, 'score'>> {
-  // Match " - DIGITS" — space before dash is required (avoids compound-word dashes).
-  // No lookahead: just find every occurrence and split the text around them.
-  const re = / -\s*(\d+)/g
-  const entries: Array<{ address: string; matricula: string }> = []
-  let lastEnd = 0
-  let match: RegExpExecArray | null
-  while ((match = re.exec(text)) !== null) {
-    const addressPart = text.slice(lastEnd, match.index).trim()
-    if (addressPart) entries.push({ address: addressPart, matricula: match[1] })
-    lastEnd = match.index + match[0].length
-  }
-  return entries
-}
-
-function scoreAddress(candidate: string, reference: string): number {
-  // Score only the tail of the candidate (real address is always at the end).
-  // Compare by the SET of numbers present — format-agnostic and robust.
-  const tail = candidate.slice(-120)
-  const numSet = (s: string) =>
-    new Set((s.match(/\d+/g) ?? []).map(n => String(parseInt(n, 10))))
-  const c = numSet(tail), r = numSet(reference)
-  let matches = 0
-  r.forEach(n => { if (c.has(n)) matches++ })
-  return matches
-}
-
-// ── MatriculaQueueModal ───────────────────────────────────────────────────────
-function MatriculaQueueModal({ queue, onSave, onDesistir, onClose }: {
-  queue: Imovel[]
-  onSave: (item: Imovel, matricula: string) => Promise<void>
-  onDesistir: (item: Imovel) => Promise<void>
+// ── TratarRespostaModal — cola a resposta do cartório e casa endereço→matrícula ──
+function TratarRespostaModal({ candidatos, onSalvar, onClose }: {
+  candidatos: Imovel[]
+  onSalvar: (pares: Array<{ item: Imovel; matricula: string }>) => Promise<void>
   onClose: () => void
 }) {
-  const [idx, setIdx] = useState(0)
-  const [value, setValue] = useState('')
+  const [text, setText] = useState('')
   const [saving, setSaving] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const [ignorar, setIgnorar] = useState<Set<number>>(new Set())
 
-  const item = queue[idx]
-  const done = idx >= queue.length
+  // Para cada "endereço - matrícula" colado, acha o imóvel enviado de maior score.
+  const matches = useMemo(() =>
+    parseCartorioEntries(text).map(e => {
+      let best: Imovel | null = null, bestScore = 0
+      for (const c of candidatos) {
+        const s = scoreAddress(e.address, formatEndereco(c))
+        if (s > bestScore) { bestScore = s; best = c }
+      }
+      return { address: e.address, matricula: e.matricula, item: bestScore > 0 ? best : null }
+    }), [text, candidatos])
 
-  const advance = () => {
-    setIdx(i => i + 1)
-    setValue('')
-    setTimeout(() => inputRef.current?.focus(), 30)
-  }
+  const aplicaveis = matches
+    .map((m, i) => ({ ...m, i }))
+    .filter(m => m.item && !ignorar.has(m.i))
 
-  const save = async () => {
-    if (!value.trim() || saving) return
+  const salvar = async () => {
+    if (!aplicaveis.length || saving) return
     setSaving(true)
-    await onSave(item, value.trim())
+    await onSalvar(aplicaveis.map(m => ({ item: m.item!, matricula: m.matricula })))
     setSaving(false)
-    advance()
+    onClose()
   }
-
-  const desistir = async () => {
-    if (saving) return
-    setSaving(true)
-    await onDesistir(item)
-    setSaving(false)
-    advance()
-  }
-
-  const backdrop = (
-    <div role="button" tabIndex={0}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-      onClick={onClose} onKeyDown={e => { if (e.key === 'Escape') onClose() }} />
-  )
-
-  if (done) return (
-    <>
-      {backdrop}
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-        <div className="rounded-xl w-full max-w-sm shadow-2xl p-8 text-center pointer-events-auto"
-          style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-          <p className="text-lg font-bold text-foreground mb-1">Tudo preenchido</p>
-          <p className="text-sm text-muted-foreground mb-6">
-            {queue.length} imóvel{queue.length !== 1 ? 'is' : ''} processado{queue.length !== 1 ? 's' : ''}
-          </p>
-          <button onClick={onClose}
-            className="text-sm font-semibold px-6 py-2.5 rounded-lg text-white bg-primary hover:bg-primary-h transition-colors">
-            Fechar
-          </button>
-        </div>
-      </div>
-    </>
-  )
 
   return (
-    <>
-      {backdrop}
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-        <div className="rounded-xl w-full max-w-md shadow-2xl overflow-hidden pointer-events-auto"
-          style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
-          onKeyDown={e => e.stopPropagation()}>
+    <div role="button" tabIndex={0}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      onClick={onClose} onKeyDown={e => { if (e.key === 'Escape') onClose() }}>
+      <div className="rounded-xl w-full max-w-2xl shadow-2xl overflow-hidden"
+        style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
+        onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
+        <div className="px-5 py-3" style={{ borderBottom: '1px solid var(--border)' }}>
+          <p className="font-semibold text-foreground text-sm">Tratar resposta do cartório</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            Cole a resposta (cada linha no formato “endereço - matrícula”). O sistema casa com os {candidatos.length} imóveis aguardando.
+          </p>
+        </div>
+        <div className="p-5 flex flex-col gap-4">
+          <textarea value={text} onChange={e => setText(e.target.value)} rows={5} autoFocus
+            placeholder={'Ex.:\nSQN 312 Bloco B Apto 204 - 123456\nSHIS QI 5 Conjunto 8 Casa 12 - 98765'}
+            className="w-full rounded-lg px-4 py-3 text-sm text-foreground outline-none focus:ring-2 ring-foreground/20 transition-all resize-none"
+            style={{ background: 'var(--secondary)', border: '1px solid var(--border)' }} />
 
-          {/* Progress bar */}
-          <div className="h-1" style={{ background: 'var(--muted)' }}>
-            <div className="h-1 transition-all duration-300"
-              style={{ width: `${(idx / queue.length) * 100}%`, background: 'var(--foreground)' }} />
-          </div>
+          {matches.length > 0 && (
+            <div className="rounded-lg overflow-hidden max-h-[40vh] overflow-y-auto" style={{ border: '1px solid var(--border)' }}>
+              {matches.map((m, i) => {
+                const off = ignorar.has(i)
+                return (
+                  <div key={i} className="flex items-center gap-2 px-3 py-2 text-[12px]"
+                    style={{ borderBottom: '1px solid var(--border)', opacity: off || !m.item ? 0.5 : 1 }}>
+                    <span className="font-mono shrink-0 text-foreground">{m.matricula}</span>
+                    <span className="text-muted-foreground shrink-0">→</span>
+                    <span className="flex-1 min-w-0 truncate text-foreground">
+                      {m.item ? formatEndereco(m.item) : <span className="italic text-muted-foreground">sem correspondência</span>}
+                    </span>
+                    {m.item && (
+                      <button onClick={() => setIgnorar(s => { const n = new Set(s); n.has(i) ? n.delete(i) : n.add(i); return n })}
+                        className="shrink-0 text-[11px] text-muted-foreground hover:text-foreground transition-colors">
+                        {off ? 'incluir' : 'ignorar'}
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
 
-          {/* Header */}
-          <div className="px-5 py-3 flex items-center justify-between"
-            style={{ borderBottom: '1px solid var(--border)' }}>
-            <span className="text-xs font-mono text-muted-foreground">{idx + 1} / {queue.length}</span>
+          <div className="flex gap-2">
             <button onClick={onClose}
-              className="text-muted-foreground hover:text-foreground p-1 transition-colors">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              className="flex-1 text-sm text-muted-foreground hover:text-foreground border border-border px-4 py-2.5 rounded-lg transition-colors">
+              Cancelar
             </button>
-          </div>
-
-          {/* Content */}
-          <div className="px-5 pt-5 pb-4 flex flex-col gap-4">
-            {/* Address */}
-            <div>
-              <p className="text-xl font-bold text-foreground leading-snug">{formatEndereco(item)}</p>
-              <div className="flex items-center gap-3 mt-2">
-                <PortalBadge portal={item.portal} />
-                {item.maps_link && (
-                  <a href={item.maps_link} target="_blank" rel="noreferrer"
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-                    Maps ↗
-                  </a>
-                )}
-                <a href={item.link} target="_blank" rel="noreferrer"
-                  className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-                  anúncio ↗
-                </a>
-              </div>
-            </div>
-
-            {/* Input */}
-            <input
-              ref={inputRef}
-              type="text"
-              value={value}
-              onChange={e => setValue(e.target.value.replace(/\D/g, ''))}
-              placeholder="Número da matrícula"
-              autoFocus
-              onKeyDown={e => { if (e.key === 'Enter') save() }}
-              className="w-full rounded-lg px-4 py-3 text-lg font-mono text-foreground outline-none focus:ring-2 ring-foreground/20 transition-all"
-              style={{ background: 'var(--secondary)', border: '1px solid var(--border)' }}
-            />
-
-            {/* Actions */}
-            <div className="flex gap-2">
-              <button onClick={desistir} disabled={saving}
-                className="flex-1 text-sm text-muted-foreground hover:text-foreground border border-border hover:border-foreground/20 px-3 py-2.5 rounded-lg transition-colors disabled:opacity-40">
-                Sem matrícula / Desistimos
-              </button>
-              <button onClick={save} disabled={saving || !value.trim()}
-                className="flex-1 text-sm font-semibold text-white bg-primary hover:bg-primary-h disabled:opacity-40 disabled:cursor-not-allowed px-4 py-2.5 rounded-lg transition-colors">
-                {saving ? 'Salvando…' : 'Salvar →'}
-              </button>
-            </div>
-            <p className="text-[10px] text-center text-muted-foreground/40">Enter para salvar</p>
+            <button onClick={salvar} disabled={saving || !aplicaveis.length}
+              className="flex-1 text-sm font-semibold text-white bg-primary hover:bg-primary-h disabled:opacity-40 disabled:cursor-not-allowed px-4 py-2.5 rounded-lg transition-colors">
+              {saving ? 'Salvando…' : `Registrar ${aplicaveis.length} matrícula(s)`}
+            </button>
           </div>
         </div>
       </div>
-    </>
+    </div>
   )
 }
 
@@ -393,15 +317,26 @@ const CANAL_INFO: Record<string, { label: string; color: string }> = {
 }
 const temMatricula = (it: Imovel) => !!it.numero_matricula && it.numero_matricula !== 'N/A' && it.numero_matricula.trim() !== ''
 
-function buildLinkOficio(oficio: Oficio, prontos: Imovel[]): string {
-  const lista = prontos.map((it, i) => `${i + 1}. ${formatEndereco(it)} — matrícula ${it.numero_matricula}`).join('\n')
-  const msg = `Olá! Solicito a certidão de ônus reais dos seguintes imóveis:\n${lista}\n\nObrigado — TRK Imóveis.`
+// Mensagem para PEDIR a matrícula (+ ônus) por endereço — é o objetivo da página,
+// então NÃO listamos matrícula (não temos ainda); enviamos só os imóveis sem ela.
+function buildLinkOficio(oficio: Oficio, pedidos: Imovel[]): string {
+  const lista = pedidos.map((it, i) => {
+    const maps = it.maps_link ? `\n   ${it.maps_link}` : ''
+    return `${i + 1}. ${formatEndereco(it)}${maps}`
+  }).join('\n')
+  const msg = `Olá! Sou da TRK Imóveis. Gostaria de solicitar o número da matrícula e a certidão de ônus reais dos seguintes imóveis:\n${lista}\n\nDesde já agradeço!`
   if (oficio.canal === 'whatsapp') { const d = oficio.contato.replace(/\D/g, ''); return `https://wa.me/${d.startsWith('55') ? d : `55${d}`}?text=${encodeURIComponent(msg)}` }
-  if (oficio.canal === 'email') return `mailto:${oficio.contato}?subject=${encodeURIComponent('Solicitação de certidão de ônus — TRK Imóveis')}&body=${encodeURIComponent(msg)}`
+  if (oficio.canal === 'email') return `mailto:${oficio.contato}?subject=${encodeURIComponent('Solicitação de matrícula e certidão de ônus — TRK Imóveis')}&body=${encodeURIComponent(msg)}`
   return `tel:${oficio.contato.replace(/[^\d+]/g, '')}`
 }
 
-function PorOficioView({ items, onEnviar }: { items: Imovel[]; onEnviar: (links: string[]) => void }) {
+function PorOficioView({ items, onEnviar, onTratar }: {
+  items: Imovel[]
+  onEnviar: (links: string[]) => void
+  onTratar: (candidatos: Imovel[]) => void
+}) {
+  const [enviandoEmail, setEnviandoEmail] = useState<string | null>(null) // nome do ofício sendo enviado
+
   const grupos = useMemo(() => {
     const map = new Map<string, { oficio: Oficio | null; items: Imovel[] }>()
     for (const it of items) {
@@ -413,12 +348,31 @@ function PorOficioView({ items, onEnviar }: { items: Imovel[]; onEnviar: (links:
     return Array.from(map.values()).sort((a, b) => (a.oficio?.nome ?? 'zzz').localeCompare(b.oficio?.nome ?? 'zzz'))
   }, [items])
 
+  const enviarEmail = async (of: Oficio, pedidos: Imovel[]) => {
+    setEnviandoEmail(of.nome)
+    try {
+      const res = await fetch('/api/cartorio/enviar-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': '' },
+        body: JSON.stringify({ links: pedidos.map(p => p.link) }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (res.ok && d.totalEnviado > 0) {
+        onEnviar(pedidos.map(p => p.link))
+      }
+    } finally {
+      setEnviandoEmail(null)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-3">
       {grupos.map(g => {
         const of = g.oficio
-        const prontos = g.items.filter(temMatricula)
-        const link = of && prontos.length ? buildLinkOficio(of, prontos) : null
+        // sem matrícula e não desistidos = o que precisamos PEDIR ao cartório
+        const aSolicitar = g.items.filter(it => !temMatricula(it) && it.numero_matricula !== 'N/A')
+        const recebidas = g.items.filter(temMatricula)
+        const link = of && aSolicitar.length ? buildLinkOficio(of, aSolicitar) : null
         const canal = of ? CANAL_INFO[of.canal] : null
         return (
           <div key={of?.nome ?? 'sem'} className="card rounded-xl overflow-hidden">
@@ -429,7 +383,7 @@ function PorOficioView({ items, onEnviar }: { items: Imovel[]; onEnviar: (links:
                   ? <span className="text-[11px] text-muted-foreground ml-2">{canal.label} · {of.contato}</span>
                   : <span className="text-[11px] text-muted-foreground ml-2">região fora da lista — defina o ofício manualmente</span>}
               </div>
-              <span className="text-[11px] text-muted-foreground font-mono whitespace-nowrap">{g.items.length} imóveis · {prontos.length} c/ matrícula</span>
+              <span className="text-[11px] text-muted-foreground font-mono whitespace-nowrap">{g.items.length} imóveis · {aSolicitar.length} a solicitar · {recebidas.length} c/ matrícula</span>
             </div>
             <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
               {g.items.map(it => (
@@ -437,21 +391,43 @@ function PorOficioView({ items, onEnviar }: { items: Imovel[]; onEnviar: (links:
                   <span className="flex-1 min-w-0 truncate text-foreground">{formatEndereco(it)}</span>
                   {temMatricula(it)
                     ? <span className="font-mono text-foreground shrink-0">mat. {it.numero_matricula}</span>
-                    : <span className="text-muted-foreground shrink-0 italic">sem matrícula</span>}
+                    : it.numero_matricula === 'N/A'
+                      ? <span className="text-muted-foreground shrink-0 italic">desistimos</span>
+                      : <span className="text-muted-foreground shrink-0 italic">aguardando matrícula</span>}
                   <span className="shrink-0"><StatusBadge status={it.status_solicitacao} /></span>
                 </div>
               ))}
             </div>
             {of && (
               <div className="flex items-center gap-2 px-4 py-2.5" style={{ borderTop: '1px solid var(--border)' }}>
-                {link ? (
-                  <a href={link} target="_blank" rel="noreferrer" className="h-8 px-3 rounded-lg text-[12px] font-semibold text-white flex items-center transition-opacity hover:opacity-85" style={{ background: canal!.color }}>
-                    Enviar {prontos.length} via {canal!.label}
-                  </a>
-                ) : <span className="text-[11px] text-muted-foreground">nenhuma matrícula pronta — preencha primeiro</span>}
-                {prontos.length > 0 && (
-                  <button onClick={() => onEnviar(prontos.map(p => p.link))} className="h-8 px-3 rounded-lg text-[12px] text-muted-foreground hover:text-foreground transition-colors" style={{ border: '1px solid var(--border)' }}>
-                    Marcar enviado
+                {!aSolicitar.length
+                  ? <span className="text-[11px] text-muted-foreground">nada a solicitar — todas com matrícula</span>
+                  : of.canal === 'email'
+                    ? (
+                      // E-mail: envia de verdade via Resend (1 clique, sem abrir cliente)
+                      <button
+                        disabled={enviandoEmail === of.nome}
+                        onClick={() => enviarEmail(of, aSolicitar)}
+                        className="h-8 px-3 rounded-lg text-[12px] font-semibold text-white flex items-center gap-1.5 transition-opacity hover:opacity-85 disabled:opacity-50"
+                        style={{ background: canal!.color }}>
+                        {enviandoEmail === of.nome
+                          ? <><svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-20" /><path d="M22 12a10 10 0 00-10-10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg>Enviando…</>
+                          : `Enviar e-mail (${aSolicitar.length})`}
+                      </button>
+                    )
+                    : (
+                      // WhatsApp / telefone: abre o canal pré-preenchido manualmente
+                      <a href={link!} target="_blank" rel="noreferrer"
+                        onClick={() => onEnviar(aSolicitar.map(p => p.link))}
+                        className="h-8 px-3 rounded-lg text-[12px] font-semibold text-white flex items-center transition-opacity hover:opacity-85"
+                        style={{ background: canal!.color }}>
+                        Solicitar {aSolicitar.length} via {canal!.label}
+                      </a>
+                    )
+                }
+                {aSolicitar.length > 0 && (
+                  <button onClick={() => onTratar(aSolicitar)} className="h-8 px-3 rounded-lg text-[12px] text-muted-foreground hover:text-foreground transition-colors" style={{ border: '1px solid var(--border)' }}>
+                    Tratar resposta
                   </button>
                 )}
               </div>
@@ -473,16 +449,17 @@ export function RelatorioClient() {
   const [whatsappText, setWhatsappText] = useState('')
   const [editItem, setEditItem] = useState<Imovel | null>(null)
   const [matriculaItem, setMatriculaItem] = useState<Imovel | null>(null)
-  const [queueOpen, setQueueOpen] = useState(false)
+  const [tratarCand, setTratarCand] = useState<Imovel[] | null>(null)
   const [pipefyLog, setPipefyLog] = useState<string | null>(null)
   const [pipefyRunning, setPipefyRunning] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const [view, setView] = useState<'lista' | 'oficio'>('lista')
+  const [view, setView] = useState<'lista' | 'oficio'>('oficio')
 
-  const queue = useMemo(
+  // Imóveis aguardando matrícula (sem número e não desistidos) — candidatos a "tratar resposta".
+  const aguardando = useMemo(
     () => items
-      .filter(i => i.status_solicitacao === 'enviado' && !i.numero_matricula)
+      .filter(i => !temMatricula(i) && i.numero_matricula !== 'N/A')
       .sort((a, b) => new Date(b.coletado_em ?? 0).getTime() - new Date(a.coletado_em ?? 0).getTime()),
     [items],
   )
@@ -620,32 +597,24 @@ export function RelatorioClient() {
     toast('Matrícula salva', 'success')
   }
 
-  const handleQueueSave = async (item: Imovel, matricula: string) => {
-    const res = await fetch('/api/relatorio', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'matricula', link: item.link, portal: item.portal, numero_matricula: matricula }),
-    })
-    if (!res.ok) {
-      const d = await res.json().catch(() => ({}))
-      toast(`Erro: ${d.error ?? res.status}`, 'error')
-      return
+  // Registra em lote as matrículas casadas a partir da resposta colada do cartório.
+  // A API já marca status_solicitacao='recebido' ao gravar uma matrícula real.
+  const handleTratarSalvar = async (pares: Array<{ item: Imovel; matricula: string }>) => {
+    let ok = 0
+    for (const { item, matricula } of pares) {
+      try {
+        const res = await fetch('/api/relatorio', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'matricula', link: item.link, portal: item.portal, numero_matricula: matricula }),
+        })
+        if (res.ok) {
+          ok++
+          setItems(prev => prev.map(i => i.link === item.link ? { ...i, numero_matricula: matricula, status_solicitacao: 'recebido' } : i))
+        }
+      } catch { /* ignora item com erro, segue o lote */ }
     }
-    setItems(prev => prev.map(i => i.link === item.link ? { ...i, numero_matricula: matricula } : i))
-  }
-
-  const handleDesistir = async (item: Imovel) => {
-    const res = await fetch('/api/relatorio', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'matricula', link: item.link, portal: item.portal, numero_matricula: 'N/A' }),
-    })
-    if (!res.ok) {
-      const d = await res.json().catch(() => ({}))
-      toast(`Erro: ${d.error ?? res.status}`, 'error')
-      return
-    }
-    setItems(prev => prev.map(i => i.link === item.link ? { ...i, numero_matricula: 'N/A' } : i))
+    toast(`${ok} matrícula(s) registrada(s)`, ok ? 'success' : 'error')
   }
 
   const saveEndereco = async (item: Imovel, newEndereco: string) => {
@@ -740,7 +709,7 @@ export function RelatorioClient() {
           </div>
           <ActionsMenu
             items={[
-              { label: queue.length ? `Preencher matrículas (${queue.length})` : 'Preencher matrículas', onClick: () => setQueueOpen(true), disabled: !queue.length },
+              { label: aguardando.length ? `Tratar resposta do cartório (${aguardando.length})` : 'Tratar resposta do cartório', onClick: () => setTratarCand(aguardando), disabled: !aguardando.length },
               { label: pipefyRunning ? 'Testando Pipefy…' : 'Testar Pipefy (preview)', onClick: testarPipefy, disabled: pipefyRunning },
               { label: 'Exportar Excel', onClick: exportExcel },
               { label: 'Gerar texto WhatsApp', onClick: generateWhatsApp },
@@ -779,7 +748,11 @@ export function RelatorioClient() {
           <p className="text-sm mt-1">Aprove (endereço completo) ou marque como visitado na Triagem/Visitas.</p>
         </div>
       ) : view === 'oficio' ? (
-        <PorOficioView items={items} onEnviar={async (links) => { if (await markLinks(links, 'enviado')) toast(`${links.length} marcado(s) como enviado`, 'success') }} />
+        <PorOficioView
+          items={items}
+          onEnviar={async (links) => { if (await markLinks(links, 'enviado')) toast(`${links.length} marcado(s) como enviado`, 'success') }}
+          onTratar={(cand) => setTratarCand(cand)}
+        />
       ) : (
         <div className="bg-white border border-[#d0d7de] rounded-lg overflow-hidden shadow-sm">
           <table className="w-full text-sm">
@@ -894,12 +867,11 @@ export function RelatorioClient() {
           onClose={() => setMatriculaItem(null)}
         />
       )}
-      {queueOpen && (
-        <MatriculaQueueModal
-          queue={queue}
-          onSave={handleQueueSave}
-          onDesistir={handleDesistir}
-          onClose={() => setQueueOpen(false)}
+      {tratarCand && (
+        <TratarRespostaModal
+          candidatos={tratarCand}
+          onSalvar={handleTratarSalvar}
+          onClose={() => setTratarCand(null)}
         />
       )}
       {pipefyLog !== null && (
