@@ -315,7 +315,10 @@ const CANAL_INFO: Record<string, { label: string; color: string }> = {
   email:    { label: 'E-mail',   color: 'var(--chart-1)' },
   telefone: { label: 'Telefone', color: 'var(--chart-2)' },
 }
-const temMatricula = (it: Imovel) => !!it.numero_matricula && it.numero_matricula !== 'N/A' && it.numero_matricula.trim() !== ''
+// 'completo' implica que a matrícula já foi obtida mesmo sem o número no campo
+const temMatricula = (it: Imovel) =>
+  it.status_solicitacao === 'completo' ||
+  (!!it.numero_matricula && it.numero_matricula !== 'N/A' && it.numero_matricula.trim() !== '')
 
 // Mensagem para PEDIR a matrícula (+ ônus) por endereço — é o objetivo da página,
 // então NÃO listamos matrícula (não temos ainda); enviamos só os imóveis sem ela.
@@ -455,6 +458,12 @@ export function RelatorioClient() {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [view, setView] = useState<'lista' | 'oficio'>('oficio')
+  const [statusFiltro, setStatusFiltro] = useState<string>('todos')
+
+  const itemsFiltrados = useMemo(
+    () => statusFiltro === 'todos' ? items : items.filter(i => (i.status_solicitacao ?? 'pendente') === statusFiltro),
+    [items, statusFiltro],
+  )
 
   // Imóveis aguardando matrícula (sem número e não desistidos) — candidatos a "tratar resposta".
   const aguardando = useMemo(
@@ -489,7 +498,7 @@ export function RelatorioClient() {
   }
 
   const toggleAll = () => {
-    setSelected(selected.size === items.length ? new Set() : new Set(items.map(i => i.link)))
+    setSelected(selected.size === itemsFiltrados.length ? new Set() : new Set(itemsFiltrados.map(i => i.link)))
   }
 
   const markLinks = async (links: string[], status: string): Promise<boolean> => {
@@ -698,7 +707,22 @@ export function RelatorioClient() {
           <h1 className="text-2xl font-bold text-[#1f2328]">Relatório para Cartório</h1>
           <p className="text-[#656d76] text-sm mt-1">Imóveis aprovados e visitados · solicitação de matrícula e ônus reais</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          {/* Filtro de status */}
+          <div className="flex rounded-lg overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+            {(['todos', 'pendente', 'enviado', 'recebido', 'completo'] as const).map(s => {
+              const label = s === 'todos' ? `Todos (${items.length})` : (STATUS_MAP[s]?.label ?? s)
+              const count = s === 'todos' ? null : items.filter(i => (i.status_solicitacao ?? 'pendente') === s).length
+              return (
+                <button key={s} onClick={() => setStatusFiltro(s)}
+                  className="px-3 py-2 text-xs font-medium transition-colors whitespace-nowrap"
+                  style={statusFiltro === s ? { background: 'var(--chart-1)', color: '#fff' } : { color: 'var(--muted-foreground)' }}>
+                  {label}{count !== null ? ` (${count})` : ''}
+                </button>
+              )
+            })}
+          </div>
+          {/* Toggle de visão */}
           <div className="flex rounded-lg overflow-hidden" style={{ border: '1px solid var(--border)' }}>
             {([['lista', 'Lista'], ['oficio', 'Por Ofício']] as const).map(([v, label]) => (
               <button key={v} onClick={() => setView(v)} className="px-3 py-2 text-sm font-medium transition-colors"
@@ -747,9 +771,14 @@ export function RelatorioClient() {
           <p className="font-medium text-[#1f2328] text-lg">Nenhum imóvel para cartório</p>
           <p className="text-sm mt-1">Aprove (endereço completo) ou marque como visitado na Triagem/Visitas.</p>
         </div>
+      ) : itemsFiltrados.length === 0 ? (
+        <div className="text-center py-16 text-[#656d76]">
+          <p className="font-medium text-[#1f2328]">Nenhum imóvel com status &quot;{STATUS_MAP[statusFiltro]?.label ?? statusFiltro}&quot;</p>
+          <button onClick={() => setStatusFiltro('todos')} className="text-sm text-trk-blue hover:underline mt-2">Ver todos</button>
+        </div>
       ) : view === 'oficio' ? (
         <PorOficioView
-          items={items}
+          items={itemsFiltrados}
           onEnviar={async (links) => { if (await markLinks(links, 'enviado')) toast(`${links.length} marcado(s) como enviado`, 'success') }}
           onTratar={(cand) => setTratarCand(cand)}
         />
@@ -760,7 +789,7 @@ export function RelatorioClient() {
               <tr className="border-b border-[#d0d7de] text-xs text-[#656d76] bg-[#f6f8fa]">
                 <th className="px-4 py-2.5 text-left w-8">
                   <input type="checkbox"
-                    checked={selected.size === items.length && items.length > 0}
+                    checked={selected.size === itemsFiltrados.length && itemsFiltrados.length > 0}
                     onChange={toggleAll}
                     className="accent-trk-blue" />
                 </th>
@@ -774,7 +803,7 @@ export function RelatorioClient() {
               </tr>
             </thead>
             <tbody>
-              {items.map(item => (
+              {itemsFiltrados.map(item => (
                 <tr key={`${item.portal}-${item.link}`}
                   onClick={() => toggleSelect(item.link)}
                   className={`border-b border-[#d0d7de] transition-colors cursor-pointer ${
@@ -847,7 +876,7 @@ export function RelatorioClient() {
             </tbody>
           </table>
           <div className="px-4 py-2.5 border-t border-[#d0d7de] text-xs text-[#656d76]">
-            {items.length} imóveis · {selected.size} selecionados
+            {itemsFiltrados.length}{statusFiltro !== 'todos' ? ` de ${items.length}` : ''} imóveis · {selected.size} selecionados
           </div>
         </div>
       )}

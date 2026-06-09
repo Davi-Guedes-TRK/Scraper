@@ -53,7 +53,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (body.action === 'status_solicitacao') {
-    const allowed = ['enviado', 'recebido']
+    const allowed = ['enviado', 'recebido', 'completo']
     if (!allowed.includes(body.status)) return Response.json({ error: 'status inválido' }, { status: 400 })
 
     try {
