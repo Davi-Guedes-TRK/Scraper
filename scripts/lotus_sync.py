@@ -17,14 +17,16 @@ log = logging.getLogger(__name__)
 BASE   = "https://lotuscidade.com.br"
 LIST   = f"{BASE}/empreendimentos/"
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; VelvetScraper/1.0)",
-    "Accept-Language": "pt-BR,pt;q=0.9",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8",
+    "Accept-Encoding": "gzip, deflate, br",
 }
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 def get(url: str) -> BeautifulSoup:
-    r = requests.get(url, headers=HEADERS, timeout=20)
+    r = requests.get(url, headers=HEADERS, timeout=30)
     r.raise_for_status()
     return BeautifulSoup(r.text, "html.parser")
 
@@ -126,7 +128,7 @@ def scrape_empreendimento(slug: str, url: str) -> dict:
                 break
     if pct_obras is None and status == "pronto":
         pct_obras = 100.0
-    if pct_obras >= 100.0:
+    if pct_obras is not None and pct_obras >= 100.0:
         status = "pronto"
 
     # endereço
@@ -290,10 +292,22 @@ def upsert(conn, rows: list[dict]):
 # ── main ──────────────────────────────────────────────────────────────────────
 
 def main():
+    import sys
     db_url = os.environ["DATABASE_URL"]
     conn = psycopg2.connect(db_url)
 
-    slugs = collect_slugs()
+    try:
+        slugs = collect_slugs()
+    except Exception as e:
+        log.error("Falha ao coletar slugs de %s: %s — abortando sem erro fatal", LIST, e)
+        conn.close()
+        sys.exit(0)
+
+    if not slugs:
+        log.warning("Nenhum slug encontrado — site pode ter bloqueado ou mudado estrutura.")
+        conn.close()
+        return
+
     rows = []
     for i, (slug, url) in enumerate(slugs, 1):
         log.info("[%d/%d] scraping %s", i, len(slugs), slug)
@@ -308,6 +322,8 @@ def main():
     if rows:
         upsert(conn, rows)
         log.info("Concluído — %d/%d empreendimentos salvos", len(rows), len(slugs))
+    else:
+        log.warning("Nenhum empreendimento scrapeado com sucesso.")
     conn.close()
 
 if __name__ == "__main__":
