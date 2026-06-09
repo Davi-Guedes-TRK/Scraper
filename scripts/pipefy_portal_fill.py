@@ -117,12 +117,23 @@ def fill_form(page, rec, log):
     pick_radio(page,                 rec["empresa"],       log)
     log.append("  ⤷ PULADOS de propósito: Código do Imóvel NIDO, Código da Proposta no NIDO")
 
+def _load_db_url():
+    """Tenta .env.local primeiro, cai para .env (mesmo formato KEY=VALUE)."""
+    for fname in (".env.local", ".env"):
+        p = ROOT / fname
+        if not p.exists():
+            continue
+        text = p.read_bytes().decode("utf-8", "replace")
+        for line in text.splitlines():
+            m = re.match(r'^\s*DATABASE_URL\s*=\s*(.+)$', line)
+            if m:
+                return m.group(1).strip().strip('"').strip("'")
+    raise SystemExit("DATABASE_URL não encontrado em .env.local nem .env")
+
 def load_from_db(limit=None):
     import psycopg2
-    env = (ROOT / ".env.local").read_bytes().decode("utf-8", "replace")
-    url = next((re.match(r'^\s*DATABASE_URL\s*=\s*(.+)$', l).group(1).strip().strip('"').strip("'")
-                for l in env.splitlines() if re.match(r'^\s*DATABASE_URL\s*=', l)), None)
-    if not url: raise SystemExit("DATABASE_URL não encontrado em .env.local")
+    url = _load_db_url()
+    if not url: raise SystemExit("DATABASE_URL não encontrado")
     q = """
       SELECT COALESCE(
                NULLIF(btrim(endereco),''),
@@ -133,7 +144,8 @@ def load_from_db(limit=None):
       WHERE numero_matricula IS NOT NULL AND btrim(numero_matricula) NOT IN ('', 'N/A')
       ORDER BY coletado_em DESC
     """ + (f" LIMIT {int(limit)}" if limit else "")
-    conn = psycopg2.connect(url); cur = conn.cursor(); cur.execute(q); rows = cur.fetchall()
+    conn = psycopg2.connect(url)
+    cur = conn.cursor(); cur.execute(q); rows = cur.fetchall()
     cur.close(); conn.close()
     recs = []
     for endereco, cidade, matricula, link, portal in rows:

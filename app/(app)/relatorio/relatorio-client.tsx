@@ -353,7 +353,7 @@ function PorOficioView({ items, onEnviar, onTratar }: {
     try {
       const res = await fetch('/api/cartorio/enviar-email', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': '' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ links: pedidos.map(p => p.link) }),
       })
       const d = await res.json().catch(() => ({}))

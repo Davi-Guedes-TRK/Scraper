@@ -36,14 +36,23 @@
 __pycache__/
 *.pyc
 
+# arquivos temporários de scripts (cache pHash, logs de dry-run, probes)
+scripts/.cache_phash.json
+scripts/_dryrun_log.txt
+scripts/_dryrun_result.txt
+scripts/_inspect_*.py
+scripts/_run_*.py
+scripts/_probe_*.py
+
 # debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files — .env.example é o único que pode ser commitado (sem valores reais)
 .env*
+!.env.example
 
 # Claude Code session files
 .claude/

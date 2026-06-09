@@ -10,6 +10,7 @@ export type LogOrigem =
   | 'visitas'
   | 'relatorio'
   | 'cartorio-inbound'
+  | 'cartorio-email'
   | 'gemini'
   | 'redis'
   | 'sistema'
