@@ -48,12 +48,13 @@ def fetch_page(session, url: str) -> str | None:
 # ── URL builder ───────────────────────────────────────────────────────────────
 
 def build_url(tipo: str, pagina: int) -> str:
+    # f=1 traz o mix completo (aluguel + venda + temporada) com precos mensais reais.
+    # sp=1 trazia temporada/comercial/quartos com valores por diaria — errado.
     base = f"{BASE_URL}/{ESTADO_SLUG}"
-    parts = ["sp=1"] if tipo == "aluguel" else []
+    parts = ["f=1"]
     if pagina > 1:
         parts.append(f"o={pagina}")
-    sep = "?" if parts else ""
-    return base + sep + "&".join(parts)
+    return base + "?" + "&".join(parts)
 
 # ── Parser ────────────────────────────────────────────────────────────────────
 
@@ -129,7 +130,7 @@ def parse_ad(ad: dict, tipo: str) -> dict | None:
         link      = link_raw if link_raw.startswith("http") else f"https://www.olx.com.br{link_raw}"
 
         props = ad.get("properties") or []
-        area_m2 = quartos = vagas = suites = banheiros = tipo_imovel = None
+        area_m2 = quartos = vagas = suites = banheiros = tipo_imovel = re_type_raw = None
         for prop in props:
             name  = (prop.get("name") or "").lower()
             label = (prop.get("label") or "").lower()
@@ -145,15 +146,42 @@ def parse_ad(ad: dict, tipo: str) -> dict | None:
             elif "bath" in name or "banheiro" in label:
                 banheiros = str(value)
             elif name in ("real_estate_type", "property_type") or "tipo" in label:
+                re_type_raw = str(value)
                 tipo_imovel = str(value)
+
+        # Determina tipo real a partir de real_estate_type e fallbacks
+        cat_name = (ad.get("categoryName") or "").lower()
+        if re_type_raw:
+            rt = re_type_raw.lower()
+            if rt.startswith("aluguel"):
+                tipo = "aluguel"
+            elif rt.startswith("venda"):
+                tipo = "venda"
+            elif "terreno" in rt or "fazenda" in rt or "sítio" in rt or "chacara" in rt or "chácara" in rt:
+                tipo = "venda"
+        if cat_name == "temporada":
+            tipo = "temporada"
+        elif "terreno" in cat_name or "fazenda" in cat_name:
+            tipo = "venda"
+        elif not re_type_raw:
+            # sem real_estate_type: ultimo recurso pelo titulo
+            subj_low = titulo.lower()
+            if subj_low.startswith("vendo ") or subj_low.startswith("venda "):
+                tipo = "venda"
 
         imgs = ad.get("images") or []
         imagens = [i.get("original") or i.get("thumbnail") or "" for i in imgs if isinstance(i, dict)]
         imagens = [u for u in imagens if u]
 
+        # OLX removeu o campo 'user' da listagem; nome agora fica em olxPay.
         user = ad.get("user") or {}
-        nome_anunciante = user.get("name") or ""
+        seller_name     = (user.get("name") or
+                           (ad.get("olxPay") or {}).get("transactionalSellerName") or "")
+        nome_anunciante = seller_name or None
         tipo_an_raw     = (user.get("accountType") or user.get("type") or "").lower()
+        # professionalAd=true → imobiliaria/profissional
+        if not tipo_an_raw and ad.get("professionalAd"):
+            tipo_an_raw = "profissional"
         tipo_anunciante = re.sub(r"[^a-z0-9]", "_", tipo_an_raw) if tipo_an_raw else None
 
         pub_date = ad.get("publishDate") or ad.get("listTime") or ad.get("date") or ""
