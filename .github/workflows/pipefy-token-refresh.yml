@@ -42,8 +42,9 @@ jobs:
           NEW_TOKEN:    ${{ steps.refresh.outputs.token }}
         run: |
           # Busca o ID atual do env var PIPEFY_TOKEN (evita ID stale no secret)
+          TEAM_ID="team_EAj829uIn8xLDr4qC6yAnX4C"
           ENV_ID=$(curl -s \
-            "https://api.vercel.com/v10/projects/$PROJECT_ID/env" \
+            "https://api.vercel.com/v10/projects/$PROJECT_ID/env?teamId=$TEAM_ID" \
             -H "Authorization: Bearer $VERCEL_TOKEN" \
             | python3 -c "
           import sys, json
@@ -59,7 +60,7 @@ jobs:
 
           # Atualiza o valor
           RESP=$(curl -s -X PATCH \
-            "https://api.vercel.com/v10/projects/$PROJECT_ID/env/$ENV_ID" \
+            "https://api.vercel.com/v10/projects/$PROJECT_ID/env/$ENV_ID?teamId=$TEAM_ID" \
             -H "Authorization: Bearer $VERCEL_TOKEN" \
             -H "Content-Type: application/json" \
             -d "{\"value\": \"$NEW_TOKEN\"}")
