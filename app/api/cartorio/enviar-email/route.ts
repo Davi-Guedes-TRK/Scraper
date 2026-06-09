@@ -17,29 +17,23 @@ type ImovelRow = {
   bairro: string | null; titulo: string | null; maps_link: string | null; cidade: string | null
 }
 
-function buildBody(imoveis: ImovelRow[], nomeOficio: string): string {
+function buildBody(imoveis: ImovelRow[]): string {
   const lista = imoveis.map((it, i) => {
     const maps = it.maps_link ? `\n   ${it.maps_link}` : ''
     return `${i + 1}. ${formatEndereco(it)}${maps}`
   }).join('\n\n')
-  return `Prezados, ${nomeOficio},
-
-Meu nome é Davi Guedes, da TRK Imóveis. Gostaria de solicitar o número da matrícula e a certidão de ônus reais dos imóveis listados abaixo:
+  return `Olá! Sou da TRK Imóveis. Gostaria de solicitar o número da matrícula dos seguintes imóveis:
 
 ${lista}
 
-Por favor, responda diretamente a este e-mail informando o número da matrícula de cada imóvel no seguinte formato:
+Por favor, responda informando o número da matrícula de cada imóvel no seguinte formato:
 
-  Endereço — [número da matrícula]
+  Endereço - [número da matrícula]
 
 Exemplo:
-  SQN 312 Bloco B Apto 204 — 123456
+  SQN 312 Bloco B Apto 204 - 123456
 
-Desde já, muito obrigado!
-
-Atenciosamente,
-Davi Guedes — TRK Imóveis
-d.guedes@trkimoveis.com.br`
+Obrigado!`
 }
 
 async function enviarViaAppsScript(to: string, subject: string, body: string): Promise<{ ok: boolean; error?: string }> {
@@ -95,8 +89,8 @@ export async function POST(req: NextRequest) {
 
   for (const { email, nome, rows } of groups.values()) {
     const n = rows.length
-    const subject = `Solicitação de matrícula e certidão de ônus — TRK Imóveis (${n} imóvel${n > 1 ? 'is' : ''})`
-    const { ok, error } = await enviarViaAppsScript(email, subject, buildBody(rows, nome))
+    const subject = `Solicitação de matrícula — TRK Imóveis (${n} imóvel${n > 1 ? 'is' : ''})`
+    const { ok, error } = await enviarViaAppsScript(email, subject, buildBody(rows))
 
     if (ok) {
       const byPortal: Record<string, string[]> = {}
