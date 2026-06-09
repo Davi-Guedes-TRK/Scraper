@@ -118,7 +118,10 @@ def parse_ad(ad: dict, tipo: str) -> dict | None:
         price_obj = ad.get("price") or {}
         preco = price_obj.get("value") or price_obj.get("formattedValue") if isinstance(price_obj, dict) else str(price_obj)
 
-        loc  = ad.get("location") or {}
+        # OLX mudou (~05/2026): 'location' virou string; campos limpos vêm em 'locationDetails'.
+        loc = ad.get("locationDetails")
+        if not isinstance(loc, dict):
+            loc = ad.get("location") if isinstance(ad.get("location"), dict) else {}
         bairro    = loc.get("neighbourhood") or ""
         cidade    = loc.get("municipality") or "Brasília"
         estado    = loc.get("uf") or "DF"
@@ -153,7 +156,7 @@ def parse_ad(ad: dict, tipo: str) -> dict | None:
         tipo_an_raw     = (user.get("accountType") or user.get("type") or "").lower()
         tipo_anunciante = re.sub(r"[^a-z0-9]", "_", tipo_an_raw) if tipo_an_raw else None
 
-        pub_date = ad.get("publishDate") or ad.get("listTime") or ""
+        pub_date = ad.get("publishDate") or ad.get("listTime") or ad.get("date") or ""
         if re.match(r"^\d{10,}$", str(pub_date)):
             try:
                 pub_date = datetime.fromtimestamp(int(pub_date)).strftime("%Y-%m-%d")
@@ -184,7 +187,7 @@ def parse_ad(ad: dict, tipo: str) -> dict | None:
             "creci":            None,
             "imagens":          ",".join(imagens[:20]) if imagens else None,
             "data_publicacao":  pub_date,
-            "dados_brutos":     json.dumps(ad, ensure_ascii=False, default=str)[:4000],
+            "dados_brutos":     json.dumps({k: v for k, v in ad.items() if k not in ("matchingAds", "carSpecificData", "vehicleTags", "vehiclePills", "zapDetails", "images")}, ensure_ascii=False, default=str),
         }
     except Exception as e:
         log.debug("Erro ao parsear ad: %s", e)
