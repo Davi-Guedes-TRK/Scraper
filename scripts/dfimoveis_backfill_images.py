@@ -93,7 +93,7 @@ def main():
             new_imgs = ",".join(imgs[:30])
             if new_imgs == (old_imgs or ""):
                 skipped += 1
-                time.sleep(random.uniform(0.3, 0.6))
+                time.sleep(random.uniform(0.1, 0.2))
                 continue
 
             if args.dry_run:
@@ -114,7 +114,7 @@ def main():
             log.info("[%d/%d] progresso — atualizados=%d  pulados=%d  erros=%d",
                      idx, len(rows), updated, skipped, errors)
 
-        time.sleep(random.uniform(0.6, 1.3))
+        time.sleep(random.uniform(0.15, 0.35))
 
     if not args.dry_run:
         conn.commit()

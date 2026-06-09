@@ -324,7 +324,7 @@ def scrape_cidade(session, tipo: str, tipo_imovel: str, cidade: str, max_paginas
                 if detail_imgs:
                     item["imagens"] = ",".join(detail_imgs[:30])
             enriched.append(item)
-            time.sleep(random.uniform(0.5, 1.2))
+            time.sleep(random.uniform(0.15, 0.35))
 
         results.extend(enriched)
         log.info("[DFImóveis] %s pág %d: %d novos (total: %d)", cidade, pagina, len(enriched), len(results))
