@@ -38,16 +38,39 @@ jobs:
       - name: Atualizar PIPEFY_TOKEN no Vercel (API REST)
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          ENV_ID:       ${{ secrets.PIPEFY_TOKEN_ENV_ID }}
           PROJECT_ID:   prj_kx2bwqph4Z7mxw0eiJ2vyLMFQvkb
           NEW_TOKEN:    ${{ steps.refresh.outputs.token }}
         run: |
-          curl -sf -X PATCH \
+          # Busca o ID atual do env var PIPEFY_TOKEN (evita ID stale no secret)
+          ENV_ID=$(curl -s \
+            "https://api.vercel.com/v10/projects/$PROJECT_ID/env" \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          envs = data.get('envs', [])
+          match = next((e['id'] for e in envs if e.get('key') == 'PIPEFY_TOKEN'), None)
+          if not match:
+              print('ERRO: PIPEFY_TOKEN nao encontrado nos envs do projeto', file=sys.stderr)
+              sys.exit(1)
+          print(match)
+          ")
+          echo "[*] ENV_ID encontrado: $ENV_ID"
+
+          # Atualiza o valor
+          RESP=$(curl -s -X PATCH \
             "https://api.vercel.com/v10/projects/$PROJECT_ID/env/$ENV_ID" \
             -H "Authorization: Bearer $VERCEL_TOKEN" \
             -H "Content-Type: application/json" \
-            -d "{\"value\": \"$NEW_TOKEN\"}" \
-          | python3 -c "import sys,json; d=json.load(sys.stdin); print('[OK] env atualizado:', d.get('key','?'))"
+            -d "{\"value\": \"$NEW_TOKEN\"}")
+          echo "$RESP" | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          if 'error' in d:
+              print('ERRO Vercel:', d['error'].get('message', d['error']))
+              sys.exit(1)
+          print('[OK] PIPEFY_TOKEN atualizado no Vercel:', d.get('key', '?'))
+          "
 
       # Nota: process.env em serverless functions do Vercel é lido por invocação —
       # o novo token entra em vigor na próxima requisição sem precisar de redeploy.
