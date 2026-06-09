@@ -52,8 +52,9 @@ async function salvarMatriculas(pares: Array<{ link: string; portal: string; mat
     if (!portalKeys.includes(portal)) continue
     await sql.unsafe(
       `UPDATE public."${portalTable(portal)}"
-          SET numero_matricula   = $1,
-              status_solicitacao = 'recebido'
+          SET numero_matricula        = $1,
+              status_solicitacao      = 'recebido',
+              status_solicitacao_em   = NOW()
         WHERE link = $2`,
       [matricula, link],
     )

@@ -61,7 +61,7 @@ export async function PATCH(req: NextRequest) {
         Object.entries(body.byPortal).map(([portal, links]) => {
           if (!portalKeys.includes(portal) || !links.length) return Promise.resolve()
           return sql.unsafe(
-            `UPDATE public."${portalTable(portal)}" SET status_solicitacao=$1 WHERE link = ANY($2)`,
+            `UPDATE public."${portalTable(portal)}" SET status_solicitacao=$1, status_solicitacao_em=NOW() WHERE link = ANY($2)`,
             [body.status, links],
           )
         }),
@@ -100,8 +100,9 @@ export async function PATCH(req: NextRequest) {
       // 'N/A' (desistimos) não mexe no status.
       await sql.unsafe(
         `UPDATE public."${portalTable(body.portal)}"
-            SET numero_matricula=$1,
-                status_solicitacao = CASE WHEN $1 <> 'N/A' THEN 'recebido' ELSE status_solicitacao END
+            SET numero_matricula      = $1,
+                status_solicitacao    = CASE WHEN $1 <> 'N/A' THEN 'recebido' ELSE status_solicitacao END,
+                status_solicitacao_em = CASE WHEN $1 <> 'N/A' THEN NOW() ELSE status_solicitacao_em END
           WHERE link=$2`,
         [body.numero_matricula, body.link],
       )

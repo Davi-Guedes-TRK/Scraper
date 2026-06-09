@@ -34,6 +34,7 @@ const imoveisBase = {
   // workflow
   status_triagem: text('status_triagem'),
   status_solicitacao: text('status_solicitacao'),
+  status_solicitacao_em: timestamp('status_solicitacao_em', { withTimezone: true }),
   visitado_em: timestamp('visitado_em', { withTimezone: true }),
   geocoded_em: timestamp('geocoded_em', { withTimezone: true }),
   pistas_ia: jsonb('pistas_ia'),
