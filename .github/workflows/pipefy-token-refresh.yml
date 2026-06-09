@@ -28,6 +28,7 @@ jobs:
         run: python scripts/pipefy_token_refresh.py
 
       - name: Atualizar PIPEFY_SESSION_B64 no GitHub (sessão renovada)
+        continue-on-error: true   # GH_PAT opcional; sem ele o token ainda é atualizado no Vercel
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
           NEW_SESSION_B64: ${{ steps.refresh.outputs.session_b64 }}
