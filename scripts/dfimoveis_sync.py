@@ -72,17 +72,20 @@ def fetch_page(session, url: str) -> str | None:
 # ── URL builder ───────────────────────────────────────────────────────────────
 
 def build_url(tipo: str, tipo_imovel: str, cidade: str, pagina: int, ordenamento: str = "mais-recente") -> str:
+    # Formato NOVO do site (mudou ~05/2026): /{negocio}/df/{cidade}/{tipo} + bairro na query.
+    # As RAs do Plano Piloto (lago-sul, asa-sul, etc.) são BAIRROS de "brasilia".
     tipo_slug   = TIPOS_NEGOCIO.get(tipo, "aluguel")
     imovel_slug = tipo_imovel if tipo_imovel != "todos" else "imoveis"
+    params = [f"ordenamento={ordenamento}"]
 
     if cidade in BAIRROS_BRASILIA:
-        path = f"{BASE_URL}/{tipo_slug}/{imovel_slug}/df/brasilia/{cidade}/"
+        path = f"{BASE_URL}/{tipo_slug}/df/brasilia/{imovel_slug}"
+        params.insert(0, f"bairro={cidade}")
     elif cidade == "todos":
-        path = f"{BASE_URL}/{tipo_slug}/{imovel_slug}/df/"
+        path = f"{BASE_URL}/{tipo_slug}/df/todos/{imovel_slug}"
     else:
-        path = f"{BASE_URL}/{tipo_slug}/{imovel_slug}/df/{cidade}/"
+        path = f"{BASE_URL}/{tipo_slug}/df/{cidade}/{imovel_slug}"
 
-    params = [f"ordenamento={ordenamento}"]
     if pagina > 1:
         params.append(f"pagina={pagina}")
     return path + "?" + "&".join(params)
@@ -184,10 +187,12 @@ def parse_card(card, cidade: str, tipo: str) -> dict | None:
         if creci_m:
             creci = creci_m.group(1)
 
+        # link novo é /imovel/{slug}; o endereço vem no título: "Endereço, BAIRRO, CIDADE"
         bairro = cidade.replace("-", " ").title() if cidade != "todos" else "DF"
-        loc_parts = href.rstrip("/").split("/")
-        if len(loc_parts) >= 2:
-            bairro = loc_parts[-2].replace("-", " ").title()
+        if titulo and "," in titulo:
+            tp = [p.strip() for p in titulo.split(",") if p.strip()]
+            if tp:
+                bairro = tp[0]
 
         area_raw = details.get("area") or ""
         area_m2 = None
