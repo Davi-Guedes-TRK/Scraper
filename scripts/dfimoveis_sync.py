@@ -146,7 +146,21 @@ def extract_details(card) -> dict:
             details["banheiros"] = re.search(r"\d+", t_low).group()
     return details
 
-def parse_card(card, cidade: str, tipo: str) -> dict | None:
+def extract_images_detail(detail_html: str) -> list[str]:
+    """Extrai todas as URLs de fotos da página de detalhe via .swiper-slide img."""
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(detail_html, "html.parser")
+    seen: set[str] = set()
+    urls: list[str] = []
+    for img in soup.select(".swiper-slide img"):
+        src = img.get("src") or img.get("data-src") or img.get("data-lazy-src") or ""
+        if "dfimoveis.com.br/fotos" in src and src not in seen:
+            seen.add(src)
+            urls.append(src)
+    return urls
+
+
+def parse_card(card, cidade: str, tipo: str, detail_html: str | None = None) -> dict | None:
     try:
         from urllib.parse import urljoin
         a = card if card.name == "a" else card.find("a")
@@ -164,10 +178,21 @@ def parse_card(card, cidade: str, tipo: str) -> dict | None:
         preco    = extract_price(card)
         details  = extract_details(card)
 
+        # Thumbnail da listagem (fallback se não tiver detalhe)
         img = card.select_one("picture img") or card.find("img")
         thumbnail = (img.get("src") or img.get("data-src") or "") if img else ""
         if not thumbnail.startswith("http"):
             thumbnail = None
+
+        # Todas as fotos da página de detalhe (quando disponível)
+        if detail_html:
+            all_imgs = extract_images_detail(detail_html)
+            if all_imgs:
+                imagens_str = ",".join(all_imgs[:30])
+            else:
+                imagens_str = thumbnail
+        else:
+            imagens_str = thumbnail
 
         tipo_imovel = None
         for key, val in _TIPO_IMOVEL_MAP.items():
@@ -220,7 +245,7 @@ def parse_card(card, cidade: str, tipo: str) -> dict | None:
             "nome_anunciante":  None,
             "tipo_anunciante":  None,
             "creci":            creci,
-            "imagens":          thumbnail,
+            "imagens":          imagens_str,
             "dados_brutos":     json.dumps({"badge": tipo_card, "creci": creci}, ensure_ascii=False),
         }
     except Exception as e:
@@ -287,8 +312,22 @@ def scrape_cidade(session, tipo: str, tipo_imovel: str, cidade: str, max_paginas
         new_items = [i for i in items if i["link"] not in seen]
         for i in new_items:
             seen.add(i["link"])
-        results.extend(new_items)
-        log.info("[DFImóveis] %s pág %d: %d novos (total: %d)", cidade, pagina, len(new_items), len(results))
+
+        # Para os cards novos: rebusca a página de detalhe para pegar todas as fotos
+        # (a listagem só tem 1 thumbnail; o detalhe tem até 30 via .swiper-slide img)
+        enriched = []
+        for item in new_items:
+            from bs4 import BeautifulSoup
+            card_html = fetch_page(session, item["link"])
+            if card_html:
+                detail_imgs = extract_images_detail(card_html)
+                if detail_imgs:
+                    item["imagens"] = ",".join(detail_imgs[:30])
+            enriched.append(item)
+            time.sleep(random.uniform(0.5, 1.2))
+
+        results.extend(enriched)
+        log.info("[DFImóveis] %s pág %d: %d novos (total: %d)", cidade, pagina, len(enriched), len(results))
 
         time.sleep(random.uniform(1.5, 3.0))
 
