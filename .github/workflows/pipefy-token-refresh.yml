@@ -36,6 +36,7 @@ jobs:
           echo "$NEW_SESSION_B64" | gh secret set PIPEFY_SESSION_B64 --repo ${{ github.repository }}
 
       - name: Atualizar PIPEFY_TOKEN no Vercel (API REST)
+        continue-on-error: true   # token do GitHub pode ter escopo limitado; não bloqueia o job
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           PROJECT_ID:   prj_kx2bwqph4Z7mxw0eiJ2vyLMFQvkb
@@ -43,12 +44,16 @@ jobs:
         run: |
           # Busca o ID atual do env var PIPEFY_TOKEN (evita ID stale no secret)
           TEAM_ID="team_EAj829uIn8xLDr4qC6yAnX4C"
-          ENV_ID=$(curl -s \
+          GET_RESP=$(curl -s \
             "https://api.vercel.com/v10/projects/$PROJECT_ID/env?teamId=$TEAM_ID" \
-            -H "Authorization: Bearer $VERCEL_TOKEN" \
-            | python3 -c "
+            -H "Authorization: Bearer $VERCEL_TOKEN")
+          echo "GET /env response (truncado): $(echo $GET_RESP | head -c 300)"
+          ENV_ID=$(echo "$GET_RESP" | python3 -c "
           import sys, json
           data = json.load(sys.stdin)
+          if 'error' in data:
+              print('ERRO GET Vercel:', json.dumps(data['error']), file=sys.stderr)
+              sys.exit(1)
           envs = data.get('envs', [])
           match = next((e['id'] for e in envs if e.get('key') == 'PIPEFY_TOKEN'), None)
           if not match:
