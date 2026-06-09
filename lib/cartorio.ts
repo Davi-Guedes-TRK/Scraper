@@ -21,17 +21,23 @@ export function formatEndereco(item: EnderecoFonte): string {
 
 export type ParsedEntry = { address: string; matricula: string }
 
-/** Quebra um texto "endereço - matrícula" (uma ou várias linhas) em pares. */
+/** Quebra a resposta do cartório em pares endereço→matrícula.
+ *  Suporta os formatos reais observados:
+ *    "SQN 312 Bl B Ap 204 - 123456"          (traço)
+ *    "SQN 312 Bl B Ap 204: MATRÍCULA 123456"  (dois-pontos + label)
+ *    "1. SQN 312 Bl B Ap 204: MATRÍCULA 123456;"  (lista numerada)
+ */
 export function parseCartorioEntries(text: string): ParsedEntry[] {
-  // Match " - DIGITS" — o espaço antes do traço evita hífens de palavras compostas.
-  const re = / -\s*(\d+)/g
   const entries: ParsedEntry[] = []
-  let lastEnd = 0
+  // Normaliza: remove numeração de lista ("1. ", "2) ") no início de cada linha
+  const normalized = text.replace(/^\s*\d+[.)]\s*/gm, '')
+  // Captura: <endereço> seguido de " - NUM" ou ": [MATRÍCULA] NUM"
+  const re = /(.+?)\s*(?:-|:\s*(?:MATR[ÍI]CULA\s*)?)\s*(\d{4,})\s*[;,]?/gi
   let match: RegExpExecArray | null
-  while ((match = re.exec(text)) !== null) {
-    const addressPart = text.slice(lastEnd, match.index).trim()
-    if (addressPart) entries.push({ address: addressPart, matricula: match[1] })
-    lastEnd = match.index + match[0].length
+  while ((match = re.exec(normalized)) !== null) {
+    const address  = match[1].trim()
+    const matricula = match[2].trim()
+    if (address && matricula) entries.push({ address, matricula })
   }
   return entries
 }
