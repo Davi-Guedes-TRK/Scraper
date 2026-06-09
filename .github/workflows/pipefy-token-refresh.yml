@@ -27,6 +27,13 @@ jobs:
           PIPEFY_SESSION_B64: ${{ secrets.PIPEFY_SESSION_B64 }}
         run: python scripts/pipefy_token_refresh.py
 
+      - name: Atualizar PIPEFY_SESSION_B64 no GitHub (sessão renovada)
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          NEW_SESSION_B64: ${{ steps.refresh.outputs.session_b64 }}
+        run: |
+          echo "$NEW_SESSION_B64" | gh secret set PIPEFY_SESSION_B64 --repo ${{ github.repository }}
+
       - name: Atualizar PIPEFY_TOKEN no Vercel (API REST)
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
