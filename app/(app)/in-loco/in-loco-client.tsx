@@ -279,7 +279,7 @@ export function InLocoClient() {
                 </p>
               </div>
               <span className="text-[9px] px-2 py-1 rounded-full mr-2 flex-shrink-0 text-white"
-                style={{ background: c.status === 'fila' ? '#c08a3e' : '#5d7a43' }}>
+                style={{ background: c.status === 'fila' ? 'var(--chart-2)' : 'var(--success)' }}>
                 {c.status === 'fila' ? 'na fila' : 'enviado'}
               </span>
             </div>

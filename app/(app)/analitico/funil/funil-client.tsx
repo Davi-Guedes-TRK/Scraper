@@ -37,29 +37,29 @@ type Data = {
 // ── Paleta ────────────────────────────────────────────────────────────────────
 
 const C = {
-  anuncios: '#64748b',
-  oportunidades: '#6366f1',
-  leads: '#8b5cf6',
-  visitados: '#f59e0b',
-  captados: '#22c55e',
+  anuncios: '#94a3b8',
+  oportunidades: '#4f46e5',
+  leads: '#6366f1',
+  visitados: '#818cf8',
+  captados: '#16a34a',
   perda: '#ef4444',
-  andamento: '#06b6d4',
+  andamento: '#818cf8',
   perdidos: '#ef4444',
 }
 
-const DONUT_COLORS = ['#ef4444', '#f97316', '#eab308', '#06b6d4', '#8b5cf6', '#ec4899', '#6366f1', '#22c55e', '#14b8a6']
+const DONUT_COLORS = ['#ef4444', '#f59e0b', '#a78bfa', '#818cf8', '#8b5cf6', '#a78bfa', '#6366f1', '#22c55e', '#14b8a6']
 
 const FASES_CORES: Record<string, string> = {
   'Informações Básicas': '#8b5cf6',
-  'Qualificação': '#06b6d4',
+  'Qualificação': '#818cf8',
   'Negociação': '#f59e0b',
   'Captado': '#22c55e',
   'Não Captado': '#ef4444',
 }
 
 const ORIGEM_CORES: Record<string, string> = {
-  'Portal': '#0ea5e9',
-  'Placas/Procura Externa': '#f97316',
+  'Portal': '#6366f1',
+  'Placas/Procura Externa': '#f59e0b',
   'Captado por Corretor': '#22c55e',
   'Sem origem': '#94a3b8',
 }

@@ -21,11 +21,11 @@ type Data = {
   regioes: string[]; tipos: string[]
 }
 
-const C = { atend: '#6366f1', proposta: '#f59e0b', fechado: '#22c55e', perda: '#ef4444', ativo: '#06b6d4' }
-const DONUT = ['#ef4444', '#f97316', '#eab308', '#06b6d4', '#8b5cf6', '#ec4899', '#6366f1', '#22c55e']
+const C = { atend: '#6366f1', proposta: '#f59e0b', fechado: '#22c55e', perda: '#ef4444', ativo: '#818cf8' }
+const DONUT = ['#ef4444', '#f59e0b', '#a78bfa', '#818cf8', '#8b5cf6', '#a78bfa', '#6366f1', '#22c55e']
 const CANAL_CORES: Record<string, string> = {
   'Telefone': '#6366f1', 'WhatsApp': '#22c55e', 'E-mail': '#f59e0b',
-  'Portais': '#0ea5e9', 'Plantão / Faixa de Rua': '#ec4899', 'Sem canal': '#94a3b8',
+  'Portais': '#818cf8', 'Plantão / Faixa de Rua': '#a78bfa', 'Sem canal': '#94a3b8',
 }
 const RANGE_OPTS = [
   { value: 'tudo', label: 'Desde 2024' },

@@ -90,9 +90,9 @@ export function CarteiraParalelaClient({ matches }: { matches: Match[] }) {
       />
 
       <div className="grid grid-cols-3 gap-2.5 mb-4">
-        <StatTile label="Inquilinos procurando" value={kpis.inquilinos} accent="#5d7a43" sublabel="atendimentos ativos com match" />
-        <StatTile label="Imóveis que casam" value={kpis.imoveis} accent="#6e4d34" sublabel="disponíveis, não administrados" />
-        <StatTile label="Oportunidades" value={kpis.pares} accent="#c08a3e" sublabel="pares inquilino × imóvel" />
+        <StatTile label="Inquilinos procurando" value={kpis.inquilinos} accent="var(--success)" sublabel="atendimentos ativos com match" />
+        <StatTile label="Imóveis que casam" value={kpis.imoveis} accent="var(--chart-1)" sublabel="disponíveis, não administrados" />
+        <StatTile label="Oportunidades" value={kpis.pares} accent="var(--chart-2)" sublabel="pares inquilino × imóvel" />
       </div>
 
       <div className="flex flex-wrap items-center gap-2 mb-3">
@@ -151,7 +151,7 @@ function Linha({ m, g }: { m: Match; g: Grupo }) {
       <div className="flex items-center gap-1.5 justify-end">
         {wa && (
           <a href={wa} target="_blank" rel="noreferrer" title="Chamar dono no WhatsApp"
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-white transition-opacity hover:opacity-85" style={{ background: '#5d7a43' }}>
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-white transition-opacity hover:opacity-85" style={{ background: 'var(--success)' }}>
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M21 12a8 8 0 01-11.6 7.15L3 21l1.85-6.4A8 8 0 1121 12z" /></svg>
           </a>
         )}

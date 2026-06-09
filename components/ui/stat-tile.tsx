@@ -16,7 +16,7 @@ export type StatTileProps = {
   deltaLabel?: string
 }
 
-export function StatTile({ label, value, sublabel, accent = '#6e4d34', href, share, delta, deltaLabel }: StatTileProps) {
+export function StatTile({ label, value, sublabel, accent = 'var(--chart-1)', href, share, delta, deltaLabel }: StatTileProps) {
   const body = (
     <div className="card card-hover rounded-lg p-3 h-full">
       <div className="flex items-center gap-1.5 mb-2">
@@ -31,7 +31,7 @@ export function StatTile({ label, value, sublabel, accent = '#6e4d34', href, sha
         {typeof delta === 'number' && (
           <span
             className="text-[11px] font-bold font-mono flex items-center gap-0.5 mb-0.5"
-            style={{ color: delta > 0 ? '#5d7a43' : delta < 0 ? '#b4452f' : '#897866' }}
+            style={{ color: delta > 0 ? 'var(--success)' : delta < 0 ? 'var(--destructive)' : 'var(--muted-foreground)' }}
             title={deltaLabel}
           >
             {delta > 0 ? '↑' : delta < 0 ? '↓' : '→'}{Math.abs(delta)}%

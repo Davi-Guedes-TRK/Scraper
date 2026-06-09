@@ -30,7 +30,7 @@ export function DataSourceBar() {
       style={{ borderBottom: '1px solid var(--border)', background: 'var(--sidebar)' }}
     >
       {src.wip && (
-        <span className="px-1.5 py-0.5 rounded-full font-semibold text-white shrink-0" style={{ background: '#c08a3e', fontSize: 9 }}>
+        <span className="px-1.5 py-0.5 rounded-full font-semibold text-white shrink-0" style={{ background: 'var(--chart-2)', fontSize: 9 }}>
           🚧 Em desenvolvimento
         </span>
       )}

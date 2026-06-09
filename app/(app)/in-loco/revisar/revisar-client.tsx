@@ -97,8 +97,8 @@ export function RevisarClient() {
 }
 
 const STATUS_BADGE: Record<string, { label: string; bg: string }> = {
-  novo: { label: 'cru', bg: '#c08a3e' },
-  revisado: { label: 'revisado', bg: '#5d7a43' },
+  novo: { label: 'cru', bg: 'var(--chart-2)' },
+  revisado: { label: 'revisado', bg: 'var(--success)' },
   descartado: { label: 'descartado', bg: '#8a8a8a' },
 }
 
@@ -144,7 +144,7 @@ function CardRevisao({ c, dup, expanded, onToggle, onPatch, onDone }: {
           <p className="text-sm text-foreground font-medium leading-snug truncate">{c.endereco || (c.lat ? 'Sem endereço — abra pra resolver' : 'Sem GPS — abra pra ajustar')}</p>
           <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1.5">
             <span>{c.tipo_imovel || 'sem tipo'}</span>
-            {dup && <span className="px-1.5 py-0.5 rounded-full text-white" style={{ background: '#b4543a', fontSize: 9 }}>possível duplicata</span>}
+            {dup && <span className="px-1.5 py-0.5 rounded-full text-white" style={{ background: 'var(--destructive)', fontSize: 9 }}>possível duplicata</span>}
           </p>
         </div>
         <span className="text-[9px] px-2 py-1 rounded-full mr-2 flex-shrink-0 text-white" style={{ background: st.bg }}>{st.label}</span>
@@ -173,7 +173,7 @@ function CardRevisao({ c, dup, expanded, onToggle, onPatch, onDone }: {
 
           <div className="grid grid-cols-3 gap-2">
             <button onClick={salvar} disabled={busy} className="h-10 rounded-lg text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40" style={{ border: '1px solid var(--border)' }}>Salvar</button>
-            <button onClick={concluir} disabled={busy} className="h-10 rounded-lg text-[13px] font-semibold text-white disabled:opacity-40" style={{ background: '#5d7a43' }}>Concluir ✓</button>
+            <button onClick={concluir} disabled={busy} className="h-10 rounded-lg text-[13px] font-semibold text-white disabled:opacity-40" style={{ background: 'var(--success)' }}>Concluir ✓</button>
             <button onClick={descartar} disabled={busy} className="h-10 rounded-lg text-[13px] font-medium text-muted-foreground hover:text-red-600 transition-colors disabled:opacity-40" style={{ border: '1px solid var(--border)' }}>Descartar</button>
           </div>
         </div>

@@ -43,10 +43,10 @@ function inativoLabel(d: number | null): string {
 }
 function prazoBand(d: number | null): { label: string; color: string } {
   if (d == null) return { label: 'sem data', color: '#94a3b8' }
-  if (d >= 1460) return { label: '48m+', color: '#c08a3e' }
-  if (d >= 1095) return { label: '36–48m', color: '#a98a5a' }
-  if (d >= 730) return { label: '24–36m', color: '#7d9466' }
-  if (d >= 365) return { label: '12–24m', color: '#5b8aa6' }
+  if (d >= 1460) return { label: '48m+', color: 'var(--chart-2)' }
+  if (d >= 1095) return { label: '36–48m', color: '#6366f1' }
+  if (d >= 730) return { label: '24–36m', color: '#818cf8' }
+  if (d >= 365) return { label: '12–24m', color: '#a5b4fc' }
   return { label: '< 12m', color: '#94a3b8' }
 }
 
@@ -95,7 +95,7 @@ export function CaptacaoClient({ leads }: { leads: Lead[] }) {
       { key: '12-24', label: '12 a 24 meses', accent: 'var(--border)' },
       { key: '24-36', label: '24 a 36 meses', accent: 'var(--border)' },
       { key: '36-48', label: '36 a 48 meses', accent: 'var(--border)' },
-      { key: '48+', label: '48 meses ou mais', accent: '#c08a3e', hint: 'contrato já ciclou — win-back forte' },
+      { key: '48+', label: '48 meses ou mais', accent: 'var(--chart-2)', hint: 'contrato já ciclou — win-back forte' },
       { key: 'sem', label: 'Sem data', accent: 'var(--border)' },
     ]
     const groups = new Map<string, Lead[]>()
@@ -151,10 +151,10 @@ export function CaptacaoClient({ leads }: { leads: Lead[] }) {
       />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 mb-4">
-        <StatTile label="Leads na lista" value={kpis.total} accent="#6e4d34" sublabel="dono já alugou conosco" />
-        <StatTile label="Aluguel médio" value={kpis.medio ? fmtBRL(kpis.medio) : '—'} accent="#5d7a43" sublabel="última locação fechada" />
-        <StatTile label="Proprietários" value={donos.length} accent="#0ea5e9" sublabel="donos distintos" />
-        <StatTile label="48+ meses" value={kpis.antigos} accent="#c08a3e" sublabel="win-back forte" />
+        <StatTile label="Leads na lista" value={kpis.total} accent="var(--chart-1)" sublabel="dono já alugou conosco" />
+        <StatTile label="Aluguel médio" value={kpis.medio ? fmtBRL(kpis.medio) : '—'} accent="var(--success)" sublabel="última locação fechada" />
+        <StatTile label="Proprietários" value={donos.length} accent="var(--chart-5)" sublabel="donos distintos" />
+        <StatTile label="48+ meses" value={kpis.antigos} accent="var(--chart-2)" sublabel="win-back forte" />
       </div>
 
       {/* toggle de visualização */}
@@ -163,7 +163,7 @@ export function CaptacaoClient({ leads }: { leads: Lead[] }) {
           {([['prazo', 'Por prazo'], ['curadoria', 'Curadoria']] as const).map(([v, label]) => (
             <button key={v} onClick={() => setView(v)}
               className={`px-3 h-9 text-[13px] font-medium transition-colors ${view === v ? 'text-white' : 'text-muted-foreground hover:text-foreground'}`}
-              style={view === v ? { background: '#6e4d34' } : undefined}>
+              style={view === v ? { background: 'var(--chart-1)' } : undefined}>
               {label}
             </button>
           ))}
@@ -225,7 +225,7 @@ export function CaptacaoClient({ leads }: { leads: Lead[] }) {
             <div className="sticky bottom-3 z-20 mt-3 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
               <span className="text-[13px] font-semibold text-foreground">{sel.size} imóvel(is) selecionado(s)</span>
               <button onClick={() => setSel(new Set())} className="text-[12px] text-muted-foreground hover:text-foreground ml-auto">limpar</button>
-              <button onClick={criar} disabled={saving} className="h-9 px-4 rounded-lg text-[13px] font-semibold text-white disabled:opacity-50 transition-opacity hover:opacity-90" style={{ background: '#6e4d34' }}>
+              <button onClick={criar} disabled={saving} className="h-9 px-4 rounded-lg text-[13px] font-semibold text-white disabled:opacity-50 transition-opacity hover:opacity-90" style={{ background: 'var(--chart-1)' }}>
                 {saving ? 'Enviando…' : 'Criar oportunidades →'}
               </button>
             </div>
@@ -254,13 +254,13 @@ function DonoCard({ dono, sel, onToggle, onToggleAll }: {
     <div className="card rounded-xl overflow-hidden">
       <div className="flex items-center gap-3 px-4 py-2.5" style={{ borderBottom: '1px solid var(--border)', background: 'var(--secondary)' }}>
         <input type="checkbox" checked={allSel} ref={el => { if (el) el.indeterminate = someSel && !allSel }}
-          onChange={e => onToggleAll(cods, e.target.checked)} style={{ accentColor: '#6e4d34', width: 16, height: 16 }} />
+          onChange={e => onToggleAll(cods, e.target.checked)} style={{ accentColor: 'var(--chart-1)', width: 16, height: 16 }} />
         <div className="min-w-0 flex-1">
           <p className="text-[13px] font-semibold text-foreground truncate">{dono.nome}</p>
           <p className="text-[11px] text-muted-foreground font-mono truncate">{dono.telefone ?? 'sem telefone'} · {dono.imoveis.length} imóvel(is){somaSel > 0 ? ` · sel. ${fmtBRL(somaSel)}` : ''}</p>
         </div>
         {wa && (
-          <a href={wa} target="_blank" rel="noreferrer" title="WhatsApp" className="w-8 h-8 rounded-lg flex items-center justify-center text-white transition-opacity hover:opacity-85 shrink-0" style={{ background: '#5d7a43' }}>
+          <a href={wa} target="_blank" rel="noreferrer" title="WhatsApp" className="w-8 h-8 rounded-lg flex items-center justify-center text-white transition-opacity hover:opacity-85 shrink-0" style={{ background: 'var(--success)' }}>
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M21 12a8 8 0 01-11.6 7.15L3 21l1.85-6.4A8 8 0 1121 12z" /></svg>
           </a>
         )}
@@ -271,7 +271,7 @@ function DonoCard({ dono, sel, onToggle, onToggleAll }: {
           const checked = sel.has(im.codigo_imovel)
           return (
             <label key={im.codigo_imovel} className="flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors" style={{ background: checked ? 'var(--accent)' : undefined }}>
-              <input type="checkbox" checked={checked} onChange={() => onToggle(im.codigo_imovel)} style={{ accentColor: '#6e4d34', width: 16, height: 16 }} />
+              <input type="checkbox" checked={checked} onChange={() => onToggle(im.codigo_imovel)} style={{ accentColor: 'var(--chart-1)', width: 16, height: 16 }} />
               <div className="min-w-0 flex-1">
                 <p className="text-[12px] text-foreground truncate font-mono"><span className="font-semibold">{im.codigo_imovel}</span>{im.endereco ? ` · ${im.endereco}` : ''}</p>
                 <p className="text-[11px] text-muted-foreground truncate">{[im.tipo_imovel, im.bairro, im.area_util ? `${Math.round(Number(im.area_util))} m²` : null].filter(Boolean).join(' · ') || '—'}</p>
@@ -303,7 +303,7 @@ function Row({ l }: { l: Lead }) {
       <div className="text-right"><span className="text-[11px] font-mono text-muted-foreground">{inativoLabel(l.dias_inativo)}</span></div>
       <div className="flex items-center gap-1.5 justify-end">
         {wa && (
-          <a href={wa} target="_blank" rel="noreferrer" title="Chamar no WhatsApp" className="w-8 h-8 rounded-lg flex items-center justify-center text-white transition-opacity hover:opacity-85" style={{ background: '#5d7a43' }}>
+          <a href={wa} target="_blank" rel="noreferrer" title="Chamar no WhatsApp" className="w-8 h-8 rounded-lg flex items-center justify-center text-white transition-opacity hover:opacity-85" style={{ background: 'var(--success)' }}>
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M21 12a8 8 0 01-11.6 7.15L3 21l1.85-6.4A8 8 0 1121 12z" /></svg>
           </a>
         )}
