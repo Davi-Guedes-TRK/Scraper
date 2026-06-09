@@ -372,8 +372,12 @@ function PorOficioView({ items, onEnviar, onTratar }: {
     <div className="flex flex-col gap-3">
       {grupos.map(g => {
         const of = g.oficio
-        // sem matrícula e não desistidos = o que precisamos PEDIR ao cartório
-        const aSolicitar = g.items.filter(it => !temMatricula(it) && it.numero_matricula !== 'N/A')
+        // só pendentes (ou sem status) — enviado/recebido/completo não entram na fila
+        const aSolicitar = g.items.filter(it =>
+          !temMatricula(it) &&
+          it.numero_matricula !== 'N/A' &&
+          (!it.status_solicitacao || it.status_solicitacao === 'pendente')
+        )
         const recebidas = g.items.filter(temMatricula)
         const link = of && aSolicitar.length ? buildLinkOficio(of, aSolicitar) : null
         const canal = of ? CANAL_INFO[of.canal] : null
@@ -419,15 +423,21 @@ function PorOficioView({ items, onEnviar, onTratar }: {
                       </button>
                     )
                     : (
-                      // WhatsApp / telefone: abre o canal pré-preenchido manualmente
+                      // WhatsApp / telefone: só abre o canal — marca enviado manualmente depois
                       <a href={link!} target="_blank" rel="noreferrer"
-                        onClick={() => onEnviar(aSolicitar.map(p => p.link))}
                         className="h-8 px-3 rounded-lg text-[12px] font-semibold text-white flex items-center transition-opacity hover:opacity-85"
                         style={{ background: canal!.color }}>
-                        Solicitar {aSolicitar.length} via {canal!.label}
+                        Abrir {canal!.label} ({aSolicitar.length})
                       </a>
                     )
                 }
+                {aSolicitar.length > 0 && of?.canal !== 'email' && (
+                  <button onClick={() => onEnviar(aSolicitar.map(p => p.link))}
+                    className="h-8 px-3 rounded-lg text-[12px] text-muted-foreground hover:text-foreground transition-colors"
+                    style={{ border: '1px solid var(--border)' }}>
+                    Marcar enviado
+                  </button>
+                )}
                 {aSolicitar.length > 0 && (
                   <button onClick={() => onTratar(aSolicitar)} className="h-8 px-3 rounded-lg text-[12px] text-muted-foreground hover:text-foreground transition-colors" style={{ border: '1px solid var(--border)' }}>
                     Tratar resposta
