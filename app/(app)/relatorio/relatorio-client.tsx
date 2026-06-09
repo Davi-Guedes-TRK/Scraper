@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx'
 import { parsePreco, fmtBRL, classifyAnunciante } from '@/lib/formatters'
 import { portalTable } from '@/lib/portals'
 import { PortalBadge } from '@/components/portal-badge'
+import { oficioFor, type Oficio } from '@/lib/oficios'
 
 type Pistas = { quadra?: string | null; conjunto?: string | null; casa_lote?: string | null }
 
@@ -384,6 +385,84 @@ function ActionsMenu({ items }: { items: Array<{ label: string; onClick: () => v
   )
 }
 
+// ── Envio por Ofício (organiza as matrículas pelos cartórios do DF — lib/oficios.ts) ──
+const CANAL_INFO: Record<string, { label: string; color: string }> = {
+  whatsapp: { label: 'WhatsApp', color: 'var(--success)' },
+  email:    { label: 'E-mail',   color: 'var(--chart-1)' },
+  telefone: { label: 'Telefone', color: 'var(--chart-2)' },
+}
+const temMatricula = (it: Imovel) => !!it.numero_matricula && it.numero_matricula !== 'N/A' && it.numero_matricula.trim() !== ''
+
+function buildLinkOficio(oficio: Oficio, prontos: Imovel[]): string {
+  const lista = prontos.map((it, i) => `${i + 1}. ${formatEndereco(it)} — matrícula ${it.numero_matricula}`).join('\n')
+  const msg = `Olá! Solicito a certidão de ônus reais dos seguintes imóveis:\n${lista}\n\nObrigado — TRK Imóveis.`
+  if (oficio.canal === 'whatsapp') { const d = oficio.contato.replace(/\D/g, ''); return `https://wa.me/${d.startsWith('55') ? d : `55${d}`}?text=${encodeURIComponent(msg)}` }
+  if (oficio.canal === 'email') return `mailto:${oficio.contato}?subject=${encodeURIComponent('Solicitação de certidão de ônus — TRK Imóveis')}&body=${encodeURIComponent(msg)}`
+  return `tel:${oficio.contato.replace(/[^\d+]/g, '')}`
+}
+
+function PorOficioView({ items, onEnviar }: { items: Imovel[]; onEnviar: (links: string[]) => void }) {
+  const grupos = useMemo(() => {
+    const map = new Map<string, { oficio: Oficio | null; items: Imovel[] }>()
+    for (const it of items) {
+      const of = oficioFor(it.cidade)
+      const key = of?.nome ?? '__sem__'
+      if (!map.has(key)) map.set(key, { oficio: of, items: [] })
+      map.get(key)!.items.push(it)
+    }
+    return Array.from(map.values()).sort((a, b) => (a.oficio?.nome ?? 'zzz').localeCompare(b.oficio?.nome ?? 'zzz'))
+  }, [items])
+
+  return (
+    <div className="flex flex-col gap-3">
+      {grupos.map(g => {
+        const of = g.oficio
+        const prontos = g.items.filter(temMatricula)
+        const link = of && prontos.length ? buildLinkOficio(of, prontos) : null
+        const canal = of ? CANAL_INFO[of.canal] : null
+        return (
+          <div key={of?.nome ?? 'sem'} className="card rounded-xl overflow-hidden">
+            <div className="flex items-center justify-between gap-3 px-4 py-2.5" style={{ borderBottom: '1px solid var(--border)', borderLeft: `3px solid ${canal?.color ?? 'var(--border)'}`, background: 'var(--secondary)' }}>
+              <div className="min-w-0">
+                <span className="text-[13px] font-semibold text-foreground">{of?.nome ?? 'Ofício não identificado'}</span>
+                {of && canal
+                  ? <span className="text-[11px] text-muted-foreground ml-2">{canal.label} · {of.contato}</span>
+                  : <span className="text-[11px] text-muted-foreground ml-2">região fora da lista — defina o ofício manualmente</span>}
+              </div>
+              <span className="text-[11px] text-muted-foreground font-mono whitespace-nowrap">{g.items.length} imóveis · {prontos.length} c/ matrícula</span>
+            </div>
+            <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+              {g.items.map(it => (
+                <div key={`${it.portal}-${it.link}`} className="flex items-center gap-3 px-4 py-2 text-[12px]">
+                  <span className="flex-1 min-w-0 truncate text-foreground">{formatEndereco(it)}</span>
+                  {temMatricula(it)
+                    ? <span className="font-mono text-foreground shrink-0">mat. {it.numero_matricula}</span>
+                    : <span className="text-muted-foreground shrink-0 italic">sem matrícula</span>}
+                  <span className="shrink-0"><StatusBadge status={it.status_solicitacao} /></span>
+                </div>
+              ))}
+            </div>
+            {of && (
+              <div className="flex items-center gap-2 px-4 py-2.5" style={{ borderTop: '1px solid var(--border)' }}>
+                {link ? (
+                  <a href={link} target="_blank" rel="noreferrer" className="h-8 px-3 rounded-lg text-[12px] font-semibold text-white flex items-center transition-opacity hover:opacity-85" style={{ background: canal!.color }}>
+                    Enviar {prontos.length} via {canal!.label}
+                  </a>
+                ) : <span className="text-[11px] text-muted-foreground">nenhuma matrícula pronta — preencha primeiro</span>}
+                {prontos.length > 0 && (
+                  <button onClick={() => onEnviar(prontos.map(p => p.link))} className="h-8 px-3 rounded-lg text-[12px] text-muted-foreground hover:text-foreground transition-colors" style={{ border: '1px solid var(--border)' }}>
+                    Marcar enviado
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── RelatorioClient ────────────────────────────────────────────────────────────
 export function RelatorioClient() {
   const { toasts, toast } = useToast()
@@ -399,6 +478,7 @@ export function RelatorioClient() {
   const [pipefyRunning, setPipefyRunning] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [view, setView] = useState<'lista' | 'oficio'>('lista')
 
   const queue = useMemo(
     () => items
@@ -435,32 +515,28 @@ export function RelatorioClient() {
     setSelected(selected.size === items.length ? new Set() : new Set(items.map(i => i.link)))
   }
 
-  const markSelected = async (status: string) => {
-    if (!selected.size) { toast('Selecione ao menos um imóvel.', 'info'); return }
+  const markLinks = async (links: string[], status: string): Promise<boolean> => {
+    if (!links.length) return false
+    const set = new Set(links)
     const byPortal: Record<string, string[]> = {}
-    items.filter(i => selected.has(i.link)).forEach(i => {
-      if (!byPortal[i.portal]) byPortal[i.portal] = []
-      byPortal[i.portal].push(i.link)
-    })
+    items.filter(i => set.has(i.link)).forEach(i => { (byPortal[i.portal] ??= []).push(i.link) })
     try {
       const res = await fetch('/api/relatorio', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'status_solicitacao', byPortal, status }),
       })
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}))
-        toast(`Erro: ${d.error ?? res.status}`, 'error')
-        return
-      }
+      if (!res.ok) { const d = await res.json().catch(() => ({})); toast(`Erro: ${d.error ?? res.status}`, 'error'); return false }
     } catch (err) {
-      toast(`Erro: ${err instanceof Error ? err.message : 'desconhecido'}`, 'error')
-      return
+      toast(`Erro: ${err instanceof Error ? err.message : 'desconhecido'}`, 'error'); return false
     }
-    setItems(prev => prev.map(i => selected.has(i.link) ? { ...i, status_solicitacao: status } : i))
+    setItems(prev => prev.map(i => set.has(i.link) ? { ...i, status_solicitacao: status } : i))
+    return true
+  }
+
+  const markSelected = async (status: string) => {
+    if (!selected.size) { toast('Selecione ao menos um imóvel.', 'info'); return }
     const count = selected.size
-    setSelected(new Set())
-    toast(`${count} imóveis atualizados`, 'success')
+    if (await markLinks([...selected], status)) { setSelected(new Set()); toast(`${count} imóveis atualizados`, 'success') }
   }
 
   const generateWhatsApp = () => {
@@ -654,6 +730,14 @@ export function RelatorioClient() {
           <p className="text-[#656d76] text-sm mt-1">Imóveis aprovados e visitados · solicitação de matrícula e ônus reais</p>
         </div>
         <div className="flex items-center gap-2">
+          <div className="flex rounded-lg overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+            {([['lista', 'Lista'], ['oficio', 'Por Ofício']] as const).map(([v, label]) => (
+              <button key={v} onClick={() => setView(v)} className="px-3 py-2 text-sm font-medium transition-colors"
+                style={view === v ? { background: 'var(--chart-1)', color: '#fff' } : { color: 'var(--muted-foreground)' }}>
+                {label}
+              </button>
+            ))}
+          </div>
           <ActionsMenu
             items={[
               { label: queue.length ? `Preencher matrículas (${queue.length})` : 'Preencher matrículas', onClick: () => setQueueOpen(true), disabled: !queue.length },
@@ -694,6 +778,8 @@ export function RelatorioClient() {
           <p className="font-medium text-[#1f2328] text-lg">Nenhum imóvel para cartório</p>
           <p className="text-sm mt-1">Aprove (endereço completo) ou marque como visitado na Triagem/Visitas.</p>
         </div>
+      ) : view === 'oficio' ? (
+        <PorOficioView items={items} onEnviar={async (links) => { if (await markLinks(links, 'enviado')) toast(`${links.length} marcado(s) como enviado`, 'success') }} />
       ) : (
         <div className="bg-white border border-[#d0d7de] rounded-lg overflow-hidden shadow-sm">
           <table className="w-full text-sm">
