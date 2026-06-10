@@ -47,6 +47,16 @@ async function loadAguardando(): Promise<ImovelAguardando[]> {
   `
 }
 
+/** Retorna true se já existe card no Pipefy para esse link de anúncio. */
+async function cardJaExiste(link: string): Promise<boolean> {
+  const rows = await sql<{ n: number }[]>`
+    SELECT count(*)::int AS n FROM public.pipefy_captacoes
+    WHERE links_anuncio ILIKE ${'%' + link + '%'}
+    LIMIT 1
+  `
+  return (rows[0]?.n ?? 0) > 0
+}
+
 async function salvarMatriculas(pares: Array<{ link: string; portal: string; matricula: string }>) {
   for (const { link, portal, matricula } of pares) {
     if (!portalKeys.includes(portal)) continue
@@ -108,12 +118,18 @@ export async function POST(req: NextRequest) {
     matricula: m.matricula,
   })))
 
-  // 2. Cria card no Pipefy "COM - Oportunidades" para cada imóvel casado
-  const cards: Array<{ link: string; cardId: string; cardUrl: string; error?: string }> = []
+  // 2. Cria card no Pipefy "COM - Oportunidades" — pula se já existir
+  const cards: Array<{ link: string; cardId: string; cardUrl: string; error?: string; skipped?: boolean }> = []
   for (const m of casados) {
     const imovel = aguardando.find(it => it.link === m.candidate!.link)
     if (!imovel) continue
     try {
+      const jaExiste = await cardJaExiste(imovel.link)
+      if (jaExiste) {
+        cards.push({ link: imovel.link, cardId: '', cardUrl: '', skipped: true })
+        await log('info', 'cartorio-inbound', 'Card ja existe — pulado', { link: imovel.link }).catch(() => {})
+        continue
+      }
       const card = await criarCardOportunidade({ ...imovel, numero_matricula: m.matricula })
       cards.push({ link: imovel.link, cardId: card.id, cardUrl: card.url })
     } catch (err) {
@@ -123,7 +139,8 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const cardsCriados = cards.filter(c => !c.error).length
+  const cardsCriados = cards.filter(c => !c.error && !c.skipped).length
+  const cardsPulados = cards.filter(c => c.skipped).length
 
   await log('info', 'cartorio-inbound', 'Resposta do cartório processada', {
     from, subject,
@@ -131,6 +148,7 @@ export async function POST(req: NextRequest) {
     casadas:     casados.length,
     semMatch:    matches.length - casados.length,
     cardsCriados,
+    cardsPulados,
     cardsComErro: cards.filter(c => c.error).length,
   }).catch(() => {})
 
@@ -139,6 +157,7 @@ export async function POST(req: NextRequest) {
     matched:     casados.length,
     unmatched:   matches.length - casados.length,
     cardsCriados,
+    cardsPulados,
     details: casados.map(m => ({
       matricula: m.matricula,
       link:      m.candidate!.link,
