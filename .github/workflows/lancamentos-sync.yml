@@ -1,20 +1,27 @@
-name: Sync Lançamentos DF → Banco
+﻿name: Sync Lançamentos DF → Banco
 
 on:
   schedule:
     - cron: '0 10 * * *'   # 07:00 BRT
   workflow_dispatch:
 
+concurrency:
+  group: lancamentos-sync
+  cancel-in-progress: false
+
 jobs:
   paulo-octavio:
     name: Paulo Octávio
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install requests beautifulsoup4 psycopg2-binary
+          cache: 'pip'
+          cache-dependency-path: scripts/requirements.txt
+      - run: pip install -r scripts/requirements.txt
       - env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: python scripts/paulo_octavio_sync.py
@@ -22,13 +29,16 @@ jobs:
   elar:
     name: Elar
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     continue-on-error: true   # site instável; não travar os demais
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install requests beautifulsoup4 psycopg2-binary
+          cache: 'pip'
+          cache-dependency-path: scripts/requirements.txt
+      - run: pip install -r scripts/requirements.txt
       - env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: python scripts/elar_sync.py
@@ -36,12 +46,15 @@ jobs:
   riva:
     name: Riva Incorporadora
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install requests beautifulsoup4 psycopg2-binary
+          cache: 'pip'
+          cache-dependency-path: scripts/requirements.txt
+      - run: pip install -r scripts/requirements.txt
       - env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: python scripts/riva_sync.py
@@ -49,12 +62,15 @@ jobs:
   direcional:
     name: Direcional
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install requests beautifulsoup4 psycopg2-binary
+          cache: 'pip'
+          cache-dependency-path: scripts/requirements.txt
+      - run: pip install -r scripts/requirements.txt
       - env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: python scripts/direcional_sync.py
@@ -62,12 +78,15 @@ jobs:
   greenhouse:
     name: GreenHouse
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install requests beautifulsoup4 psycopg2-binary
+          cache: 'pip'
+          cache-dependency-path: scripts/requirements.txt
+      - run: pip install -r scripts/requirements.txt
       - env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: python scripts/greenhouse_sync.py
@@ -75,12 +94,15 @@ jobs:
   lotus-cidade:
     name: Lotus Cidade
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install requests beautifulsoup4 psycopg2-binary
+          cache: 'pip'
+          cache-dependency-path: scripts/requirements.txt
+      - run: pip install -r scripts/requirements.txt
       - env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: python scripts/lotus_sync.py

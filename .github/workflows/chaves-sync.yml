@@ -1,24 +1,27 @@
-name: Sync Chaves na Mão → Banco
+﻿name: Sync Chaves na Mão → Banco
 
 on:
   schedule:
     - cron: '0 11 * * *'   # 08:00 BRT
   workflow_dispatch:
 
+concurrency:
+  group: chaves-sync
+  cancel-in-progress: false
+
 jobs:
   chaves-sync:
     name: Chaves na Mão — locação DF
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
-      - name: Instalar dependências
-        run: pip install requests beautifulsoup4 psycopg2-binary
-
+          cache: 'pip'
+          cache-dependency-path: scripts/requirements.txt
+      - run: pip install -r scripts/requirements.txt
       - name: Sincronizar
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

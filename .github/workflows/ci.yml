@@ -1,0 +1,50 @@
+name: CI — Build & Type Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Next.js build + TypeScript
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: TypeScript
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+        env:
+          # Variáveis mínimas para o build não quebrar (valores fake — build-time only)
+          DATABASE_URL: postgresql://fake:fake@localhost/fake
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
+          GEMINI_API_KEY: placeholder
+          SCRAPER_API_KEY: placeholder
+          UPSTASH_REDIS_REST_URL: https://placeholder.upstash.io
+          UPSTASH_REDIS_REST_TOKEN: placeholder
+          PIPEFY_TOKEN: placeholder
+          PIPEFY_PIPE_ID: '307179010'
+          APPS_SCRIPT_URL: https://placeholder
+          APPS_SCRIPT_SECRET: placeholder
+          INBOUND_WEBHOOK_SECRET: placeholder
+          TELEGRAM_SESSION: placeholder
+          SENTRY_ORG: trk-imoveis
+          SENTRY_PROJECT: erp-trk

@@ -1,4 +1,4 @@
-name: Validar Links → Banco
+﻿name: Validar Links → Banco
 
 on:
   schedule:
@@ -14,20 +14,22 @@ on:
         required: false
         default: '300'
 
+concurrency:
+  group: validar-links
+  cancel-in-progress: false
+
 jobs:
   validar:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
-      - name: Instalar dependências
-        run: pip install curl_cffi psycopg2-binary
-
+          cache: 'pip'
+          cache-dependency-path: scripts/requirements.txt
+      - run: pip install -r scripts/requirements.txt
       - name: Validar links
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

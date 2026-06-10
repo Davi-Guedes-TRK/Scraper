@@ -1,27 +1,28 @@
-name: Sync ZAP Imóveis → Banco
+﻿name: Sync ZAP Imóveis → Banco
 
 on:
   schedule:
     - cron: '0 13 * * *'   # 10:00 BRT
   workflow_dispatch:
 
+concurrency:
+  group: zap-sync
+  cancel-in-progress: false
+
 jobs:
   zap-sync:
     name: ZAP Imóveis — locação DF
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
-      - name: Instalar dependências
-        run: pip install requests psycopg2-binary playwright
-
-      - name: Instalar Chromium (fallback Playwright)
-        run: playwright install chromium --with-deps
-
+          cache: 'pip'
+          cache-dependency-path: scripts/requirements-playwright.txt
+      - run: pip install -r scripts/requirements-playwright.txt
+      - run: playwright install chromium --with-deps
       - name: Sincronizar
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
