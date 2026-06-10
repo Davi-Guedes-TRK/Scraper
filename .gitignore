@@ -36,13 +36,11 @@
 __pycache__/
 *.pyc
 
-# arquivos temporários de scripts (cache pHash, logs de dry-run, probes)
+# arquivos temporários de scripts (cache, logs, probes de sessão)
 scripts/.cache_phash.json
-scripts/_dryrun_log.txt
-scripts/_dryrun_result.txt
-scripts/_inspect_*.py
-scripts/_run_*.py
-scripts/_probe_*.py
+scripts/_*.py
+scripts/_*.txt
+scripts/_*.json
 
 # debug
 npm-debug.log*
