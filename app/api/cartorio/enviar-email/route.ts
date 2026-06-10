@@ -13,6 +13,7 @@ const APPS_SCRIPT_SECRET = process.env.APPS_SCRIPT_SECRET ?? ''
 type ImovelRow = {
   link: string; portal: string
   endereco: string | null
+  endereco_fonte: string | null
   pistas_ia: { quadra?: string | null; conjunto?: string | null; casa_lote?: string | null } | null
   bairro: string | null; titulo: string | null; maps_link: string | null; cidade: string | null
 }
@@ -49,11 +50,11 @@ async function enviarViaAppsScript(to: string, subject: string, body: string): P
 }
 
 export async function POST(req: NextRequest) {
-  let body: { links?: string[] }
+  let body: { links?: string[]; auto?: boolean }
   try { body = await req.json() } catch {
     return NextResponse.json({ error: 'Body inválido' }, { status: 400 })
   }
-  const { links } = body
+  const { links, auto = false } = body
   if (!Array.isArray(links) || !links.length) {
     return NextResponse.json({ error: 'links[] obrigatório' }, { status: 400 })
   }
@@ -61,7 +62,7 @@ export async function POST(req: NextRequest) {
   let imoveis: ImovelRow[]
   try {
     imoveis = await sql<ImovelRow[]>`
-      SELECT link, portal, endereco, pistas_ia, bairro, titulo, maps_link, cidade
+      SELECT link, portal, endereco, endereco_fonte, pistas_ia, bairro, titulo, maps_link, cidade
       FROM imoveis_todos WHERE link = ANY(${links})
     `
   } catch (err) {
@@ -70,9 +71,16 @@ export async function POST(req: NextRequest) {
   if (!imoveis.length) return NextResponse.json({ error: 'Nenhum imóvel encontrado' }, { status: 404 })
 
   // 1 e-mail por imóvel, roteado pelo ofício de canal e-mail (2º Ofício).
-  const results: Array<{ link: string; oficio?: string; ok: boolean; error?: string }> = []
+  const results: Array<{ link: string; oficio?: string; ok: boolean; error?: string; skipped?: boolean }> = []
 
   for (const it of imoveis) {
+    // GATE de confiança: no modo automático, só envia endereço grau-cartório
+    // (resolvido pelo Geoportal IDE-DF). Os demais ficam para revisão humana do pin.
+    if (auto && it.endereco_fonte !== 'geoportal') {
+      results.push({ link: it.link, ok: false, skipped: true, error: `confiança baixa (${it.endereco_fonte ?? 'sem fonte'}) — conferir pin` })
+      continue
+    }
+
     const of = oficioFor(it.cidade) ?? oficioFor(it.bairro)
     if (!of || of.canal !== 'email') {
       results.push({ link: it.link, ok: false, error: 'sem ofício de e-mail para a região' })
@@ -104,9 +112,10 @@ export async function POST(req: NextRequest) {
   }
 
   const totalEnviado = results.filter(r => r.ok).length
-  await log('info', 'cartorio-email', totalEnviado ? 'E-mails enviados (1 por imóvel)' : 'Falha ao enviar', {
-    pedidos: links.length, totalEnviado, falhas: results.length - totalEnviado,
+  const pulados      = results.filter(r => r.skipped).length
+  await log('info', 'cartorio-email', totalEnviado ? 'E-mails enviados (1 por imóvel)' : 'Nenhum enviado', {
+    pedidos: links.length, auto, totalEnviado, pulados, falhas: results.length - totalEnviado - pulados,
   }).catch(() => {})
 
-  return NextResponse.json({ ok: totalEnviado > 0, totalEnviado, results })
+  return NextResponse.json({ ok: totalEnviado > 0, auto, totalEnviado, pulados, results })
 }

@@ -136,8 +136,8 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
   mapsLink: string
   setMapsLink: (s: string) => void
   dups: string[]
-  onApprove: (item: Imovel, data: { endereco: string; mapsLink: string }) => Promise<void>
-  onVisitar: (item: Imovel, data: { endereco: string; mapsLink: string }) => Promise<void>
+  onApprove: (item: Imovel, data: { endereco: string; mapsLink: string; fonte?: string | null }) => Promise<void>
+  onVisitar: (item: Imovel, data: { endereco: string; mapsLink: string; fonte?: string | null }) => Promise<void>
   onDiscard: (item: Imovel) => Promise<void>
   onClose: () => void
 }) {
@@ -148,6 +148,7 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
   const [matriculaOpen, setMatriculaOpen] = useState(false)
   const [descricao, setDescricao] = useState<string | null>(null)
   const [resolving, setResolving] = useState(false)
+  const [fonte, setFonte] = useState<string | null>(null)  // confiança do endereço: 'geoportal' | 'maps' | null
 
   const MAPS_RE = /maps\.app\.goo\.gl\/|(?:www\.)?google\.com\/maps/
 
@@ -166,6 +167,7 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
       if (data.mapsLink) setMapsLink(data.mapsLink)
       // Geoportal = endereço oficial do DF -> sobrescreve o palpite das pistas; place-name só preenche se vazio
       if (data.endereco && (data.source === 'geoportal' || !endereco.trim())) setEndereco(data.endereco)
+      setFonte(data.source ?? null)  // marca a confiança para o gate de auto-envio ao cartório
     } catch { /* ignore */ } finally {
       setResolving(false)
     }
@@ -173,6 +175,7 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
 
   useEffect(() => {
     setDescricao(null)
+    setFonte(null)
     fetch(`/api/triagem/detalhe?link=${encodeURIComponent(item.link)}`)
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.descricao) setDescricao(d.descricao) })
@@ -192,8 +195,8 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
   ].filter(f => pistas[f.key])
 
   const canSave = !saving && !!endereco.trim()
-  const approve = async () => { setSaving(true); await onApprove(item, { endereco, mapsLink }); setSaving(false) }
-  const visitar = async () => { setSaving(true); await onVisitar(item, { endereco, mapsLink }); setSaving(false) }
+  const approve = async () => { setSaving(true); await onApprove(item, { endereco, mapsLink, fonte }); setSaving(false) }
+  const visitar = async () => { setSaving(true); await onVisitar(item, { endereco, mapsLink, fonte }); setSaving(false) }
   const discard = async () => { setSaving(true); await onDiscard(item); setSaving(false) }
   const fsbo = classifyAnunciante(item)
 
@@ -723,7 +726,7 @@ export function TriagemClient() {
   const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
   const reviewIdx = reviewItem ? filtered.findIndex(i => i.link === reviewItem.link) : -1
 
-  const updateStatus = async (item: Imovel, status: string, extra: { endereco?: string; maps_link?: string } = {}) => {
+  const updateStatus = async (item: Imovel, status: string, extra: { endereco?: string; maps_link?: string; endereco_fonte?: string } = {}) => {
     try {
       const res = await fetch('/api/triagem', {
         method: 'PATCH',
@@ -746,8 +749,8 @@ export function TriagemClient() {
     return true
   }
 
-  const handleApprove = async (item: Imovel, data: { endereco: string; mapsLink: string }) => {
-    const ok = await updateStatus(item, 'aprovado', { endereco: data.endereco || undefined, maps_link: data.mapsLink || undefined })
+  const handleApprove = async (item: Imovel, data: { endereco: string; mapsLink: string; fonte?: string | null }) => {
+    const ok = await updateStatus(item, 'aprovado', { endereco: data.endereco || undefined, maps_link: data.mapsLink || undefined, endereco_fonte: data.fonte ?? undefined })
     if (!ok) return
     setReviewItem(null)
     // Cria card no Pipefy em background — não bloqueia UI
@@ -772,8 +775,8 @@ export function TriagemClient() {
       }
     }).catch(() => { /* silencioso — triagem já foi atualizada */ })
   }
-  const handleVisitar = async (item: Imovel, data: { endereco: string; mapsLink: string }) => {
-    const ok = await updateStatus(item, 'para_visitar', { endereco: data.endereco || undefined, maps_link: data.mapsLink || undefined })
+  const handleVisitar = async (item: Imovel, data: { endereco: string; mapsLink: string; fonte?: string | null }) => {
+    const ok = await updateStatus(item, 'para_visitar', { endereco: data.endereco || undefined, maps_link: data.mapsLink || undefined, endereco_fonte: data.fonte ?? undefined })
     if (ok) setReviewItem(null)
   }
   const handleDiscard = async (item: Imovel) => {

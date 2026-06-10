@@ -57,14 +57,14 @@ export async function GET() {
 }
 
 export async function PATCH(req: NextRequest) {
-  let body: { link?: string; portal?: string; status?: string; endereco?: string; maps_link?: string }
+  let body: { link?: string; portal?: string; status?: string; endereco?: string; maps_link?: string; endereco_fonte?: string }
   try {
     body = await req.json()
   } catch {
     return Response.json({ error: 'Body inválido' }, { status: 400 })
   }
 
-  const { link, portal, status, endereco, maps_link } = body
+  const { link, portal, status, endereco, maps_link, endereco_fonte } = body
 
   if (!link || !portal || !status) {
     return Response.json({ error: 'link, portal e status são obrigatórios' }, { status: 400 })
@@ -86,13 +86,13 @@ export async function PATCH(req: NextRequest) {
       const geo = parseLatLng(maps_link)
       if (geo) {
         await sql.unsafe(
-          `UPDATE public."${table}" SET status_triagem=$1, endereco=$2, maps_link=$3, lat=$4, lng=$5, geocoded_em=NOW() WHERE link=$6`,
-          [status, endereco ?? null, maps_link, geo.lat, geo.lng, link],
+          `UPDATE public."${table}" SET status_triagem=$1, endereco=$2, maps_link=$3, lat=$4, lng=$5, geocoded_em=NOW(), endereco_fonte=$6 WHERE link=$7`,
+          [status, endereco ?? null, maps_link, geo.lat, geo.lng, endereco_fonte ?? null, link],
         )
       } else {
         await sql.unsafe(
-          `UPDATE public."${table}" SET status_triagem=$1, endereco=$2, maps_link=$3 WHERE link=$4`,
-          [status, endereco ?? null, maps_link, link],
+          `UPDATE public."${table}" SET status_triagem=$1, endereco=$2, maps_link=$3, endereco_fonte=$4 WHERE link=$5`,
+          [status, endereco ?? null, maps_link, endereco_fonte ?? null, link],
         )
       }
     } else {

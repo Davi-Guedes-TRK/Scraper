@@ -23,12 +23,13 @@ type RelatorioRow = {
   creci: string | null
   numero_matricula: string | null
   status_solicitacao_em: string | null
+  endereco_fonte: string | null
 }
 
 export async function GET() {
   const rows = await sql<RelatorioRow[]>`
     SELECT link, portal, titulo, bairro, cidade, preco, coletado_em, descricao,
-           pistas_ia, status_solicitacao, status_solicitacao_em, endereco, maps_link, visitado_em,
+           pistas_ia, status_solicitacao, status_solicitacao_em, endereco, endereco_fonte, maps_link, visitado_em,
            nome_anunciante, telefone, tipo_anunciante, tipo_imovel, creci,
            numero_matricula
     FROM imoveis_todos
