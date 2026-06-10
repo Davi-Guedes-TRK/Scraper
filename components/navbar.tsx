@@ -96,6 +96,16 @@ const NAV_GROUPS = [
           </svg>
         ),
       },
+      {
+        href: '/busca-pessoa',
+        label: 'Busca Pessoa',
+        icon: (
+          <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+            <circle cx="11" cy="11" r="7" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 8a3 3 0 100 6 3 3 0 000-6z" />
+          </svg>
+        ),
+      },
     ],
   },
   {
