@@ -103,7 +103,8 @@ export async function criarCardOportunidade(imovel: ImovelParaCard): Promise<Car
   if (imovel.maps_link)        fields.push({ field_id: 'link_de_localiza_o',  field_value: String(imovel.maps_link) })
   if (bairroNorm)              fields.push({ field_id: 'bairro_1',            field_value: bairroNorm })
   if (tipoNorm)                fields.push({ field_id: 'tipo_de_im_vel_1',    field_value: tipoNorm })
-  if (imovel.numero_matricula) fields.push({ field_id: 'matr_cula',           field_value: String(imovel.numero_matricula) })
+  if (imovel.numero_matricula) fields.push({ field_id: 'matr_cula_1',          field_value: String(imovel.numero_matricula) })
+  fields.push({ field_id: 'tem_cadastro_no_nido', field_value: 'Não' })
 
   const mutation = `
     mutation CreateCard($input: CreateCardInput!) {
