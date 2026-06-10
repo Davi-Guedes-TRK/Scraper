@@ -139,3 +139,60 @@ export async function consultarLotePorPonto(lat: number, lng: number): Promise<W
     bruto: mais_proximo,
   }
 }
+
+// ── PoC: candidatos de lote para um endereço impreciso ───────────────────────────
+// Diferente de consultarLotePorPonto (1 lote), retorna TODOS os lotes plausíveis
+// para depois ranquear por features (área, endereço — e, no futuro, piscina/visão).
+
+export type Candidato = {
+  lote: LoteRegistrado
+  endereco: string | null     // end_siturb || end_usual || end_cart
+  centro: [number, number]    // [lng, lat] do centroide
+  distancia_m: number | null  // distância ao ponto de referência (se houver)
+}
+
+export async function buscarCandidatos(opts: {
+  lat?: number; lng?: number
+  quadra?: string | null; conjunto?: string | null; setor?: string | null
+  limite?: number
+}): Promise<Candidato[]> {
+  const limite = opts.limite ?? 40
+  let features: WfsFeature[] = []
+
+  if (opts.lat != null && opts.lng != null) {
+    // Ponto conhecido → bbox ~150m, todos os lotes ao redor são candidatos
+    const deg = 0.0014
+    const r = await wfsQuery({
+      maxFeatures: String(limite),
+      bbox: `${opts.lng - deg},${opts.lat - deg},${opts.lng + deg},${opts.lat + deg}`,
+    })
+    features = r.features ?? []
+  } else if (opts.quadra || opts.conjunto || opts.setor) {
+    // Sem ponto → filtra por atributo (quadra/conjunto/setor) via CQL
+    const esc = (s: string) => s.replace(/'/g, "''").trim()
+    const clauses: string[] = []
+    if (opts.quadra)   clauses.push(`quadra ILIKE '${esc(opts.quadra)}'`)
+    if (opts.conjunto) clauses.push(`conjunto ILIKE '${esc(opts.conjunto)}'`)
+    if (opts.setor)    clauses.push(`setor ILIKE '%${esc(opts.setor)}%'`)
+    if (!clauses.length) return []
+    const r = await wfsQuery({ maxFeatures: String(limite), CQL_FILTER: clauses.join(' AND ') })
+    features = r.features ?? []
+  } else {
+    return []
+  }
+
+  const ref: [number, number] | null =
+    opts.lat != null && opts.lng != null ? [opts.lng, opts.lat] : null
+
+  return features.map(f => {
+    const centro = centroide(f.geometry)
+    // sqrt(graus²)×111_000 ≈ metros (aprox. suficiente para ranquear)
+    const distancia_m = ref ? Math.round(Math.sqrt(distancia2(ref, centro)) * 111_000) : null
+    return {
+      lote: f.properties,
+      endereco: escolherSiturb(f.properties) ?? escolherCart(f.properties),
+      centro,
+      distancia_m,
+    }
+  })
+}
