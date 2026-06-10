@@ -69,3 +69,50 @@ export function matchCartorioReply(text: string, candidates: Candidate[]): Reply
     return { matricula: e.matricula, address: e.address, candidate: bestScore > 0 ? best : null }
   })
 }
+
+// ── Correlação determinística por REF (1 email por imóvel) ───────────────────────
+// Cada solicitação leva uma ref curta e estável (derivada do link) no ASSUNTO.
+// A resposta do cartório mantém "Re: ... [#REF]", então casamos pela ref — sem
+// matching fuzzy de endereço. A ref é computada (não persistida): o inbound
+// recalcula a ref de cada imóvel aguardando e compara.
+
+/** Hash determinístico (djb2) → 6 chars base36 maiúsculo. Estável para o mesmo link. */
+export function refForLink(link: string): string {
+  let h = 5381
+  for (let i = 0; i < link.length; i++) {
+    h = ((h << 5) + h + link.charCodeAt(i)) >>> 0  // h*33 + c, unsigned
+  }
+  return h.toString(36).toUpperCase().padStart(6, '0').slice(-6)
+}
+
+/** Formato da ref no assunto/corpo do e-mail: "[#A1B2C3]". */
+export function refTag(link: string): string {
+  return `[#${refForLink(link)}]`
+}
+
+/** Extrai a ref de um assunto de resposta ("Re: ... [#A1B2C3]"). */
+export function parseRefFromSubject(subject: string | null | undefined): string | null {
+  if (!subject) return null
+  const m = subject.match(/\[#\s*([A-Z0-9]{4,8})\s*\]/i)
+  return m ? m[1].toUpperCase() : null
+}
+
+/** Extrai o número da matrícula do texto da resposta (1 imóvel por e-mail).
+ *  Prioriza número próximo da palavra "matrícula"; senão, a maior sequência 4-9 dígitos. */
+export function parseMatriculaFromText(text: string | null | undefined): string | null {
+  if (!text) return null
+  const limpo = text.replace(/\r/g, '')
+  // 1) primeiro número após a palavra "matrícula" — tolera "do imóvel é", "nº", ":",
+  //    e aceita separador de milhar (145.678). [^\d]{0,30} pula o texto até o número.
+  const labeled = limpo.match(/matr[íi]cula[^\d]{0,30}(\d{1,3}(?:\.\d{3})+|\d{4,12})/i)
+  if (labeled) {
+    const d = labeled[1].replace(/\D/g, '')
+    if (d.length >= 4) return d
+  }
+  // 2) fallback sem palavra-chave: maior número 4-9 dígitos (aceita 145.678)
+  const nums = (limpo.match(/\d{1,3}(?:\.\d{3})+|\d{4,9}/g) ?? [])
+    .map(n => n.replace(/\D/g, ''))
+    .filter(n => n.length >= 4)
+  if (!nums.length) return null
+  return nums.sort((a, b) => b.length - a.length)[0]
+}

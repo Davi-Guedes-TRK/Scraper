@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import sql from '@/lib/db'
 import { portalTable, portalKeys } from '@/lib/portals'
-import { matchCartorioReply, formatEndereco } from '@/lib/cartorio'
+import { matchCartorioReply, formatEndereco, refForLink, parseRefFromSubject, parseMatriculaFromText } from '@/lib/cartorio'
 import { criarCardOportunidade, type ImovelParaCard } from '@/lib/pipefy'
 import { log } from '@/lib/logger'
 
@@ -108,8 +108,30 @@ export async function POST(req: NextRequest) {
     endereco: formatEndereco(it),
   }))
 
-  const matches   = matchCartorioReply(text, candidates)
-  const casados   = matches.filter(m => m.candidate !== null)
+  // Correlação: com 1 e-mail por imóvel, a ref no assunto ("Re: ... [#REF]")
+  // identifica o imóvel de forma determinística. Fallback fuzzy por endereço
+  // cobre e-mails antigos (lista numerada) ou assuntos sem ref.
+  type Casado = { matricula: string; address: string; candidate: typeof candidates[number] }
+  const ref          = parseRefFromSubject(subject)
+  const refCandidate = ref ? (candidates.find(c => refForLink(c.link) === ref) ?? null) : null
+  const refMatricula = parseMatriculaFromText(text)
+
+  let casados: Casado[]
+  let metodo: 'ref' | 'fuzzy'
+  let entradas: number
+
+  if (refCandidate && refMatricula) {
+    metodo   = 'ref'
+    entradas = 1
+    casados  = [{ matricula: refMatricula, address: refCandidate.endereco, candidate: refCandidate }]
+  } else {
+    metodo        = 'fuzzy'
+    const matches = matchCartorioReply(text, candidates)
+    entradas      = matches.length
+    casados       = matches.filter(m => m.candidate !== null).map(m => ({
+      matricula: m.matricula, address: m.address, candidate: m.candidate!,
+    }))
+  }
 
   // 1. Salva matrículas
   await salvarMatriculas(casados.map(m => ({
@@ -143,10 +165,10 @@ export async function POST(req: NextRequest) {
   const cardsPulados = cards.filter(c => c.skipped).length
 
   await log('info', 'cartorio-inbound', 'Resposta do cartório processada', {
-    from, subject,
-    entradas:    matches.length,
+    from, subject, metodo,
+    entradas,
     casadas:     casados.length,
-    semMatch:    matches.length - casados.length,
+    semMatch:    entradas - casados.length,
     cardsCriados,
     cardsPulados,
     cardsComErro: cards.filter(c => c.error).length,
@@ -154,8 +176,9 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     ok:          casados.length > 0,
+    metodo,
     matched:     casados.length,
-    unmatched:   matches.length - casados.length,
+    unmatched:   entradas - casados.length,
     cardsCriados,
     cardsPulados,
     details: casados.map(m => ({

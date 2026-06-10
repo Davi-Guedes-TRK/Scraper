@@ -1,7 +1,7 @@
 // TRK Imoveis - Cartorio: envia e recebe e-mail do 2o Oficio
 // Cole este arquivo inteiro no Google Apps Script (script.google.com)
 
-var WEBHOOK_URL    = 'https://SEU-APP.vercel.app/api/cartorio/inbound';
+var WEBHOOK_URL    = 'https://erp-trk.vercel.app/api/cartorio/inbound';
 var WEBHOOK_TOKEN  = '2f68948e90f9bca3f205eb15ca86cde0124c45be22d08a3b7996e0021bccd067';
 var APPS_SECRET    = 'trk-cartorio-2024';
 var CARTORIO_EMAIL = 'certidao.onus@2ridf.com.br';

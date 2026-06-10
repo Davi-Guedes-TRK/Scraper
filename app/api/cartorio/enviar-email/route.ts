@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import sql from '@/lib/db'
 import { portalTable, portalKeys } from '@/lib/portals'
 import { oficioFor } from '@/lib/oficios'
-import { formatEndereco } from '@/lib/cartorio'
+import { formatEndereco, refTag } from '@/lib/cartorio'
 import { log } from '@/lib/logger'
 
 // O envio real acontece via Google Apps Script (GmailApp.sendEmail).
@@ -17,22 +17,17 @@ type ImovelRow = {
   bairro: string | null; titulo: string | null; maps_link: string | null; cidade: string | null
 }
 
-function buildBody(imoveis: ImovelRow[]): string {
-  const lista = imoveis.map((it, i) => {
-    const maps = it.maps_link ? `\n   ${it.maps_link}` : ''
-    return `${i + 1}. ${formatEndereco(it)}${maps}`
-  }).join('\n\n')
-  return `Olá! Sou da TRK Imóveis. Gostaria de solicitar o número da matrícula dos seguintes imóveis:
+// 1 e-mail por imóvel. A ref no ASSUNTO é a chave de correlação na volta
+// (o cartório responde "Re: ... [#REF]" → o inbound casa pela ref, sem fuzzy).
+function buildBody(it: ImovelRow): string {
+  const maps = it.maps_link ? `\n${it.maps_link}` : ''
+  return `Olá! Sou da TRK Imóveis. Gostaria de solicitar o número da matrícula do seguinte imóvel:
 
-${lista}
+${formatEndereco(it)}${maps}
 
-Por favor, responda informando o número da matrícula de cada imóvel no seguinte formato:
+Por favor, responda informando apenas o número da matrícula.
 
-  Endereço - [número da matrícula]
-
-Exemplo:
-  SQN 312 Bloco B Apto 204 - 123456
-
+Ref.: ${refTag(it.link)}
 Obrigado!`
 }
 
@@ -74,44 +69,44 @@ export async function POST(req: NextRequest) {
   }
   if (!imoveis.length) return NextResponse.json({ error: 'Nenhum imóvel encontrado' }, { status: 404 })
 
-  const groups = new Map<string, { email: string; nome: string; rows: ImovelRow[] }>()
+  // 1 e-mail por imóvel, roteado pelo ofício de canal e-mail (2º Ofício).
+  const results: Array<{ link: string; oficio?: string; ok: boolean; error?: string }> = []
+
   for (const it of imoveis) {
     const of = oficioFor(it.cidade) ?? oficioFor(it.bairro)
-    if (!of || of.canal !== 'email') continue
-    if (!groups.has(of.contato)) groups.set(of.contato, { email: of.contato, nome: of.nome, rows: [] })
-    groups.get(of.contato)!.rows.push(it)
-  }
-  if (!groups.size) {
-    return NextResponse.json({ error: 'Nenhum imóvel pertence a ofício com canal e-mail' }, { status: 422 })
-  }
+    if (!of || of.canal !== 'email') {
+      results.push({ link: it.link, ok: false, error: 'sem ofício de e-mail para a região' })
+      continue
+    }
+    if (!portalKeys.includes(it.portal)) {
+      results.push({ link: it.link, ok: false, error: `portal desconhecido: ${it.portal}` })
+      continue
+    }
 
-  const results: Array<{ oficio: string; enviado: number; error?: string }> = []
-
-  for (const { email, nome, rows } of groups.values()) {
-    const n = rows.length
-    const subject = `Solicitação de matrícula — TRK Imóveis (${n} imóvel${n > 1 ? 'is' : ''})`
-    const { ok, error } = await enviarViaAppsScript(email, subject, buildBody(rows))
+    const subject = `Solicitação de matrícula — TRK Imóveis ${refTag(it.link)}`
+    const { ok, error } = await enviarViaAppsScript(of.contato, subject, buildBody(it))
 
     if (ok) {
-      const byPortal: Record<string, string[]> = {}
-      for (const it of rows) {
-        if (portalKeys.includes(it.portal)) (byPortal[it.portal] ??= []).push(it.link)
-      }
-      await Promise.all(
-        Object.entries(byPortal).map(([p, ls]) =>
-          sql.unsafe(`UPDATE public."${portalTable(p)}" SET status_solicitacao='enviado' WHERE link = ANY($1)`, [ls])
+      try {
+        await sql.unsafe(
+          `UPDATE public."${portalTable(it.portal)}"
+              SET status_solicitacao='enviado', status_solicitacao_em=NOW()
+            WHERE link=$1`,
+          [it.link],
         )
-      )
-      results.push({ oficio: nome, enviado: n })
+        results.push({ link: it.link, oficio: of.nome, ok: true })
+      } catch (err) {
+        results.push({ link: it.link, oficio: of.nome, ok: false, error: `enviado mas falha ao gravar status: ${err instanceof Error ? err.message : err}` })
+      }
     } else {
-      results.push({ oficio: nome, enviado: 0, error })
+      results.push({ link: it.link, oficio: of.nome, ok: false, error })
     }
   }
 
-  const totalEnviado = results.reduce((s, r) => s + r.enviado, 0)
-  await log('info', 'cartorio-email', totalEnviado ? 'E-mails enviados' : 'Falha ao enviar', {
-    links: links.length, totalEnviado, results,
+  const totalEnviado = results.filter(r => r.ok).length
+  await log('info', 'cartorio-email', totalEnviado ? 'E-mails enviados (1 por imóvel)' : 'Falha ao enviar', {
+    pedidos: links.length, totalEnviado, falhas: results.length - totalEnviado,
   }).catch(() => {})
 
-  return NextResponse.json({ ok: totalEnviado > 0, results, totalEnviado })
+  return NextResponse.json({ ok: totalEnviado > 0, totalEnviado, results })
 }
