@@ -208,10 +208,10 @@ export function FunilInquilinosClient() {
 
       <div className="grid gap-2.5" style={{ gridTemplateColumns: '14fr 10fr' }}>
         <PanelCard title="Demanda por Região">
-          <ResponsiveContainer width="100%" height={210}>
-            <BarChart data={data?.porRegiao ?? []} margin={{ left: 4, right: 12, top: 4, bottom: 40 }}>
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={data?.porRegiao ?? []} margin={{ left: 4, right: 12, top: 4, bottom: 64 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-              <XAxis dataKey="regiao" tick={{ fontSize: 9 }} tickLine={false} angle={-30} textAnchor="end" interval={0} />
+              <XAxis dataKey="regiao" tick={{ fontSize: 9 }} tickLine={false} angle={-45} textAnchor="end" interval={0} height={64} tickFormatter={(v: string) => v && v.length > 12 ? v.slice(0, 11) + '…' : v} />
               <YAxis tick={{ fontSize: 9 }} tickLine={false} axisLine={false} />
               <Tooltip />
               <Legend wrapperStyle={{ fontSize: 10 }} />
@@ -222,10 +222,10 @@ export function FunilInquilinosClient() {
           </ResponsiveContainer>
         </PanelCard>
         <PanelCard title="Demanda por Tipo">
-          <ResponsiveContainer width="100%" height={210}>
-            <BarChart data={data?.porTipo ?? []} margin={{ left: 4, right: 12, top: 4, bottom: 40 }}>
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={data?.porTipo ?? []} margin={{ left: 4, right: 12, top: 4, bottom: 64 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-              <XAxis dataKey="tipo" tick={{ fontSize: 9 }} tickLine={false} angle={-30} textAnchor="end" interval={0} />
+              <XAxis dataKey="tipo" tick={{ fontSize: 9 }} tickLine={false} angle={-45} textAnchor="end" interval={0} height={64} tickFormatter={(v: string) => v && v.length > 12 ? v.slice(0, 11) + '…' : v} />
               <YAxis tick={{ fontSize: 9 }} tickLine={false} axisLine={false} />
               <Tooltip />
               <Legend wrapperStyle={{ fontSize: 10 }} />
