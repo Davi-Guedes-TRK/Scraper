@@ -149,6 +149,10 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
   const [descricao, setDescricao] = useState<string | null>(null)
   const [resolving, setResolving] = useState(false)
   const [fonte, setFonte] = useState<string | null>(null)  // confiança do endereço: 'geoportal' | 'maps' | null
+  type CandGeo = { endereco: string | null; score: number; loteMatch: boolean; lote: { area_proj: number | null; end_cart: string | null } }
+  const [candidatos, setCandidatos] = useState<CandGeo[]>([])
+  const [candConf, setCandConf] = useState<string | null>(null)
+  const [buscandoCand, setBuscandoCand] = useState(false)
 
   const MAPS_RE = /maps\.app\.goo\.gl\/|(?:www\.)?google\.com\/maps/
 
@@ -176,10 +180,33 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
   useEffect(() => {
     setDescricao(null)
     setFonte(null)
+    setCandidatos([]); setCandConf(null)
     fetch(`/api/triagem/detalhe?link=${encodeURIComponent(item.link)}`)
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.descricao) setDescricao(d.descricao) })
       .catch(() => {})
+
+    // Candidatos do Geoportal a partir das pistas DO PRÓPRIO anúncio
+    const p = (item.pistas_ia ?? {}) as Record<string, unknown>
+    const quadra = (p.quadra as string) || ''
+    const conjunto = (p.conjunto as string) || ''
+    if (quadra || conjunto) {
+      setBuscandoCand(true)
+      fetch('/api/geoportal/candidatos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          quadra:    quadra || undefined,
+          conjunto:  conjunto || undefined,
+          casa_lote: (p.casa_lote as string) || undefined,
+          area_m2:   item.area_m2 ? parseFloat(String(item.area_m2).replace(',', '.')) : undefined,
+        }),
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(j => { if (j) { setCandidatos((j.candidatos ?? []).slice(0, 6)); setCandConf(j.confianca ?? null) } })
+        .catch(() => {})
+        .finally(() => setBuscandoCand(false))
+    }
   }, [item.link])
 
   const preco = parsePreco(item.preco)
@@ -298,6 +325,44 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
                     {((pistas as Record<string, string[]>).pontos_referencia).join(' · ')}
                   </p>
               )}
+            </div>
+          )}
+
+          {(buscandoCand || candidatos.length > 0) && (
+            <div className="rounded-lg p-2.5 border" style={{ background: 'color-mix(in srgb, var(--chart-1) 7%, var(--card))', borderColor: 'color-mix(in srgb, var(--chart-1) 30%, transparent)' }}>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <p className="text-[9px] font-bold uppercase tracking-wider font-mono" style={{ color: 'var(--chart-1)' }}>Candidatos do Geoportal</p>
+                {candConf && (
+                  <span className={`text-[8px] px-1 py-0.5 rounded font-mono font-bold uppercase leading-none ${
+                    candConf === 'alta' ? 'bg-green-100 text-green-700' :
+                    candConf === 'media' ? 'bg-amber-100 text-amber-700' : 'bg-zinc-100 text-zinc-500'
+                  }`}>{candConf}</span>
+                )}
+                {buscandoCand && (
+                  <svg className="w-3 h-3 animate-spin text-muted-foreground ml-auto" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                  </svg>
+                )}
+              </div>
+              <div className="flex flex-col gap-1">
+                {candidatos.map((c, i) => {
+                  const end = c.endereco ?? c.lote.end_cart
+                  const sel = !!end && endereco === end && fonte === 'geoportal'
+                  return (
+                    <button key={i} onClick={() => { if (end) { setEndereco(end); setFonte('geoportal') } }}
+                      className={`w-full text-left rounded-md px-2 py-1.5 border transition-colors ${sel ? 'border-[var(--chart-1)] bg-[var(--chart-1)]/10' : 'border-border hover:bg-muted'}`}>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] text-foreground font-medium truncate flex-1">{end ?? '—'}</span>
+                        {c.loteMatch && <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-green-100 text-green-700 shrink-0 leading-none">lote ✓</span>}
+                        <span className="text-[10px] font-bold tabular-nums shrink-0" style={{ color: 'var(--chart-1)' }}>{Math.round(c.score * 100)}%</span>
+                      </div>
+                      {c.lote.area_proj != null && <span className="text-[9px] text-muted-foreground font-mono">{c.lote.area_proj}m²</span>}
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="text-[9px] text-muted-foreground/60 mt-1.5">clique para preencher o endereço (marca confiança Geoportal)</p>
             </div>
           )}
 
