@@ -46,7 +46,7 @@ REGIAO_OFICIO = {
     1: ['asa sul', 'lago sul', 'sudoeste', 'cruzeiro', 'octogonal', 'setor grafico sul'],
     2: ['asa norte', 'paranoa', 'jardim botanico', 'lago norte', 'sof norte'],
     3: ['taguatinga', 'aguas claras', 'samambaia', 'recanto'],
-    4: ['guara', 'nucleo bandeirante', 'candangolandia', 'riacho fundo', 'setor de industria', 'smpw'],
+    4: ['guara', 'nucleo bandeirante', 'candangolandia', 'riacho fundo', 'setor de industria', 'smpw', 'park way', 'park sul'],
 }
 def cartorio_for(bairro):
     b = _norm(bairro)
@@ -115,7 +115,8 @@ def fill_form(page, rec, log):
     pick(page,      "Cartório",      rec["cartorio"],      log)
     pick(page,      "Finalidade",    rec["finalidade"],    log)
     pick_radio(page,                 rec["empresa"],       log)
-    log.append("  ⤷ PULADOS de propósito: Código do Imóvel NIDO, Código da Proposta no NIDO")
+    fill_text(page, "Código do Im",  "0",                  log)  # Código do Imóvel NIDO — obrigatório, sem código real
+    log.append("  ⤷ PULADO de propósito: Código da Proposta no NIDO")
 
 def _load_db_url():
     """Tenta .env.local primeiro, cai para .env (mesmo formato KEY=VALUE)."""
@@ -129,6 +130,61 @@ def _load_db_url():
             if m:
                 return m.group(1).strip().strip('"').strip("'")
     raise SystemExit("DATABASE_URL não encontrado em .env.local nem .env")
+
+def load_from_pipefy():
+    """Lê do Pipefy todos os cards em 'Informações Básicas' sem proprietário e com matrícula."""
+    import requests
+    tok_file = ROOT / "credentials" / "pipefy_token.txt"
+    if not tok_file.exists():
+        raise SystemExit("[ERRO] credentials/pipefy_token.txt não encontrado. Rode pipefy_token_refresh.py.")
+    token = tok_file.read_text(encoding="utf-8").strip()
+
+    res = requests.post("https://api.pipefy.com/graphql",
+        json={"query": """
+          query {
+            pipe(id: 307179010) {
+              phases {
+                name
+                cards(first: 50) {
+                  edges { node { id title fields { name value } } }
+                }
+              }
+            }
+          }
+        """},
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        timeout=20).json()
+
+    if "errors" in res:
+        raise SystemExit(f"[ERRO] Pipefy GraphQL: {res['errors']}")
+
+    recs = []
+    for phase in res["data"]["pipe"]["phases"]:
+        if "nforma" not in phase["name"].lower():
+            continue
+        for edge in phase["cards"]["edges"]:
+            card = edge["node"]
+            fields = {f["name"]: (f["value"] or "").strip() for f in card["fields"]}
+
+            prop = fields.get("Nome do Proprietário", "")
+            mat  = re.sub(r"\.0$", "", fields.get("Matrícula", "").strip())
+            if prop or not mat:
+                continue   # tem proprietário ou não tem matrícula → pula
+
+            # Endereço — prefere campo Endereço, cai para título (sem o sufixo duplicado do DFImóveis)
+            endereco = fields.get("Endereço", "") or re.split(r" — ", card["title"])[0].strip()
+            bairro   = fields.get("Bairro", "")
+
+            recs.append({**DEFAULTS,
+                "endereco":      endereco,
+                "regiao_bairro": bairro,
+                "matricula":     mat,
+                "cartorio":      cartorio_for(bairro),
+                "_card_id":      card["id"],
+            })
+
+    return recs
+
 
 def load_from_db(limit=None):
     import psycopg2
@@ -158,19 +214,32 @@ def load_from_db(limit=None):
 def main():
     flags = [a for a in sys.argv[1:] if a.startswith("--")]
     args  = [a for a in sys.argv[1:] if not a.startswith("--")]
-    submit, headful, from_db = "--submit" in flags, "--headful" in flags, "--from-db" in flags
+    submit      = "--submit"       in flags
+    headful     = "--headful"      in flags
+    from_db     = "--from-db"      in flags
+    from_pipefy = "--from-pipefy"  in flags
 
-    if from_db:
+    if from_pipefy:
+        recs = load_from_pipefy()
+        print(f"[from-pipefy] {len(recs)} card(s) sem proprietário e com matrícula em 'Informações Básicas'.")
+        if not recs:
+            print("  → Nenhum card elegível encontrado.")
+            return
+        print("  Lista:")
+        for i, r in enumerate(recs): print(f"   {i+1:>3}. matr {r['matricula']:<10} | {r['endereco']} | {r['regiao_bairro']}")
+        if not submit:
+            print("\n  → DRY-RUN: abrindo preview de todos (sem enviar)...")
+    elif from_db:
         limit = next((int(a) for a in args if a.isdigit()), None)
         recs = load_from_db(limit)
         print(f"[from-db] {len(recs)} imóvel(is) com matrícula preenchida (≠ N/A).")
         if not recs:
-            print("  → Nada a preencher. Preencha as matrículas no relatório do Velvet ('Preencher matrículas') e rode de novo.")
+            print("  → Nada a preencher.")
             return
         if not submit:
             print("  Lista que SERIA preenchida (preview do 1º; nada enviado):")
             for i, r in enumerate(recs): print(f"   {i+1:>3}. matr {r['matricula']:<10} | {r['endereco']} | {r['regiao_bairro']}")
-            recs = recs[:1]  # sem --submit, só pré-visualiza o primeiro
+            recs = recs[:1]
     else:
         data = json.loads(Path(args[0]).read_bytes().decode("utf-8", "replace")) if args and Path(args[0]).exists() else {}
         if not data: print("[dry] sem JSON -> amostra [TESTE], não envio.")

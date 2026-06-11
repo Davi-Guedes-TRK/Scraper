@@ -26,7 +26,7 @@ export const OFICIOS: Oficio[] = [
   },
   {
     nome: '4º Ofício', canal: 'telefone', contato: '5561910184400',
-    regioes: ['Guará', 'Núcleo Bandeirante', 'Candangolândia', 'Riacho Fundo', 'Setor de Indústria', 'SMPW'],
+    regioes: ['Guará', 'Núcleo Bandeirante', 'Candangolândia', 'Riacho Fundo', 'Setor de Indústria', 'SMPW', 'Park Way', 'Park Sul'],
   },
 ]
 
