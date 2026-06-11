@@ -1,0 +1,38 @@
+name: Auto 2º Ofício (cartório)
+
+# Dispara a PoC do Geoportal → gate de envio. Por padrão SIMULA (dryRun) — não
+# manda e-mail. Depois de validar algumas rodadas, descomente o schedule abaixo.
+on:
+  workflow_dispatch:
+    inputs:
+      dryRun:
+        description: 'Simular (não envia e-mail ao cartório)'
+        type: boolean
+        default: true
+      limite:
+        description: 'Máx. imóveis a processar por rodada'
+        default: '20'
+  # schedule:
+  #   - cron: '0 17 * * *'   # 14:00 BRT — habilitar SÓ após validar as simulações
+
+concurrency:
+  group: auto-cartorio-2oficio
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Disparar /api/cartorio/auto
+        env:
+          API_KEY: ${{ secrets.SCRAPER_API_KEY }}
+          DRY_RUN: ${{ github.event.inputs.dryRun || 'true' }}
+          LIMITE:  ${{ github.event.inputs.limite || '20' }}
+        run: |
+          echo "dryRun=$DRY_RUN limite=$LIMITE"
+          curl -fsS -X POST "https://erp-trk.vercel.app/api/cartorio/auto" \
+            -H "x-api-key: $API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{\"dryRun\": $DRY_RUN, \"limite\": $LIMITE}" | tee resposta.json
+          echo ""

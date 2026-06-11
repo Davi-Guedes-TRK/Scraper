@@ -11,6 +11,8 @@ export type LogOrigem =
   | 'relatorio'
   | 'cartorio-inbound'
   | 'cartorio-email'
+  | 'cartorio-auto'
+  | 'gchat'
   | 'gemini'
   | 'redis'
   | 'sistema'
