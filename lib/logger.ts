@@ -12,6 +12,7 @@ export type LogOrigem =
   | 'cartorio-inbound'
   | 'cartorio-email'
   | 'cartorio-auto'
+  | 'pipefy-webhook'
   | 'gchat'
   | 'gemini'
   | 'redis'
