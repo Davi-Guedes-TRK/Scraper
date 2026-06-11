@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { classifyAnunciante, parsePreco, fmtBRL, timeAgo, allImgs, dedupKey, startOfToday } from '@/lib/formatters'
 import { portalLabel } from '@/lib/portals'
+import { parseEnderecoDF } from '@/lib/endereco-df'
 import { PortalBadge } from '@/components/portal-badge'
 import { MatriculaModal } from './matricula-modal'
 
@@ -186,20 +187,20 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
       .then(d => { if (d?.descricao) setDescricao(d.descricao) })
       .catch(() => {})
 
-    // Candidatos do Geoportal a partir das pistas DO PRÓPRIO anúncio
-    const p = (item.pistas_ia ?? {}) as Record<string, unknown>
-    const quadra = (p.quadra as string) || ''
-    const conjunto = (p.conjunto as string) || ''
-    if (quadra || conjunto) {
+    // Candidatos do Geoportal a partir do COMEÇO DE ENDEREÇO do próprio anúncio
+    // (bairro/título do DFImóveis/Chaves trazem "QR 516 Conjunto 17" etc.)
+    const txt = `${item.bairro ?? ''} ${item.titulo ?? ''}`.trim()
+    const { quadra, casa_lote } = parseEnderecoDF(txt)
+    if (quadra) {
       setBuscandoCand(true)
       fetch('/api/geoportal/candidatos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          quadra:    quadra || undefined,
-          conjunto:  conjunto || undefined,
-          casa_lote: (p.casa_lote as string) || undefined,
-          area_m2:   item.area_m2 ? parseFloat(String(item.area_m2).replace(',', '.')) : undefined,
+          quadra,
+          casa_lote,
+          endereco: txt,  // texto do anúncio → o scorer credita conjunto/tokens
+          area_m2: item.area_m2 ? parseFloat(String(item.area_m2).replace(',', '.')) : undefined,
         }),
       })
         .then(r => r.ok ? r.json() : null)
