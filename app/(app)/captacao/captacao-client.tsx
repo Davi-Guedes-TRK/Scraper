@@ -55,6 +55,7 @@ export function CaptacaoClient({ leads }: { leads: Lead[] }) {
   const [q, setQ] = useState('')
   const [bairro, setBairro] = useState(ALL)
   const [tipo, setTipo] = useState(ALL)
+  const [tempo, setTempo] = useState(ALL)
   const [fechados, setFechados] = useState<Set<string>>(new Set())
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [saving, setSaving] = useState(false)
@@ -72,13 +73,22 @@ export function CaptacaoClient({ leads }: { leads: Lead[] }) {
     return leads.filter(l => {
       if (bairro !== ALL && l.bairro !== bairro) return false
       if (tipo !== ALL && l.tipo_imovel !== tipo) return false
+      if (tempo !== ALL) {
+        const d = l.dias_inativo ?? -1
+        if (tempo === '0-12') { if (d < 0 || d >= 365) return false }
+        else if (tempo === '12-24') { if (d < 365 || d >= 730) return false }
+        else if (tempo === '24-36') { if (d < 730 || d >= 1095) return false }
+        else if (tempo === '36-48') { if (d < 1095 || d >= 1460) return false }
+        else if (tempo === '48+') { if (d < 1460) return false }
+        else if (tempo === 'sem') { if (d >= 0) return false }
+      }
       if (needle) {
         const hay = `${l.codigo_imovel} ${l.proprietario ?? ''} ${l.endereco ?? ''} ${l.bairro ?? ''} ${l.telefone ?? ''}`.toLowerCase()
         if (!hay.includes(needle)) return false
       }
       return true
     })
-  }, [leads, q, bairro, tipo])
+  }, [leads, q, bairro, tipo, tempo])
 
   const kpis = useMemo(() => {
     let soma = 0, n = 0, antigos = 0
@@ -171,6 +181,15 @@ export function CaptacaoClient({ leads }: { leads: Lead[] }) {
         <div className="w-56"><SearchInput value={q} onChange={setQ} placeholder="Proprietário, endereço, VK…" /></div>
         <Select value={bairro} onChange={setBairro} options={[{ value: ALL, label: 'Todos os bairros' }, ...bairros.map(b => ({ value: b, label: b }))]} />
         <Select value={tipo} onChange={setTipo} options={[{ value: ALL, label: 'Todos os tipos' }, ...tipos.map(tp => ({ value: tp, label: tp }))]} />
+        <Select value={tempo} onChange={setTempo} options={[
+          { value: ALL, label: 'Qualquer tempo inativo' },
+          { value: '0-12', label: 'Até 12 meses' },
+          { value: '12-24', label: '12 a 24 meses' },
+          { value: '24-36', label: '24 a 36 meses' },
+          { value: '36-48', label: '36 a 48 meses' },
+          { value: '48+', label: '48 meses ou mais' },
+          { value: 'sem', label: 'Sem data' },
+        ]} />
         <span className="text-xs text-muted-foreground ml-auto font-mono">{filtered.length} de {leads.length}</span>
       </div>
 

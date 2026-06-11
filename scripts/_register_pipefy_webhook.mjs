@@ -5,7 +5,7 @@ import { resolve } from 'path'
 
 const env = readFileSync(resolve(import.meta.dirname, '..', '.env.local'), 'utf8')
 const get = (k) => (env.match(new RegExp('^' + k + '=(.+)$', 'm'))?.[1] ?? '').trim()
-const TOKEN = get('PIPEFY_TOKEN')
+const TOKEN = process.env.PIPEFY_TOKEN || get('PIPEFY_TOKEN')
 const KEY = get('PIPEFY_WEBHOOK_SECRET')
 const PIPE = '307179010'
 if (!KEY) { console.error('Falta PIPEFY_WEBHOOK_SECRET no .env.local'); process.exit(1) }
