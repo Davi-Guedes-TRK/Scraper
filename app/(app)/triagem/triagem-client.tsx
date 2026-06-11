@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { classifyAnunciante, parsePreco, fmtBRL, timeAgo, allImgs, dedupKey, startOfToday } from '@/lib/formatters'
 import { portalLabel } from '@/lib/portals'
-import { parseEnderecoDF } from '@/lib/endereco-df'
+import { parseEnderecoDF, ehCasaLote } from '@/lib/endereco-df'
 import { PortalBadge } from '@/components/portal-badge'
 import { MatriculaModal } from './matricula-modal'
 
@@ -191,7 +191,8 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
     // (bairro/título do DFImóveis/Chaves trazem "QR 516 Conjunto 17" etc.)
     const txt = `${item.bairro ?? ''} ${item.titulo ?? ''}`.trim()
     const { quadra, casa_lote } = parseEnderecoDF(txt)
-    if (quadra) {
+    // Candidato de lote só para casa/lote — apartamento/sala não tem lote próprio
+    if (quadra && ehCasaLote(item.tipo_imovel)) {
       setBuscandoCand(true)
       fetch('/api/geoportal/candidatos', {
         method: 'POST',

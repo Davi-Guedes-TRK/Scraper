@@ -2,7 +2,7 @@ import sql from '@/lib/db'
 import { portalTable } from '@/lib/portals'
 import { oficioFor } from '@/lib/oficios'
 import { acharCandidatos } from '@/lib/geoportal-candidates'
-import { parseEnderecoDF } from '@/lib/endereco-df'
+import { parseEnderecoDF, ehCasaLote } from '@/lib/endereco-df'
 import { solicitarMatriculas, type EnvioResult } from '@/lib/cartorio-envio'
 import { log } from '@/lib/logger'
 
@@ -17,7 +17,7 @@ type Pendente = {
   link: string; portal: string
   endereco: string | null
   endereco_fonte: string | null
-  pistas_ia: { quadra?: string | null; conjunto?: string | null; casa_lote?: string | null } | null
+  tipo_imovel: string | null
   bairro: string | null; cidade: string | null
   area_m2: string | null
   lat: number | null; lng: number | null
@@ -51,7 +51,7 @@ export async function rodarAuto2Oficio(opts: { limite?: number; dryRun?: boolean
 
   // 1) aprovados, sem solicitação enviada e sem matrícula
   const pend = await sql<Pendente[]>`
-    SELECT link, portal, endereco, endereco_fonte, pistas_ia, bairro, cidade, area_m2, lat, lng
+    SELECT link, portal, endereco, endereco_fonte, tipo_imovel, bairro, cidade, area_m2, lat, lng
     FROM imoveis_todos
     WHERE status_triagem = 'aprovado'
       AND (status_solicitacao IS NULL OR status_solicitacao = 'pendente')
@@ -73,6 +73,7 @@ export async function rodarAuto2Oficio(opts: { limite?: number; dryRun?: boolean
   let processados = 0
   for (const p of do2o) {
     if (p.endereco_fonte === 'geoportal') continue
+    if (!ehCasaLote(p.tipo_imovel)) continue  // só casa/lote tem lote próprio no cadastro
     if (processados >= limite) break
     processados++
 
