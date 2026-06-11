@@ -144,8 +144,13 @@ function parsePhones(html: string): Telefone[] {
       const m = r.exec(b)?.[1]?.trim() ?? ''
       return (m === 'SEM INFORMAÇÃO' || m === 'Sem Informação') ? '' : m
     }
-    const numero = v('NÚMERO')
-    if (!numero) continue
+    const raw = v('NÚMERO').replace(/\D/g, '')
+    if (raw.length < 10 || raw.length > 11) continue  // filtra inválidos ("29", max_int32 etc.)
+    const ddd  = raw.slice(0, 2)
+    const num  = raw.slice(2)
+    const numero = num.length === 9
+      ? `(${ddd}) ${num.slice(0, 5)}-${num.slice(5)}`
+      : `(${ddd}) ${num.slice(0, 4)}-${num.slice(4)}`
     phones.push({ numero, status: v('STATUS'), tipo: v('TIPO'), operadora: v('OPERADORA'), whatsapp: v('WHATSAPP') })
   }
   return phones
@@ -153,12 +158,40 @@ function parsePhones(html: string): Telefone[] {
 
 // ── CPF ────────────────────────────────────────────────────────────────────────
 
+function decodeCfemail(encoded: string): string {
+  // Cloudflare ofusca e-mails com XOR: primeiro byte = chave, demais = e-mail codificado
+  const key = parseInt(encoded.slice(0, 2), 16)
+  let result = ''
+  for (let i = 2; i < encoded.length; i += 2) {
+    result += String.fromCharCode(parseInt(encoded.slice(i, i + 2), 16) ^ key)
+  }
+  return result
+}
+
+function parseEmails(html: string): string[] {
+  // Cloudflare protege e-mails com __cf_email__ — decodifica o atributo data-cfemail
+  const cfEmails: string[] = []
+  const cfRe = /data-cfemail="([a-f0-9]+)"/gi
+  let m: RegExpExecArray | null
+  while ((m = cfRe.exec(html)) !== null) {
+    try { cfEmails.push(decodeCfemail(m[1])) } catch { /* ignora */ }
+  }
+  if (cfEmails.length) return [...new Set(cfEmails)]
+
+  // Fallback: regex direta (páginas sem Cloudflare)
+  const matches = html.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g) ?? []
+  return [...new Set(matches)].filter(e =>
+    !e.includes('sentry') && !e.includes('supabase') && !e.includes('example')
+  )
+}
+
 export interface CPFResult {
   cpf:            string
   nome:           string
   dataNascimento: string
   idade:          number | null
   renda:          string
+  emails:         string[]
   telefones:      Telefone[]
   url:            string
 }
@@ -176,6 +209,7 @@ export async function lookupCPF(cpf: string): Promise<CPFResult> {
     dataNascimento: fv(html, 'DATA DE NASCIMENTO:'),
     idade:          calcIdade(fv(html, 'DATA DE NASCIMENTO:')),
     renda:          fv(html, 'RENDA:'),
+    emails:         parseEmails(html),
     telefones:      parsePhones(html),
     url,
   }

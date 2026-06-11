@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import sql from '@/lib/db'
 import { portalTable, portalKeys } from '@/lib/portals'
+import { criarCardOportunidade } from '@/lib/pipefy'
 
 type RelatorioRow = {
   link: string
@@ -98,8 +99,6 @@ export async function PATCH(req: NextRequest) {
     if (!portalKeys.includes(body.portal)) return Response.json({ error: 'portal inválido' }, { status: 400 })
 
     try {
-      // Ao registrar uma matrícula real, o pedido foi atendido → status 'recebido'.
-      // 'N/A' (desistimos) não mexe no status.
       await sql.unsafe(
         `UPDATE public."${portalTable(body.portal)}"
             SET numero_matricula      = $1,
@@ -111,6 +110,24 @@ export async function PATCH(req: NextRequest) {
     } catch (err) {
       return Response.json({ error: err instanceof Error ? err.message : 'Erro no banco' }, { status: 500 })
     }
+
+    // Matrícula real recebida → cria card no Pipefy se ainda não existir
+    if (body.numero_matricula && body.numero_matricula !== 'N/A') {
+      try {
+        const jaExiste = await sql<{ n: number }[]>`
+          SELECT count(*)::int AS n FROM public.pipefy_captacoes
+          WHERE links_anuncio ILIKE ${'%' + body.link + '%'} LIMIT 1`
+        if ((jaExiste[0]?.n ?? 0) === 0) {
+          const rows = await sql<{ link: string; portal: string; titulo: string | null; bairro: string | null; cidade: string | null; preco: string | null; area_m2: string | null; tipo_imovel: string | null; tipo: string | null; maps_link: string | null; endereco: string | null; pistas_ia: Record<string, unknown> | null }[]>`
+            SELECT link, portal, titulo, bairro, cidade, preco, area_m2, tipo_imovel, tipo, maps_link, endereco, pistas_ia
+            FROM imoveis_todos WHERE link = ${body.link} LIMIT 1`
+          if (rows[0]) {
+            await criarCardOportunidade({ ...rows[0], numero_matricula: body.numero_matricula }).catch(() => {})
+          }
+        }
+      } catch { /* não bloqueia a resposta se Pipefy falhar */ }
+    }
+
     return Response.json({ ok: true })
   }
 

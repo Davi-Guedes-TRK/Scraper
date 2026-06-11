@@ -190,7 +190,7 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
     // Candidatos do Geoportal a partir do COMEÇO DE ENDEREÇO do próprio anúncio
     // (bairro/título do DFImóveis/Chaves trazem "QR 516 Conjunto 17" etc.)
     const txt = `${item.bairro ?? ''} ${item.titulo ?? ''}`.trim()
-    const { quadra, casa_lote } = parseEnderecoDF(txt)
+    const { setor, quadra, casa_lote } = parseEnderecoDF(txt)
     // Candidato de lote só para casa/lote — apartamento/sala não tem lote próprio
     if (quadra && ehCasaLote(item.tipo_imovel)) {
       setBuscandoCand(true)
@@ -198,6 +198,7 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          setor,          // desambigua a quadra (SHIS=Lago Sul vs SRIA vs Indústria…)
           quadra,
           casa_lote,
           endereco: txt,  // texto do anúncio → o scorer credita conjunto/tokens

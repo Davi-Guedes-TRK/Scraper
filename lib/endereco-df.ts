@@ -3,11 +3,16 @@
 // Focado em CASA/LOTE (QI/QL/QR/QS/QN/QNM/QNN/QE...), que é onde o WFS tem cobertura.
 // Setor comercial/superquadra (SCS/SHCGN/CLN) cai fora de propósito (cadastro não cobre).
 
-export type EnderecoDF = { quadra?: string; conjunto?: string; casa_lote?: string }
+export type EnderecoDF = { setor?: string; quadra?: string; conjunto?: string; casa_lote?: string }
 
 export function parseEnderecoDF(texto: string | null | undefined): EnderecoDF {
   if (!texto) return {}
   const t = texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase()
+
+  // setor habitacional que DESAMBIGUA a quadra (mesma "QI 7" existe em vários setores):
+  // SHIS=Lago Sul, SHIN=Lago Norte, SRIA, SHCS/SHCN… casa com o campo `setor` do WFS.
+  const st = t.match(/\b(SH[A-Z]{1,4}|SRIA)\b/)
+  const setor = st?.[1]
 
   // SÓ quadra de casa/lote: família Q (QI/QL/QR/QS/QN/QNM/QNN/QE + número).
   // Superquadras (SQN/SQS/SQNW) e setores comerciais (SCS/SHCGN/CLN) NÃO casam aqui
@@ -19,7 +24,7 @@ export function parseEnderecoDF(texto: string | null | undefined): EnderecoDF {
   const cj = t.match(/(?:CONJUNTO|CONJ|CJ|BLOCO|BL)\s*([A-Z0-9]{1,3})\b/)
   const lt = t.match(/(?:LOTE|LT|CASA)\s*([0-9]+[A-Z]?)\b/)
 
-  return { quadra, conjunto: cj?.[1], casa_lote: lt?.[1] }
+  return { setor, quadra, conjunto: cj?.[1], casa_lote: lt?.[1] }
 }
 
 // Candidato de LOTE só faz sentido para casa/lote/terreno — não para apartamento,

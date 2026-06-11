@@ -83,6 +83,7 @@ export async function rodarAuto2Oficio(opts: { limite?: number; dryRun?: boolean
     const r = await acharCandidatos({
       lat: p.lat ?? undefined,
       lng: p.lng ?? undefined,
+      setor:     ender.setor,
       quadra:    ender.quadra,
       casa_lote: ender.casa_lote,
       endereco:  txt || p.endereco,
