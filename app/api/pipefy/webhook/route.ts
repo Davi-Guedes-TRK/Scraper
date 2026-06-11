@@ -12,7 +12,7 @@ export const maxDuration = 30
 // Payload Pipefy: { data: { action: "card.create"|..., card: { id }, ... } }
 export async function POST(req: NextRequest) {
   const token = req.nextUrl.searchParams.get('token')
-  if (!process.env.SCRAPER_API_KEY || token !== process.env.SCRAPER_API_KEY) {
+  if (!process.env.PIPEFY_WEBHOOK_SECRET || token !== process.env.PIPEFY_WEBHOOK_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
