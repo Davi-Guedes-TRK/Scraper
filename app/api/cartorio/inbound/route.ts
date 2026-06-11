@@ -4,6 +4,7 @@ import { portalTable, portalKeys } from '@/lib/portals'
 import { matchCartorioReply, formatEndereco, refForLink, parseRefFromSubject, parseMatriculaFromText } from '@/lib/cartorio'
 import { criarCardOportunidade, type ImovelParaCard } from '@/lib/pipefy'
 import { log } from '@/lib/logger'
+import { notifyGChat, cartorioMsg } from '@/lib/gchat'
 
 // Webhook de inbound Resend.
 // Configuração: Resend Dashboard → Inbound → Routing
@@ -133,12 +134,15 @@ export async function POST(req: NextRequest) {
     }))
   }
 
-  // 1. Salva matrículas
+  // 1. Salva matrículas + notifica GChat
   await salvarMatriculas(casados.map(m => ({
     link:      m.candidate!.link,
     portal:    m.candidate!.portal,
     matricula: m.matricula,
   })))
+  await Promise.all(casados.map(m =>
+    notifyGChat(cartorioMsg.matriculaRecebida(m.candidate!.endereco, m.matricula, metodo))
+  )).catch(() => {})
 
   // 2. Cria card no Pipefy "COM - Oportunidades" — pula se já existir
   const cards: Array<{ link: string; cardId: string; cardUrl: string; error?: string; skipped?: boolean }> = []
@@ -149,14 +153,16 @@ export async function POST(req: NextRequest) {
       const jaExiste = await cardJaExiste(imovel.link)
       if (jaExiste) {
         cards.push({ link: imovel.link, cardId: '', cardUrl: '', skipped: true })
-        await log('info', 'cartorio-inbound', 'Card ja existe — pulado', { link: imovel.link }).catch(() => {})
+        await notifyGChat(cartorioMsg.cardExistente(formatEndereco(imovel))).catch(() => {})
         continue
       }
       const card = await criarCardOportunidade({ ...imovel, numero_matricula: m.matricula })
       cards.push({ link: imovel.link, cardId: card.id, cardUrl: card.url })
+      await notifyGChat(cartorioMsg.cardCriado(formatEndereco(imovel), m.matricula, card.url)).catch(() => {})
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       cards.push({ link: imovel.link, cardId: '', cardUrl: '', error: msg })
+      await notifyGChat(cartorioMsg.erroCard(formatEndereco(imovel), msg)).catch(() => {})
       await log('error', 'cartorio-inbound', 'Falha ao criar card Pipefy', { link: imovel.link, error: msg }).catch(() => {})
     }
   }

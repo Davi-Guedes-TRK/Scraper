@@ -106,6 +106,16 @@ const NAV_GROUPS = [
           </svg>
         ),
       },
+      {
+        href: '/geoportal',
+        label: 'Geoportal',
+        icon: (
+          <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l6 3V10m-6 7V4m0 0l6-3" />
+            <circle cx="15.5" cy="9.5" r="1" fill="currentColor" />
+          </svg>
+        ),
+      },
     ],
   },
   {

@@ -10,7 +10,7 @@ export const maxDuration = 20
 export async function POST(req: NextRequest) {
   let body: {
     lat?: number; lng?: number
-    quadra?: string; conjunto?: string; setor?: string
+    quadra?: string; conjunto?: string; setor?: string; casa_lote?: string
     endereco?: string; area_m2?: number
   }
   try { body = await req.json() } catch {

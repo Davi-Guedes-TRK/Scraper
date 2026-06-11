@@ -78,10 +78,11 @@ export async function rodarAuto2Oficio(opts: { limite?: number; dryRun?: boolean
     const r = await acharCandidatos({
       lat: p.lat ?? undefined,
       lng: p.lng ?? undefined,
-      quadra:   p.pistas_ia?.quadra ?? undefined,
-      conjunto: p.pistas_ia?.conjunto ?? undefined,
-      endereco: p.endereco,
-      area_m2:  parseArea(p.area_m2),
+      quadra:    p.pistas_ia?.quadra ?? undefined,
+      conjunto:  p.pistas_ia?.conjunto ?? undefined,
+      casa_lote: p.pistas_ia?.casa_lote ?? undefined,
+      endereco:  p.endereco,
+      area_m2:   parseArea(p.area_m2),
     }).catch(() => null)
 
     if (r && r.confianca === 'alta' && r.melhor?.endereco) {
