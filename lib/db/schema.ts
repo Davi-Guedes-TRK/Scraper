@@ -57,7 +57,6 @@ const imoveisBase = {
 export const imoveisOlx         = pgTable('imoveis_olx',         imoveisBase)
 export const imoveisDfimoveis   = pgTable('imoveis_dfimoveis',   imoveisBase)
 export const imoveisWimoveis    = pgTable('imoveis_wimoveis',    imoveisBase)
-export const imoveisFacebook    = pgTable('imoveis_facebook',    imoveisBase)
 export const imoveisVivareal    = pgTable('imoveis_vivareal',    imoveisBase)
 export const imoveisZap         = pgTable('imoveis_zap',         imoveisBase)
 export const imoveisChavesnamao = pgTable('imoveis_chavesnamao', imoveisBase)

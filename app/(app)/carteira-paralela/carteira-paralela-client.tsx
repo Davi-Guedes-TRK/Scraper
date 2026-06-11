@@ -49,13 +49,26 @@ type Grupo = { atendimento: string; inquilino: string | null; tipo: string | nul
 export function CarteiraParalelaClient({ matches }: { matches: Match[] }) {
   const [q, setQ] = useState('')
   const [bairro, setBairro] = useState(ALL)
+  const [tipoFiltro, setTipoFiltro] = useState(ALL)
+  const [precoMin, setPrecoMin] = useState('')
+  const [precoMax, setPrecoMax] = useState('')
+  const [areaMin, setAreaMin] = useState('')
 
   const bairros = useMemo(() => Array.from(new Set(matches.map(m => m.busca_bairro).filter(Boolean) as string[])).sort(), [matches])
+  const tiposImovel = useMemo(() => Array.from(new Set(matches.map(m => m.tipo_imovel).filter(Boolean) as string[])).sort(), [matches])
 
   const grupos = useMemo<Grupo[]>(() => {
+    const pMin = precoMin ? Number(precoMin) : 0
+    const pMax = precoMax ? Number(precoMax) : Infinity
+    const aMn = areaMin ? Number(areaMin) : 0
     const map = new Map<string, Grupo>()
     for (const m of matches) {
       if (bairro !== ALL && m.busca_bairro !== bairro) continue
+      if (tipoFiltro !== ALL && m.tipo_imovel !== tipoFiltro) continue
+      const preco = n(m.preco_locacao)
+      if (preco !== null && (preco < pMin || preco > pMax)) continue
+      const area = n(m.area_util)
+      if (aMn > 0 && area !== null && area < aMn) continue
       if (!map.has(m.codigo_atendimento)) {
         map.set(m.codigo_atendimento, {
           atendimento: m.codigo_atendimento, inquilino: m.inquilino, tipo: m.busca_tipo,
@@ -72,8 +85,13 @@ export function CarteiraParalelaClient({ matches }: { matches: Match[] }) {
         g.imoveis.some(i => `${i.proprietario ?? ''} ${i.endereco ?? ''} ${i.codigo_imovel} ${i.telefone ?? ''}`.toLowerCase().includes(needle)),
       )
     }
-    return list.sort((a, b) => b.imoveis.length - a.imoveis.length)
-  }, [matches, q, bairro])
+    // Ordenar por maior VK (preco_locacao) do melhor imóvel de cada grupo
+    return list.sort((a, b) => {
+      const maxA = Math.max(...a.imoveis.map(i => n(i.preco_locacao) ?? 0))
+      const maxB = Math.max(...b.imoveis.map(i => n(i.preco_locacao) ?? 0))
+      return maxB - maxA
+    })
+  }, [matches, q, bairro, tipoFiltro, precoMin, precoMax, areaMin])
 
   const kpis = useMemo(() => ({
     inquilinos: new Set(matches.map(m => m.codigo_atendimento)).size,
@@ -98,7 +116,14 @@ export function CarteiraParalelaClient({ matches }: { matches: Match[] }) {
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <div className="w-64"><SearchInput value={q} onChange={setQ} placeholder="Inquilino, dono, endereço, VK…" /></div>
         <Select value={bairro} onChange={setBairro} options={[{ value: ALL, label: 'Todos os bairros' }, ...bairros.map(b => ({ value: b, label: b }))]} />
-        <span className="text-xs text-muted-foreground ml-auto font-mono">{grupos.length} inquilinos</span>
+        <Select value={tipoFiltro} onChange={setTipoFiltro} options={[{ value: ALL, label: 'Todos os tipos' }, ...tiposImovel.map(t => ({ value: t, label: t }))]} />
+        <input type="number" placeholder="R$ mín" value={precoMin} onChange={e => setPrecoMin(e.target.value)}
+          className="w-24 h-8 px-2 text-sm rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+        <input type="number" placeholder="R$ máx" value={precoMax} onChange={e => setPrecoMax(e.target.value)}
+          className="w-24 h-8 px-2 text-sm rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+        <input type="number" placeholder="Área mín m²" value={areaMin} onChange={e => setAreaMin(e.target.value)}
+          className="w-28 h-8 px-2 text-sm rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+        <span className="text-xs text-muted-foreground ml-auto font-mono">{grupos.length} inquilinos · ordenado por maior VK</span>
       </div>
 
       {grupos.length === 0 ? (

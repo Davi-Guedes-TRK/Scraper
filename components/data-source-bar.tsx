@@ -12,7 +12,7 @@ const SOURCES: Src[] = [
   { match: '/in-loco',                    fonte: 'Captura em campo (leads_in_loco) · endereço via Geoportal-DF', ano: 'ao vivo', wip: true },
   { match: '/carteira-paralela',          fonte: 'Nido (dw_trk) · atendimentos ativos × imóveis disponíveis → carteira_paralela', ano: 'snapshot diário', wip: true },
   { match: '/captacao',                   fonte: 'Nido (dw_trk) · nido_imoveis (Negociado/Inativo) → leads_nao_adm', ano: 'snapshot diário' },
-  { match: '/triagem',                    fonte: 'Portais scrapeados — DFImóveis, OLX, ZAP, VivaReal, Facebook, ChavesNaMão (imoveis_todos)', ano: 'ao vivo' },
+  { match: '/triagem',                    fonte: 'Portais scrapeados — DFImóveis, OLX, ZAP, VivaReal, ChavesNaMão (imoveis_todos)', ano: 'ao vivo' },
   { match: '/relatorio',                  fonte: 'Portais scrapeados + matrículas (imoveis_todos)', ano: 'ao vivo' },
   { match: '/lancamentos',                fonte: 'Empreendimentos de incorporadoras (scraping: Lotus, Direcional, Riva…)', ano: 'ao vivo' },
   { match: '/scrapers',                   fonte: 'Jobs de scraping dos portais', ano: 'ao vivo' },

@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ThemeToggle } from './theme-toggle'
-import { SearchInput, Select } from './ui/toolbar'
+import { SearchInput } from './ui/toolbar'
 import { signOut } from '@/app/actions/auth'
 import { useNewPropertiesCtx } from './new-properties-provider'
 
@@ -15,6 +15,12 @@ const TITLES: Record<string, string> = {
   '/visitas': 'Roteiro de Visitas',
   '/relatorio': 'Cartório',
   '/analitico': 'Analítico',
+  '/lancamentos': 'Lançamentos',
+  '/carteira-paralela': 'Carteira Paralela',
+  '/captacao': 'Captação',
+  '/in-loco': 'Visita In Loco',
+  '/busca-pessoa': 'Busca Pessoa',
+  '/geoportal': 'Geoportal',
 }
 
 function titleFor(pathname: string) {
@@ -37,7 +43,6 @@ export function Topbar({ email }: { email?: string }) {
   const router = useRouter()
   const params = useSearchParams()
   const { count, latestTitle, markSeen } = useNewPropertiesCtx()
-  const [period, setPeriod] = useState('7')
   const [notifOpen, setNotifOpen] = useState(false)
   const [userOpen, setUserOpen] = useState(false)
 
@@ -98,17 +103,7 @@ export function Topbar({ email }: { email?: string }) {
 
       {/* Ações */}
       <div className="flex items-center gap-1.5 ml-auto sm:ml-0 flex-shrink-0">
-        <div className="hidden md:block">
-          <Select
-            value={period}
-            onChange={setPeriod}
-            options={[
-              { value: '7', label: 'Últimos 7 dias' },
-              { value: '30', label: 'Últimos 30 dias' },
-              { value: '90', label: 'Últimos 90 dias' },
-            ]}
-          />
-        </div>
+
 
         {/* Notificações */}
         <div className="relative" ref={notifRef}>

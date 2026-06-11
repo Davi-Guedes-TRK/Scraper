@@ -48,6 +48,18 @@ type ApiResponse = { items: Empreendimento[]; stats: FonteStats[] }
 type SortCol = 'nome' | 'bairro' | 'area_min_m2' | 'preco_min' | 'pct_obras' | 'total_unidades' | 'scraped_at'
 type SortDir = 'asc' | 'desc'
 
+// Extrai bairro: usa campo bairro ou tenta casar a partir do endereço/cidade
+function getBairro(item: Empreendimento): string | null {
+  if (item.bairro?.trim()) return item.bairro.trim()
+  // Tenta achar um bairro TRK no endereço ou cidade
+  const haystack = `${item.endereco ?? ''} ${item.cidade ?? ''}`.toLowerCase()
+  for (const b of BAIRROS_TRK) {
+    if (haystack.includes(b.toLowerCase())) return b
+  }
+  // Usa cidade como último recurso
+  return item.cidade?.trim() || null
+}
+
 function StatusBadge({ status }: { status: string | null }) {
   if (!status) return null
   const label = STATUS_LABELS[status] ?? status
@@ -206,7 +218,7 @@ export function LancamentosClient() {
     if (!data) return new Map<string, number>()
     const m = new Map<string, number>()
     for (const it of data.items) {
-      const k = it.bairro?.trim() || '(sem bairro)'
+      const k = getBairro(it) || '(sem bairro)'
       m.set(k, (m.get(k) ?? 0) + 1)
     }
     return m
@@ -394,7 +406,7 @@ export function LancamentosClient() {
                           <StatusBadge status={item.status} />
                         </td>
                         <td className="px-3 py-3 text-[12px] text-muted-foreground font-mono whitespace-nowrap">
-                          {item.bairro ?? '—'}
+                          {getBairro(item) ?? '—'}
                         </td>
                         <td className="px-3 py-3 text-[12px] font-mono whitespace-nowrap text-foreground">
                           {area}

@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 
 const STORAGE_KEY = 'triagem_last_seen'
 const PORTAL_TABLES = [
-  'imoveis_olx', 'imoveis_dfimoveis', 'imoveis_wimoveis', 'imoveis_facebook',
+  'imoveis_olx', 'imoveis_dfimoveis', 'imoveis_wimoveis',
   'imoveis_vivareal', 'imoveis_zap', 'imoveis_chavesnamao',
 ] as const
 
