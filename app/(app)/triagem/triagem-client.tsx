@@ -59,8 +59,27 @@ function ToastStack({ toasts }: { toasts: Toast[] }) {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function getRegiao(item: Imovel) {
-  const raw = item.cidade || item.bairro || ''
-  return raw.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+  // cidade do DFImóveis vem slug ("lago-sul"); OLX vem "Brasília" (genérico) com a RA no bairro.
+  let raw = (item.cidade || '').trim()
+  if (!raw || /^(bras[íi]lia|df)$/i.test(raw)) raw = (item.bairro || raw || '').trim()
+  if (!raw) return ''
+  // colapsa variantes de caixa: "LAGO SUL"/"lago-sul"/"Lago Sul" → "Lago Sul"
+  return raw.toLowerCase().replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim()
+    .replace(/\b\w/g, c => c.toUpperCase())
+}
+
+// Canonicaliza o tipo_imovel (dezenas de variantes: "Aluguel - apartamento padrão",
+// "apartamento", "Apartamento"...) em poucas categorias úteis para o filtro.
+function tipoCanonico(t: string | null | undefined): string {
+  if (!t) return 'Outro'
+  const s = t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+  if (/apart|apto|flat/.test(s))                 return 'Apartamento'
+  if (/kitch|kitnet|studio|loft|quarto/.test(s)) return 'Kitnet/Studio'
+  if (/casa|sobrado/.test(s))                    return 'Casa'
+  if (/lote|terreno/.test(s))                    return 'Lote/Terreno'
+  if (/sala|comercial|loja|galp|escrit|ponto/.test(s)) return 'Comercial'
+  if (/sitio|chacara|rural|fazenda/.test(s))     return 'Rural'
+  return 'Outro'
 }
 
 function addressScore(item: Imovel) {
@@ -735,7 +754,7 @@ export function TriagemClient() {
   }, [items])
 
   const tiposImovel = useMemo(() => {
-    const set = new Set(items.map(i => i.tipo_imovel).filter((t): t is string => !!t))
+    const set = new Set(items.map(i => tipoCanonico(i.tipo_imovel)))
     return ['Todos', ...[...set].sort((a, b) => a.localeCompare(b))]
   }, [items])
 
@@ -777,7 +796,7 @@ export function TriagemClient() {
       if (filterPrecoMax > 0 && parsePreco(item.preco) > filterPrecoMax) return false
       if (filterHoje && (item.coletado_em ?? '') < todayCutoff) return false
       if (pubCutoff && (!item.data_publicacao || item.data_publicacao < pubCutoff)) return false
-      if (filterTipo !== 'Todos' && item.tipo_imovel !== filterTipo) return false
+      if (filterTipo !== 'Todos' && tipoCanonico(item.tipo_imovel) !== filterTipo) return false
       if (filterBairro !== 'Todos' && getRegiao(item) !== filterBairro) return false
       if (filterProprietario && classifyAnunciante(item) !== 'proprietario') return false
       if (filterNovos && (item.coletado_em ?? '') <= lastSeen) return false

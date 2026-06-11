@@ -38,6 +38,7 @@ export async function GET() {
                tipo_imovel, creci, nome_anunciante, tipo_anunciante
         FROM imoveis_todos
         WHERE status_triagem = 'pendente'
+          AND portal <> 'chavesnamao'
           AND (creci IS NULL OR creci != '22784')
           AND coletado_em >= NOW() - (${CUTOFF_DAYS} || ' days')::interval
         ORDER BY coletado_em DESC
@@ -47,6 +48,7 @@ export async function GET() {
         SELECT count(*)::int AS total
         FROM imoveis_todos
         WHERE status_triagem = 'pendente'
+          AND portal <> 'chavesnamao'
           AND (creci IS NULL OR creci != '22784')
           AND coletado_em >= NOW() - (${CUTOFF_DAYS} || ' days')::interval
       `,
