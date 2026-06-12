@@ -66,14 +66,12 @@ O card em "COM | Oportunidades" precisa ser ATUALIZADO a cada etapa, não só cr
 - Cada evento do pipeline (matrícula recebida, dedup, ônus, proprietário, contato) escreve no card + log no GChat.
 - Definir os campos do card: status da etapa, matrícula, endereço oficial, proprietário, CPF, telefones, flag "já existe no dw_trk".
 
-### Fase 2 — Dedup contra o dw_trk (gate antes da ônus)
-**Restrição-chave: o dw_trk (Nido) está em rede local (192.168.x), inalcançável da Vercel e read-only.**
-- **Ponte recomendada**: script local agendado (Tarefa do Windows ou runner on-prem do GitHub Actions) que exporta `imoveis` + `proprietarios` do dw_trk e faz UPSERT num espelho no Supabase (`dw_imoveis`, `dw_proprietarios`), 1x/dia. Volume de imobiliária cabe folgado.
-- **Normalizador canônico de endereço** — `lib/endereco-normalizar.ts`, usado nos DOIS lados (espelho e lead):
-  - `conjunto|cj.|conj` → `cj` · `quadra|qd.` → `q` · `casa|cs` → `cs` · `lote|lt.` → `lt` · `bloco|bl.` → `bl` · `apartamento|apto|ap.` → `ap`
-  - remove acentos/pontuação, colapsa espaços, normaliza "SHIS QI 17" vs "shis qi17"
-  - aproveitar o que `parseEnderecoDF()` já extrai (setor/quadra/conjunto/lote) — o match estruturado por componentes é mais robusto que regex sobre a string inteira; regex fica de fallback p/ endereços não parseáveis.
-- Resultado do dedup: **existe** → GChat avisa + card marcado "JÁ NA BASE" (não gasta ônus); **não existe** → libera Fase 3.
+### Fase 2 — Dedup contra o dw_trk ✅ CONSTRUÍDA (jun/12)
+- **Ponte**: `scripts/dw_sync.mjs` roda como **Tarefa Agendada "ERP_TRK dw_sync"** (8h30, diária, StartWhenAvailable) na máquina do Davi — a única que alcança `192.168.64.106:5432/dw_trk` (`DW_TRK_URL` no `.env.local`). Log em `%LOCALAPPDATA%\erp_trk_dw_sync.log` + ping no GChat. Espelha `nido_imoveis` (11.3k) e `nido_pessoas` (119k) → `dw_imoveis`/`dw_pessoas` no Supabase (`scripts/sql/create_dw_mirror.sql`).
+- **Normalizador**: `lib/endereco-normalizar.ts` — `enderecoNorm()` (string canônica), `chaveEndereco()` (chave estruturada `QI 11|CJ 7|17`; setor SHIS/SHIN fica FORA da chave e só confirma/derruba), `nomeNorm()`. Self-contained de propósito: o Node 24 importa o .ts direto no script de sync — UMA fonte de verdade nos dois lados.
+- **Dedup**: `lib/dw-dedup.ts` (`buscarImovelNoDw`, `buscarPessoaNoDw`) + endpoint `POST /api/dw/dedup`. Níveis: `exato` (chave igual + setor compatível) / `provavel` (trgm > 0.5, só em linhas sem chave) / `nenhum` (libera ônus). 65% do espelho tem chave estruturada.
+- ⚠️ **Nido NÃO tem CPF** em `nido_pessoas` — match de proprietário é por **nome normalizado** (homônimos possíveis; tratar como "provável forte"). Validado: dedup achou a mesma casa do Lago Sul 3x duplicada no próprio Nido.
+- Falta (vira Fase 3): chamar o gate no fluxo real (cartorio-auto/triagem) → existe → GChat + card "JÁ NA BASE"; não existe → solicitar ônus.
 
 ### Fase 3 — Ônus automatizada + OCR + proprietário
 1. **Solicitar ônus** (DECIDIDO jun/12): o pedido é o **form público Pipefy "SEC | Ônus"** (org 300542579), hoje preenchido manualmente por `pipefy_portal_fill.py` (Playwright + sessão salva). Automação:
