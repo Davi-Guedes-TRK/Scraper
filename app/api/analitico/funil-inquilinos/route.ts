@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   const desde  = searchParams.get('desde') || resolverDesde(searchParams.get('range') ?? 'tudo')
   const ate    = searchParams.get('ate')   || new Date().toISOString().slice(0, 10)
 
-  const [statsRows, motivosRows, canalRows, porRegiaoRows, porTipoRows, porMesRows, filtrosRow] = await Promise.all([
+  const [statsRows, motivosRows, canalRows, porRegiaoRows, porTipoRows, porMesRows, filtrosRow, saidasAdmRows] = await Promise.all([
     sql`
       SELECT
         count(*)::int AS atendimentos,
@@ -86,9 +86,21 @@ export async function GET(req: NextRequest) {
              array_agg(DISTINCT tipo   ORDER BY tipo)   FILTER (WHERE tipo   IS NOT NULL) AS tipos
       FROM funil_inquilinos
     `,
+    sql`
+      SELECT to_char(date_trunc('month', desde), 'YYYY-MM') AS mes,
+             count(*)::int AS saidas_adm
+      FROM leads_nao_adm
+      WHERE desde IS NOT NULL
+      GROUP BY 1 ORDER BY 1
+    `,
   ])
 
   const f = filtrosRow[0] as { regioes: string[] | null; tipos: string[] | null }
+  const saidasMap = new Map((saidasAdmRows as unknown as { mes: string; saidas_adm: number }[]).map(r => [r.mes, r.saidas_adm]))
+  const porMesComSaidas = (porMesRows as unknown as { mes: string; atendimentos: number; fechados: number }[]).map(r => ({
+    ...r,
+    saidas_adm: saidasMap.get(r.mes) ?? 0,
+  }))
 
   return Response.json({
     stats:     statsRows[0],
@@ -96,7 +108,7 @@ export async function GET(req: NextRequest) {
     canal:     canalRows,
     porRegiao: porRegiaoRows,
     porTipo:   porTipoRows,
-    porMes:    porMesRows,
+    porMes:    porMesComSaidas,
     regioes:   ['Todos', ...(f?.regioes ?? [])],
     tipos:     ['Todos', ...(f?.tipos   ?? [])],
   })

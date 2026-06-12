@@ -14,14 +14,14 @@ type Motivo = { motivo: string; total: number }
 type Canal = { canal: string; total: number; fechados: number }
 type PorRegiao = { regiao: string; atendimentos: number; com_proposta: number; fechados: number }
 type PorTipo = { tipo: string; atendimentos: number; fechados: number }
-type PorMes = { mes: string; atendimentos: number; fechados: number }
+type PorMes = { mes: string; atendimentos: number; fechados: number; saidas_adm: number }
 type Data = {
   stats: Stats; motivos: Motivo[]; canal: Canal[]
   porRegiao: PorRegiao[]; porTipo: PorTipo[]; porMes: PorMes[]
   regioes: string[]; tipos: string[]
 }
 
-const C = { atend: '#6366f1', proposta: '#f59e0b', fechado: '#22c55e', perda: '#ef4444', ativo: '#818cf8' }
+const C = { atend: '#6366f1', proposta: '#f59e0b', fechado: '#22c55e', perda: '#ef4444', ativo: '#818cf8', saida: '#e879f9' }
 const DONUT = ['#ef4444', '#f59e0b', '#a78bfa', '#818cf8', '#8b5cf6', '#a78bfa', '#6366f1', '#22c55e']
 const CANAL_CORES: Record<string, string> = {
   'Telefone': '#6366f1', 'WhatsApp': '#22c55e', 'E-mail': '#f59e0b',
@@ -236,7 +236,7 @@ export function FunilInquilinosClient() {
         </PanelCard>
       </div>
 
-      <PanelCard title="Evolução Mensal — Atendimentos e Fechados">
+      <PanelCard title="Evolução Mensal — Atendimentos, Fechados e Saídas da Adm">
         <ResponsiveContainer width="100%" height={180}>
           <LineChart data={(data?.porMes ?? []).map(d => ({ ...d, mes: fmtMes(d.mes) }))} margin={{ left: 4, right: 24, top: 4, bottom: 4 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
@@ -246,6 +246,7 @@ export function FunilInquilinosClient() {
             <Legend wrapperStyle={{ fontSize: 10 }} />
             <Line type="linear" dataKey="atendimentos" name="Atendimentos" stroke={C.atend} strokeWidth={2} dot={{ r: 2, fill: C.atend, strokeWidth: 0 }} activeDot={{ r: 4 }} />
             <Line type="linear" dataKey="fechados" name="Fechados" stroke={C.fechado} strokeWidth={2} dot={{ r: 2, fill: C.fechado, strokeWidth: 0 }} activeDot={{ r: 4 }} />
+            <Line type="linear" dataKey="saidas_adm" name="Saídas da Adm" stroke={C.saida} strokeWidth={2} strokeDasharray="4 2" dot={{ r: 2, fill: C.saida, strokeWidth: 0 }} activeDot={{ r: 4 }} />
           </LineChart>
         </ResponsiveContainer>
       </PanelCard>
