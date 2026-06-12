@@ -58,6 +58,13 @@ function ToastStack({ toasts }: { toasts: Toast[] }) {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
+// RAs prioritárias da TRK: sempre presentes no filtro, mesmo sem item na fila
+// carregada (a lista só-dinâmica fazia "Lago Sul" sumir quando a fila não tinha).
+const BAIRROS_FIXOS = [
+  'Lago Sul', 'Lago Norte', 'Asa Sul', 'Asa Norte',
+  'Noroeste', 'Sudoeste', 'Park Way', 'Park Sul',
+]
+
 function getRegiao(item: Imovel) {
   // cidade do DFImóveis vem slug ("lago-sul"); OLX vem "Brasília" (genérico) com a RA no bairro.
   let raw = (item.cidade || '').trim()
@@ -749,7 +756,7 @@ export function TriagemClient() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const bairros = useMemo(() => {
-    const set = new Set(items.map(i => getRegiao(i)).filter(Boolean))
+    const set = new Set([...BAIRROS_FIXOS, ...items.map(i => getRegiao(i)).filter(Boolean)])
     return ['Todos', ...[...set].sort((a, b) => a.localeCompare(b))]
   }, [items])
 
