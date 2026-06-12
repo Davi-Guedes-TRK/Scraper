@@ -1,6 +1,7 @@
 'use client'
 
 import { Fragment, useEffect, useState, useCallback } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, PieChart, Pie, Cell, LineChart, Line,
@@ -135,23 +136,42 @@ function MotivosDonut({ data }: { data: Motivo[] }) {
   )
 }
 
+function ChartSkeleton({ h = 180 }: { h?: number }) {
+  return <div className="animate-pulse rounded bg-muted" style={{ height: h }} />
+}
+
 export function FunilInquilinosClient() {
-  const [regiao, setRegiao] = useState('Todos')
-  const [tipo, setTipo] = useState('Todos')
-  const [range, setRange] = useState('tudo')
+  const searchParams = useSearchParams()
+  const router = useRouter()
+
+  const [regiao, setRegiao] = useState(() => searchParams.get('regiao') ?? 'Todos')
+  const [tipo, setTipo] = useState(() => searchParams.get('tipo') ?? 'Todos')
+  const [range, setRange] = useState(() => searchParams.get('range') ?? 'tudo')
   const [data, setData] = useState<Data | null>(null)
   const [loading, setLoading] = useState(true)
+  const [erro, setErro] = useState<string | null>(null)
+
+  const syncUrl = useCallback((rg: string, tp: string, r: string) => {
+    const p = new URLSearchParams()
+    if (rg !== 'Todos') p.set('regiao', rg)
+    if (tp !== 'Todos') p.set('tipo', tp)
+    if (r !== 'tudo') p.set('range', r)
+    router.replace(`?${p.toString()}`, { scroll: false })
+  }, [router])
 
   const load = useCallback(async (rg: string, tp: string, r: string) => {
-    setLoading(true)
+    setLoading(true); setErro(null)
     try {
       const p = new URLSearchParams({ regiao: rg, tipo: tp, range: r })
       const res = await fetch(`/api/analitico/funil-inquilinos?${p}`, { cache: 'no-store' })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       setData(await res.json())
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Erro ao carregar')
     } finally { setLoading(false) }
   }, [])
 
-  useEffect(() => { load(regiao, tipo, range) }, [regiao, tipo, range, load])
+  useEffect(() => { syncUrl(regiao, tipo, range); load(regiao, tipo, range) }, [regiao, tipo, range, load, syncUrl])
 
   const s = data?.stats
   const selectCls = 'h-8 px-2.5 text-sm rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring'
@@ -161,13 +181,13 @@ export function FunilInquilinosClient() {
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-lg font-semibold text-foreground">Funil de Inquilinos</h1>
-          <p className="text-[13px] text-muted-foreground">Demanda de locação (Nido){loading && <span className="ml-2 opacity-50">carregando…</span>}</p>
+          <p className="text-[13px] text-muted-foreground flex items-center gap-1.5">Demanda de locação (Nido){loading && <svg className="w-3.5 h-3.5 animate-spin text-muted-foreground/50" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" /></svg>}</p>
         </div>
         <div className="flex gap-2 items-center flex-wrap">
           <div className="flex rounded-lg border border-border overflow-hidden">
             {RANGE_OPTS.map(o => (
               <button key={o.value} onClick={() => setRange(o.value)}
-                className={`px-2.5 py-1.5 text-xs font-medium transition-colors ${range === o.value ? 'bg-primary text-white' : 'bg-background text-muted-foreground hover:bg-muted'}`}>
+                className={`px-2.5 py-1.5 text-xs font-medium transition-colors cursor-pointer ${range === o.value ? 'bg-primary text-white' : 'bg-background text-muted-foreground hover:bg-muted'}`}>
                 {o.label}
               </button>
             ))}
@@ -181,11 +201,18 @@ export function FunilInquilinosClient() {
         </div>
       </div>
 
-      {s && <FunilVisual stats={s} />}
+      {erro && (
+        <div className="rounded-lg border border-red-500/20 bg-red-500/10 text-red-400 text-sm px-4 py-3 flex items-center justify-between gap-3">
+          <span>{erro}</span>
+          <button onClick={() => load(regiao, tipo, range)} className="text-xs font-medium underline hover:no-underline cursor-pointer shrink-0">Tentar novamente</button>
+        </div>
+      )}
+
+      {loading ? <ChartSkeleton h={80} /> : s && <FunilVisual stats={s} />}
 
       <div className="grid gap-2.5" style={{ gridTemplateColumns: '11fr 13fr' }}>
         <PanelCard title="Canal de Origem">
-          {data?.canal?.length ? (
+          {loading ? <ChartSkeleton /> : data?.canal?.length ? (
             <ResponsiveContainer width="100%" height={180}>
               <BarChart data={data.canal} margin={{ left: 4, right: 12, top: 4, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
@@ -202,7 +229,7 @@ export function FunilInquilinosClient() {
           ) : <p className="text-xs text-muted-foreground py-6 text-center px-3">Sem dados</p>}
         </PanelCard>
         <PanelCard title="Motivos de Não Fechamento">
-          {data?.motivos?.length ? <MotivosDonut data={data.motivos} /> : <p className="text-xs text-muted-foreground py-6 text-center px-3">Sem dados</p>}
+          {loading ? <ChartSkeleton /> : data?.motivos?.length ? <MotivosDonut data={data.motivos} /> : <p className="text-xs text-muted-foreground py-6 text-center px-3">Sem dados</p>}
         </PanelCard>
       </div>
 

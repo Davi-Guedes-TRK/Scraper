@@ -1,6 +1,7 @@
 'use client'
 
 import { Fragment, useEffect, useState, useCallback } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, PieChart, Pie, Cell, LineChart, Line, LabelList,
@@ -277,26 +278,47 @@ function ValorTooltip({ active, payload, label }: {
 
 // ── Componente principal ──────────────────────────────────────────────────────
 
+function ChartSkeleton({ h = 180 }: { h?: number }) {
+  return <div className="animate-pulse rounded bg-muted" style={{ height: h }} />
+}
+
 export function FunilClient() {
-  const [bairro,     setBairro]     = useState('Todos')
-  const [tipo,       setTipo]       = useState('Todos')
-  const [range,      setRange]      = useState('ano')
+  const searchParams = useSearchParams()
+  const router = useRouter()
+
+  const [bairro,     setBairro]     = useState(() => searchParams.get('bairro') ?? 'Todos')
+  const [tipo,       setTipo]       = useState(() => searchParams.get('tipo') ?? 'Todos')
+  const [range,      setRange]      = useState(() => searchParams.get('range') ?? 'ano')
   const [showCustom, setShowCustom] = useState(false)
-  const [customDe,   setCustomDe]   = useState('')
-  const [customAte,  setCustomAte]  = useState('')
+  const [customDe,   setCustomDe]   = useState(() => searchParams.get('de') ?? '')
+  const [customAte,  setCustomAte]  = useState(() => searchParams.get('ate') ?? '')
   const [data,       setData]       = useState<Data | null>(null)
   const [loading,    setLoading]    = useState(true)
+  const [erro,       setErro]       = useState<string | null>(null)
 
   const today = new Date().toISOString().slice(0, 10)
 
+  const syncUrl = useCallback((b: string, t: string, r: string, de: string, ate: string) => {
+    const p = new URLSearchParams()
+    if (b !== 'Todos') p.set('bairro', b)
+    if (t !== 'Todos') p.set('tipo', t)
+    if (r !== 'ano') p.set('range', r)
+    if (de) p.set('de', de)
+    if (ate) p.set('ate', ate)
+    router.replace(`?${p.toString()}`, { scroll: false })
+  }, [router])
+
   const load = useCallback(async (b: string, t: string, r: string, de?: string, ate?: string) => {
-    setLoading(true)
+    setLoading(true); setErro(null)
     try {
       const p = new URLSearchParams({ bairro: b, tipo_imovel: t })
       if (de && ate) { p.set('desde', de); p.set('ate', ate) }
       else           { p.set('range', r) }
       const res = await fetch(`/api/pipefy/funil?${p}`, { cache: 'no-store' })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       setData(await res.json())
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Erro ao carregar')
     } finally {
       setLoading(false)
     }
@@ -305,9 +327,10 @@ export function FunilClient() {
   const customAtivo = showCustom && !!customDe && !!customAte
 
   useEffect(() => {
+    syncUrl(bairro, tipo, range, customDe, customAte)
     if (customAtivo) load(bairro, tipo, range, customDe, customAte)
     else             load(bairro, tipo, range)
-  }, [bairro, tipo, range, customAtivo, customDe, customAte, load])
+  }, [bairro, tipo, range, customAtivo, customDe, customAte, load, syncUrl])
 
   const s = data?.stats
 
@@ -318,8 +341,8 @@ export function FunilClient() {
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-lg font-semibold text-foreground">Funil de Captação</h1>
-          <p className="text-[13px] text-muted-foreground">
-            Pipefy{loading && <span className="ml-2 opacity-50">carregando…</span>}
+          <p className="text-[13px] text-muted-foreground flex items-center gap-1.5">
+            Pipefy{loading && <svg className="w-3.5 h-3.5 animate-spin text-muted-foreground/50" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" /></svg>}
           </p>
         </div>
         <div className="flex flex-col items-end gap-1.5">
@@ -330,7 +353,7 @@ export function FunilClient() {
                 <button
                   key={o.value}
                   onClick={() => { setRange(o.value); setShowCustom(false) }}
-                  className={`px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                  className={`px-2.5 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
                     !customAtivo && range === o.value
                       ? 'bg-primary text-white'
                       : 'bg-background text-muted-foreground hover:bg-muted'
@@ -344,7 +367,7 @@ export function FunilClient() {
             <button
               onClick={() => setShowCustom(v => !v)}
               title="Período personalizado"
-              className={`h-8 w-8 rounded-lg border flex items-center justify-center transition-colors ${
+              className={`h-8 w-8 rounded-lg border flex items-center justify-center transition-colors cursor-pointer ${
                 customAtivo
                   ? 'bg-primary text-white border-primary'
                   : showCustom
@@ -389,12 +412,21 @@ export function FunilClient() {
         </div>
       </div>
 
+      {erro && (
+        <div className="rounded-lg border border-red-500/20 bg-red-500/10 text-red-400 text-sm px-4 py-3 flex items-center justify-between gap-3">
+          <span>{erro}</span>
+          <button onClick={() => load(bairro, tipo, range, customDe || undefined, customAte || undefined)} className="text-xs font-medium underline hover:no-underline cursor-pointer shrink-0">
+            Tentar novamente
+          </button>
+        </div>
+      )}
+
       {/* Row 1 — Funil visual com valores */}
-      {s && <FunilVisual stats={s} anuncios={data?.anunciosAtivos ?? 0} anunciosValor={data?.anunciosValor ?? 0} />}
+      {loading ? <ChartSkeleton h={80} /> : s && <FunilVisual stats={s} anuncios={data?.anunciosAtivos ?? 0} anunciosValor={data?.anunciosValor ?? 0} />}
 
       {/* Row 2 — Origem da oportunidade */}
       <PanelCard title="Origem da Oportunidade">
-        {data?.origem?.length
+        {loading ? <ChartSkeleton h={180} /> : data?.origem?.length
           ? <OrigemChart data={data.origem} />
           : <p className="text-xs text-muted-foreground py-6 text-center px-3">Sem dados</p>}
       </PanelCard>
@@ -402,12 +434,12 @@ export function FunilClient() {
       {/* Row 3 — Motivos + Fases */}
       <div className="grid gap-2.5" style={{ gridTemplateColumns: '11fr 13fr' }}>
         <PanelCard title="Motivos de Não Captação">
-          {data?.motivos?.length
+          {loading ? <ChartSkeleton h={180} /> : data?.motivos?.length
             ? <DonutChart data={data.motivos} />
             : <p className="text-xs text-muted-foreground py-6 text-center px-3">Sem dados</p>}
         </PanelCard>
         <PanelCard title="Distribuição por Fase Atual">
-          {data?.fases?.length
+          {loading ? <ChartSkeleton h={180} /> : data?.fases?.length
             ? <FasesChart data={data.fases} />
             : <p className="text-xs text-muted-foreground py-6 text-center px-3">Sem dados</p>}
         </PanelCard>
