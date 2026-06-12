@@ -14,34 +14,14 @@ export async function saveProfile(
   const nome = (formData.get('nome') as string | null)?.trim() || null
   const tema = (formData.get('tema') as string | null) ?? 'system'
 
-  // Try update first (works if row exists and RLS allows update)
-  const { error: updateError, count } = await supabase
+  // upsert: creates the row if it doesn't exist, updates if it does
+  const { error } = await supabase
     .from('profiles')
-    .update({ nome, tema, onboarding_completo: true })
-    .eq('id', user.id)
-    .select('id', { count: 'exact', head: true })
+    .upsert({ id: user.id, nome, tema, onboarding_completo: true })
 
-  if (!updateError && (count ?? 0) > 0) {
-    // Update succeeded — row existed and was updated
-    revalidatePath('/', 'layout')
-    return { error: null }
-  }
-
-  // Row doesn't exist yet — try insert
-  const { error: insertError } = await supabase
-    .from('profiles')
-    .insert({ id: user.id, nome, tema, onboarding_completo: true, papel: 'captador' })
-
-  if (insertError) {
-    // Last resort: try upsert
-    const { error: upsertError } = await supabase
-      .from('profiles')
-      .upsert({ id: user.id, nome, tema, onboarding_completo: true })
-
-    if (upsertError) {
-      console.error('[saveProfile] all attempts failed:', { updateError, insertError, upsertError })
-      return { error: 'Não foi possível salvar. Tente novamente.' }
-    }
+  if (error) {
+    console.error('[saveProfile] upsert failed:', error)
+    return { error: 'Não foi possível salvar. Tente novamente.' }
   }
 
   revalidatePath('/', 'layout')
