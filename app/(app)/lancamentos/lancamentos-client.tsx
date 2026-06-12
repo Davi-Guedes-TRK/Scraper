@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { LANCAMENTO_FONTES } from '@/lib/portals'
 import { fmtBRL, timeAgo } from '@/lib/formatters'
 
@@ -190,29 +191,42 @@ function TipologiasRow({ tipologias, colSpan }: { tipologias: unknown; colSpan: 
 }
 
 export function LancamentosClient() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const [data, setData] = useState<ApiResponse | null>(null)
   const [loading, setLoading] = useState(true)
-  const [fonte, setFonte] = useState<string | null>(null)
-  const [bairro, setBairro] = useState<string | null>(null)
-  const [status, setStatus] = useState<string | null>(null)
+  const [erro, setErro] = useState<string | null>(null)
+  const [fonte, setFonte] = useState<string | null>(() => searchParams.get('fonte'))
+  const [bairro, setBairro] = useState<string | null>(() => searchParams.get('bairro'))
+  const [status, setStatus] = useState<string | null>(() => searchParams.get('status'))
   const [sortCol, setSortCol] = useState<SortCol>('scraped_at')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
+  const [reloadKey, setReloadKey] = useState(0)
+
+  const syncUrl = useCallback((f: string | null, b: string | null, s: string | null) => {
+    const p = new URLSearchParams()
+    if (f) p.set('fonte', f)
+    if (b) p.set('bairro', b)
+    if (s) p.set('status', s)
+    router.replace(`?${p.toString()}`, { scroll: false })
+  }, [router])
 
   useEffect(() => {
     const ac = new AbortController()
-    setLoading(true)
+    setLoading(true); setErro(null)
+    syncUrl(fonte, bairro, status)
     const params = new URLSearchParams()
     if (fonte) params.set('fonte', fonte)
     if (bairro) params.set('bairro', bairro)
     if (status) params.set('status', status)
     fetch(`/api/empreendimentos?${params}`, { signal: ac.signal })
-      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
       .then(setData)
-      .catch(() => { /* aborted */ })
+      .catch(e => { if (e.name !== 'AbortError') setErro(e.message ?? 'Erro ao carregar') })
       .finally(() => setLoading(false))
     return () => ac.abort()
-  }, [fonte, bairro, status])
+  }, [fonte, bairro, status, syncUrl, reloadKey])
 
   const itemsByBairro = useMemo(() => {
     if (!data) return new Map<string, number>()
@@ -316,6 +330,15 @@ export function LancamentosClient() {
           })}
         </div>
       </div>
+
+      {erro && (
+        <div className="rounded-lg border border-red-500/20 bg-red-500/10 text-red-400 text-sm px-4 py-3 flex items-center justify-between gap-3">
+          <span>{erro}</span>
+          <button onClick={() => setReloadKey(k => k + 1)} className="text-xs font-medium underline hover:no-underline cursor-pointer shrink-0">
+            Tentar novamente
+          </button>
+        </div>
+      )}
 
       {/* Tabela */}
       {loading ? (
