@@ -209,9 +209,9 @@ Fase 6 (polimento)                ← contínuo, fechamento
 
 ## Status
 
-- [ ] Tarefa 1.1 — docs/JORNADAS.md
-- [ ] Fase 1 — Fundação de acesso
-- [ ] Fase 2 — Navegação por jornada
+- [x] Tarefa 1.1 — docs/JORNADAS.md
+- [x] Fase 1 — Fundação de acesso (commit 4b0cbe2 — migration SQL pendente de executar no Supabase)
+- [x] Fase 2 — Navegação por jornada
 - [ ] Fase 3 — Estados e feedback (0/14 páginas)
 - [ ] Fase 4 — Mobile Campo
 - [ ] Fase 5 — Dashboard por papel
