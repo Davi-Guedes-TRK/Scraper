@@ -1,0 +1,28 @@
+name: Sync Wimoveis → Banco
+
+on:
+  schedule:
+    - cron: '0 12 * * *'   # 09:00 BRT
+  workflow_dispatch:
+
+concurrency:
+  group: wimoveis-sync
+  cancel-in-progress: false
+
+jobs:
+  wimoveis-sync:
+    name: Wimoveis — aluguel DF
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: scripts/requirements.txt
+      - run: pip install -r scripts/requirements.txt
+      - name: Sincronizar
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python scripts/wimoveis_sync.py --tipo aluguel --paginas 20 --publicados-ha 1
