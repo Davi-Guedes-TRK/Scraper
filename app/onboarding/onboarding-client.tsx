@@ -140,11 +140,19 @@ export function OnboardingClient({ papel, nomeInicial }: { papel: Papel; nomeIni
     const fd = new FormData()
     fd.set('nome', nome)
     fd.set('tema', tema)
-    await action(fd)
-    setStep('tour')
+    const result = await action(fd)
+    // Only advance if save succeeded (no error)
+    if (!result?.error) {
+      setStep('tour')
+    }
   }
 
-  function handlePular() {
+  async function handlePular() {
+    // Save profile with onboarding_completo=true before redirecting
+    const fd = new FormData()
+    fd.set('nome', nome || '')
+    fd.set('tema', tema)
+    await action(fd)
     router.push('/dashboard')
     router.refresh()
   }
