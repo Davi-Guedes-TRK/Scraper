@@ -20,8 +20,8 @@ export async function saveProfile(
     .eq('id', user.id)
 
   if (error) {
-    console.error('[saveProfile] update failed:', error)
-    return { error: 'Não foi possível salvar. Tente novamente.' }
+    console.error('[saveProfile] update failed:', JSON.stringify(error))
+    return { error: `Erro: ${error.message} (code: ${error.code})` }
   }
 
   revalidatePath('/', 'layout')
