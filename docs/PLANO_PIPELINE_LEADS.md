@@ -73,14 +73,15 @@ O card em "COM | Oportunidades" precisa ser ATUALIZADO a cada etapa, não só cr
 - ⚠️ **Nido NÃO tem CPF** em `nido_pessoas` — match de proprietário é por **nome normalizado** (homônimos possíveis; tratar como "provável forte"). Validado: dedup achou a mesma casa do Lago Sul 3x duplicada no próprio Nido.
 - Falta (vira Fase 3): chamar o gate no fluxo real (cartorio-auto/triagem) → existe → GChat + card "JÁ NA BASE"; não existe → solicitar ônus.
 
-### Fase 3 — Ônus automatizada + OCR + proprietário
-1. **Solicitar ônus** (DECIDIDO jun/12): o pedido é o **form público Pipefy "SEC | Ônus"** (org 300542579), hoje preenchido manualmente por `pipefy_portal_fill.py` (Playwright + sessão salva). Automação:
-   - (a) **Preferido**: GraphQL `createCard` direto no pipe do SEC | Ônus com o token da API (mesma org; o script já lê o pipe 307179010 com esse token). Sem browser, sem sessão expirando — roda em GitHub Actions agendado. Testar: descobrir pipe ID + field IDs do form e criar 1 card de teste.
-   - (b) Fallback: rodar o próprio `pipefy_portal_fill.py --from-pipefy --submit` em GitHub Actions (Pipefy é SaaS, runner alcança) — mas `pipefy_session.json` expira e exige refresh interativo; frágil em CI.
-   - Mover a lista `ONUS_SUBMETIDOS` (hardcoded no script) p/ coluna no banco (`onus_solicitada_em`) — em volume alto, hardcode não escala.
-2. **Inbound da ônus + extração** (custo revisado): a certidão costuma ser **PDF digital com texto selecionável** → extração de texto pura (`pdf-parse`/`pdfjs`, grátis) + parsing extrai `{proprietario_atual, cpf, matricula, onus_existentes}`. **Claude API só como fallback** p/ PDF escaneado, usando **Haiku** (centavos por certidão — ordens de grandeza menor que o custo da própria certidão). Sem dependência obrigatória de vision.
-3. **Cadeia de contato**: CPF → consulta espelho `dw_proprietarios` → achou? contato pro card. Não achou? → `lib/cpf-lookup.ts` (busca-pessoa/Telegram, já existe) → telefones/e-mails pro card.
-4. Validação de CPF (dígito verificador) antes de gastar consulta no bot.
+### Fase 3 — Ônus automatizada + extração + proprietário ✅ CONSTRUÍDA (jun/12)
+Estado em `onus_pipeline` (tabela nova — evita mexer nas 7 tabelas+view). Fluxo implantado:
+1. **Gate** (`lib/onus-gate.ts`): matrícula chega no `/api/cartorio/inbound` → dedup no espelho →
+   `exato` = GChat "JÁ NA BASE" + card `tem_cadastro_no_nido='Sim'`, NÃO solicita ·
+   `provavel` = GChat com candidatos (humano decide) · `nenhum` = entra na fila da ônus.
+2. **Solicitar ônus**: o pipe do form SEC | Ônus **não é visível pro token do Davi** (outro time) → caminho é o form público mesmo: `pipefy_portal_fill.py --from-gate [--submit]` lê a fila do `onus_pipeline` e marca `onus_solicitada_em` após enviar. **Tarefa Agendada "ERP_TRK onus_fill" (10h, DESABILITADA)** — ligar só após validar um dry-run com fila real (`Enable-ScheduledTask "ERP_TRK onus_fill"`).
+3. **Inbound da ônus** (`/api/onus/inbound`): Apps Script detecta PDF anexo do cartório e POSTa base64 → **Gemini 2.5 Flash** extrai `{matricula, proprietarios[nome,cpf], onus_ativos}` (lê PDF digital E escaneado; sem custo novo — mesma GEMINI_API_KEY; decisão: Gemini em vez de Claude vision por custo) → correlaciona pela MATRÍCULA → CPF validado por dígito verificador.
+4. **Cadeia de contato**: nome → `dw_pessoas` (espelho; Nido não tem CPF, match por nome) → senão CPF → `lookupCPF` (Telegram, já existia) → senão GChat pede busca manual. Contato + ônus + co-proprietários → card COM-Oportunidades (`atualizarCardOportunidade` em `lib/pipefy.ts`).
+5. **Apps Script reescrito** (`scripts/cartorio_apps_script.js`): rastreio por timestamp de MENSAGEM (Script Properties) em vez de label por thread — ônus que chega como resposta em thread já processada não se perde. ⚠️ **Re-colar no editor do Google** (de novo).
 
 ### Fase 4 — Dashboard "bolsa de valores"
 Página `/pregao` (ou reformular `/dashboard`): o funil como um pregão em tempo real.

@@ -7,6 +7,9 @@ Fontes de dados:
   • um JSON por imóvel:        python scripts/pipefy_portal_fill.py dados.json
   • do banco (relatório):      python scripts/pipefy_portal_fill.py --from-db [N]
         -> imóveis com numero_matricula preenchido (≠ 'N/A') em imoveis_todos
+  • do gate de dedup (Fase 3): python scripts/pipefy_portal_fill.py --from-gate [N]
+        -> onus_pipeline: dedup_nivel='nenhum' e onus_solicitada_em IS NULL
+        -> com --submit, marca onus_solicitada_em=now() após enviar
 Flags: --submit (envia), --headful (mostra o browser)
 
 Fixos por padrão: Finalidade="Consulta de Dados ( Simples )", Empresa="TRK Administradora",
@@ -186,6 +189,41 @@ def load_from_pipefy():
     return recs
 
 
+def load_from_gate(limit=None):
+    """Fila do gate de dedup (Fase 3): imóveis liberados (não existem no Nido)
+    com matrícula recebida e ônus ainda não solicitada."""
+    import psycopg2
+    url = _load_db_url()
+    q = """
+      SELECT link, endereco, matricula, bairro, cidade
+      FROM onus_pipeline
+      WHERE dedup_nivel = 'nenhum'
+        AND onus_solicitada_em IS NULL
+        AND matricula IS NOT NULL AND btrim(matricula) <> ''
+      ORDER BY criado_em
+    """ + (f" LIMIT {int(limit)}" if limit else "")
+    conn = psycopg2.connect(url)
+    cur = conn.cursor(); cur.execute(q); rows = cur.fetchall()
+    cur.close(); conn.close()
+    recs = []
+    for link, endereco, matricula, bairro, cidade in rows:
+        regiao = pretty_regiao(cidade) if cidade and cidade != 'Brasília' else (bairro or pretty_regiao(cidade))
+        recs.append({**DEFAULTS, "endereco": endereco or "",
+                     "regiao_bairro": regiao or "",
+                     "matricula": str(matricula), "cartorio": cartorio_for(regiao or ""),
+                     "_link": link})
+    return recs
+
+
+def marcar_solicitada(link):
+    """Marca onus_solicitada_em=now() após submit de verdade (idempotência da fila)."""
+    import psycopg2
+    conn = psycopg2.connect(_load_db_url())
+    cur = conn.cursor()
+    cur.execute("UPDATE onus_pipeline SET onus_solicitada_em = now(), atualizado_em = now() WHERE link = %s", (link,))
+    conn.commit(); cur.close(); conn.close()
+
+
 def load_from_db(limit=None):
     import psycopg2
     url = _load_db_url()
@@ -218,8 +256,21 @@ def main():
     headful     = "--headful"      in flags
     from_db     = "--from-db"      in flags
     from_pipefy = "--from-pipefy"  in flags
+    from_gate   = "--from-gate"    in flags
 
-    if from_pipefy:
+    if from_gate:
+        limit = next((int(a) for a in args if a.isdigit()), None)
+        recs = load_from_gate(limit)
+        print(f"[from-gate] {len(recs)} imóvel(is) liberados pelo dedup aguardando ônus.")
+        if not recs:
+            print("  → Fila vazia.")
+            return
+        for i, r in enumerate(recs):
+            print(f"   {i+1:>3}. matr {r['matricula']:<10} | {r['endereco']} | {r['regiao_bairro']} | {r['cartorio']}")
+        if not submit:
+            print("\n  → DRY-RUN: preview do 1º (nada enviado; use --submit).")
+            recs = recs[:1]
+    elif from_pipefy:
         recs = load_from_pipefy()
         print(f"[from-pipefy] {len(recs)} card(s) sem proprietário e com matrícula em 'Informações Básicas'.")
         if not recs:
@@ -280,8 +331,13 @@ def main():
             print("\n".join(log)); print(f"  screenshot: {shot}")
             if submit:
                 btn = page.query_selector("button:has-text('Criar novo card')") or page.query_selector("button:has-text('Enviar')")
-                if btn: btn.click(); time.sleep(3); print("  → ENVIADO.")
-                else:   print("  [!] botão de envio não encontrado — não enviei.")
+                if btn:
+                    btn.click(); time.sleep(3); print("  → ENVIADO.")
+                    if from_gate and rec.get("_link"):
+                        marcar_solicitada(rec["_link"])
+                        print("  → onus_solicitada_em marcado no banco.")
+                else:
+                    print("  [!] botão de envio não encontrado — não enviei.")
             else:
                 print("  → NÃO enviei (use --submit pra enviar de verdade).")
         browser.close()

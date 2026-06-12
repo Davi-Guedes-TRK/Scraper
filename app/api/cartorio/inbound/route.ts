@@ -3,6 +3,7 @@ import sql from '@/lib/db'
 import { portalTable, portalKeys } from '@/lib/portals'
 import { matchCartorioReply, formatEndereco, refForLink, parseRefFromSubject, parseMatriculaFromText } from '@/lib/cartorio'
 import { criarCardOportunidade, type ImovelParaCard } from '@/lib/pipefy'
+import { rodarGateOnus } from '@/lib/onus-gate'
 import { log } from '@/lib/logger'
 import { notifyGChat, cartorioMsg } from '@/lib/gchat'
 
@@ -165,6 +166,26 @@ export async function POST(req: NextRequest) {
       await notifyGChat(cartorioMsg.erroCard(formatEndereco(imovel), msg)).catch(() => {})
       await log('error', 'cartorio-inbound', 'Falha ao criar card Pipefy', { link: imovel.link, error: msg }).catch(() => {})
     }
+  }
+
+  // 3. Gate de dedup contra o dw_trk: decide se a ônus será solicitada (Fase 3).
+  //    Best-effort — falha no gate não derruba o processamento da matrícula.
+  for (const m of casados) {
+    const imovel = aguardando.find(it => it.link === m.candidate!.link)
+    if (!imovel) continue
+    const card = cards.find(c => c.link === imovel.link)
+    await rodarGateOnus({
+      link:      imovel.link,
+      portal:    imovel.portal,
+      endereco:  formatEndereco(imovel),
+      matricula: m.matricula,
+      bairro:    imovel.bairro,
+      cidade:    imovel.cidade,
+      cardId:    card?.cardId || null,
+    }).catch(err =>
+      log('error', 'cartorio-inbound', 'Falha no gate de ônus', {
+        link: imovel.link, error: err instanceof Error ? err.message : String(err),
+      }).catch(() => {}))
   }
 
   const cardsCriados = cards.filter(c => !c.error && !c.skipped).length

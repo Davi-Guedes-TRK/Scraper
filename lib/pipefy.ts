@@ -120,3 +120,27 @@ export async function criarCardOportunidade(imovel: ImovelParaCard): Promise<Car
   }
   return data.createCard.card
 }
+
+// O card é o espelho vivo do lead: cada etapa do pipeline (dedup, ônus, proprietário,
+// contato) escreve nele. Field IDs do COM - Oportunidades:
+//   nome_do_propriet_rio_1 · telefone_contato_1 · e_mail · outros_contatos
+//   tem_cadastro_no_nido ('Sim'/'Não') · matr_cula_1
+export async function atualizarCardOportunidade(
+  cardId: string,
+  valores: Array<{ fieldId: string; value: string }>,
+): Promise<void> {
+  const token = process.env.PIPEFY_TOKEN
+  if (!token) throw new Error('PIPEFY_TOKEN não configurado')
+  if (!valores.length) return
+
+  const mutation = `
+    mutation UpdateFields($input: UpdateFieldsValuesInput!) {
+      updateFieldsValues(input: $input) { success userErrors { field message } }
+    }
+  `
+  const data = await gql(token, mutation, {
+    input: { nodeId: cardId, values: valores.map(v => ({ fieldId: v.fieldId, value: v.value })) },
+  }) as { updateFieldsValues: { success: boolean; userErrors: { field: string; message: string }[] } }
+  const errs = data.updateFieldsValues.userErrors
+  if (errs?.length) throw new Error(errs.map(e => `${e.field}: ${e.message}`).join('; '))
+}
