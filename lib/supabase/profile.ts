@@ -1,6 +1,6 @@
 'server-only'
 
-import { createClient } from './server'
+import sql from '@/lib/db'
 
 export type Papel = 'captador' | 'operador' | 'gestor' | 'admin'
 
@@ -13,15 +13,26 @@ export type Profile = {
 }
 
 export async function getProfile(userId: string): Promise<Profile> {
-  const supabase = await createClient()
-  const { data } = await supabase
-    .from('profiles')
-    .select('id, nome, papel, onboarding_completo, tema')
-    .eq('id', userId)
-    .single()
+  const rows = await sql`
+    SELECT id, nome, papel, onboarding_completo, tema
+    FROM profiles
+    WHERE id = ${userId}
+    LIMIT 1
+  `
+
+  if (rows.length > 0) {
+    const r = rows[0]
+    return {
+      id: r.id,
+      nome: r.nome,
+      papel: r.papel as Papel,
+      onboarding_completo: r.onboarding_completo,
+      tema: r.tema,
+    }
+  }
 
   // Fallback: se o profile ainda não existe, força onboarding (seguro — não pula)
-  return data ?? {
+  return {
     id: userId,
     nome: null,
     papel: 'captador' as Papel,
