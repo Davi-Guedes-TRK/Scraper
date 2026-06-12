@@ -15,8 +15,7 @@ export async function saveProfile(
 
   const { error } = await supabase
     .from('profiles')
-    .update({ nome, tema, onboarding_completo: true })
-    .eq('id', user.id)
+    .upsert({ id: user.id, nome, tema, onboarding_completo: true })
 
   if (error) return { error: 'Não foi possível salvar. Tente novamente.' }
   return { error: null }
