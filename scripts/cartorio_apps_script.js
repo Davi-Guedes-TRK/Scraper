@@ -84,6 +84,30 @@ function getOuCriarLabel(nome) {
   return label;
 }
 
+// Busca e-mails no Gmail — chamado via GET com ?token=APPS_SECRET&q=query
+function doGet(e) {
+  var secret = (e.parameter && e.parameter.token) ? e.parameter.token : '';
+  if (secret !== APPS_SECRET) {
+    return resposta({ error: 'Unauthorized' });
+  }
+  var q = (e.parameter && e.parameter.q) ? e.parameter.q : 'subject:(onus OR matricula)';
+  var threads = GmailApp.search(q, 0, 50);
+  var results = [];
+  for (var i = 0; i < threads.length; i++) {
+    var thread = threads[i];
+    var msgs = thread.getMessages();
+    var last = msgs[msgs.length - 1];
+    results.push({
+      subject: thread.getFirstMessageSubject(),
+      from:    last.getFrom(),
+      to:      last.getTo(),
+      date:    Utilities.formatDate(last.getDate(), 'America/Sao_Paulo', 'yyyy-MM-dd'),
+      body:    last.getPlainBody().slice(0, 300)
+    });
+  }
+  return resposta({ ok: true, count: results.length, emails: results });
+}
+
 function resposta(obj) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))

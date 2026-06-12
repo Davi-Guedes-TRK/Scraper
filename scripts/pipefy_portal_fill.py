@@ -227,6 +227,14 @@ def main():
             return
         print("  Lista:")
         for i, r in enumerate(recs): print(f"   {i+1:>3}. matr {r['matricula']:<10} | {r['endereco']} | {r['regiao_bairro']}")
+        # Matrículas já confirmadas por e-mail do Pipefy — não re-submeter
+        ONUS_SUBMETIDOS = {'25063','51051','36521','80888','4587','4694',
+                           '94385','24996','89307','104923','31071','35641'}
+        antes = len(recs)
+        recs = [r for r in recs if str(r.get('matricula','')).replace(',','') not in ONUS_SUBMETIDOS]
+        pulados = antes - len(recs)
+        if pulados:
+            print(f"  ({pulados} ja submetidos anteriormente — pulados)")
         if not submit:
             print("\n  → DRY-RUN: abrindo preview de todos (sem enviar)...")
     elif from_db:
