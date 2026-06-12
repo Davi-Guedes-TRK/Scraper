@@ -28,8 +28,11 @@ export type PregaoData = {
   parados: Array<{ tipo: string; endereco: string; dias: number; link: string }>
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rows<T>(result: any): T[] { return result as T[] }
+
 export async function GET() {
-  const [funilRows, onusRows, ticker, volume, paradosMat, paradosOnus] = await Promise.all([
+  const [funilRows, onusRows, tickerRows, volumeRows, paradosMatRows, paradosOnusRows] = await Promise.all([
     sql`
       SELECT
         count(*) FILTER (WHERE status_triagem = 'pendente')  ::int AS na_fila,
@@ -90,6 +93,10 @@ export async function GET() {
 
   const f = funilRows[0]
   const o = onusRows[0]
+  const ticker = rows<PregaoData['ticker'][number]>(tickerRows)
+  const volume = rows<PregaoData['volume14d'][number]>(volumeRows)
+  const paradosMat = rows<PregaoData['parados'][number]>(paradosMatRows)
+  const paradosOnus = rows<PregaoData['parados'][number]>(paradosOnusRows)
 
   const data: PregaoData = {
     agora: new Date().toISOString(),
@@ -106,9 +113,9 @@ export async function GET() {
       mat_solicitadas_total: f.mat_solicitadas_total, mat_recebidas_total: f.mat_recebidas_total,
       onus_solicitadas_total: o.onus_solicitadas_total, contatos_total: o.contato_ok,
     },
-    ticker: ticker as unknown as PregaoData['ticker'],
-    volume14d: volume as unknown as PregaoData['volume14d'],
-    parados: [...paradosMat, ...paradosOnus].sort((a, b) => (b as any).dias - (a as any).dias) as PregaoData['parados'],
+    ticker,
+    volume14d: volume,
+    parados: [...paradosMat, ...paradosOnus].sort((a, b) => b.dias - a.dias),
   }
   return NextResponse.json(data, { headers: { 'Cache-Control': 'no-store' } })
 }
