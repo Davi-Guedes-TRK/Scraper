@@ -38,6 +38,14 @@ export async function GET(req: NextRequest) {
   const fonte = req.nextUrl.searchParams.get('fonte')
   const bairro = req.nextUrl.searchParams.get('bairro')
   const status = req.nextUrl.searchParams.get('status')
+  const statsOnly = req.nextUrl.searchParams.get('stats') === '1'
+
+  if (statsOnly) {
+    const rows = await sql<{ max_scraped_at: string | null; total: number }[]>`
+      SELECT MAX(scraped_at) AS max_scraped_at, COUNT(*)::int AS total FROM empreendimentos_all
+    `
+    return Response.json({ maxScrapedAt: rows[0]?.max_scraped_at ?? null, total: rows[0]?.total ?? 0 })
+  }
 
   if (fonte && !lancamentoFontes.includes(fonte)) {
     return Response.json({ error: 'fonte inválida' }, { status: 400 })

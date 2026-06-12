@@ -7,20 +7,23 @@ import { ThemeToggle } from './theme-toggle'
 import { SearchInput } from './ui/toolbar'
 import { signOut } from '@/app/actions/auth'
 import { useNewPropertiesCtx } from './new-properties-provider'
+import { timeAgo } from '@/lib/formatters'
 
 const TITLES: Record<string, string> = {
-  '/dashboard': 'Dashboard',
-  '/scrapers': 'Scrapers',
-  '/triagem': 'Fila de Triagem',
-  '/visitas': 'Roteiro de Visitas',
-  '/relatorio': 'Cartório',
-  '/analitico': 'Analítico',
-  '/lancamentos': 'Lançamentos',
-  '/carteira-paralela': 'Carteira Paralela',
-  '/captacao': 'Captação',
-  '/in-loco': 'Visita In Loco',
-  '/busca-pessoa': 'Busca Pessoa',
+  '/dashboard': 'Início',
+  '/triagem': 'Triagem',
   '/geoportal': 'Geoportal',
+  '/busca-pessoa': 'Busca Pessoa',
+  '/visitas': 'Visitas',
+  '/in-loco': 'In Loco',
+  '/relatorio': 'Cartório',
+  '/captacao': 'Carteiras · Alugamos não Adm.',
+  '/carteira-paralela': 'Carteiras · Paralela',
+  '/lancamentos': 'Carteiras · Lançamentos',
+  '/analitico/funil-inquilinos': 'Funil de Inquilinos',
+  '/analitico/funil': 'Funil de Captação',
+  '/analitico': 'Analítico',
+  '/scrapers': 'Sistema · Scrapers',
 }
 
 function titleFor(pathname: string) {
@@ -38,13 +41,22 @@ function useOutside(onClose: () => void) {
   return ref
 }
 
-export function Topbar({ email }: { email?: string }) {
+export function Topbar({ email, nome }: { email?: string; nome?: string | null }) {
   const pathname = usePathname()
   const router = useRouter()
   const params = useSearchParams()
   const { count, latestTitle, markSeen } = useNewPropertiesCtx()
   const [notifOpen, setNotifOpen] = useState(false)
   const [userOpen, setUserOpen] = useState(false)
+  const [lancamentosTs, setLancamentosTs] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!pathname.startsWith('/lancamentos')) return
+    fetch('/api/empreendimentos?stats=1')
+      .then(r => r.json())
+      .then((d: { maxScrapedAt?: string | null }) => setLancamentosTs(d.maxScrapedAt ?? null))
+      .catch(() => {})
+  }, [pathname])
 
   const notifRef = useOutside(() => setNotifOpen(false))
   const userRef = useOutside(() => setUserOpen(false))
@@ -92,9 +104,16 @@ export function Topbar({ email }: { email?: string }) {
       style={{ background: 'var(--sidebar)', borderBottom: '1px solid var(--sidebar-border)' }}
     >
       {/* Título da página */}
-      <h1 className="font-display font-bold text-foreground text-[15px] tracking-tight flex-shrink-0 min-w-0 truncate">
-        {titleFor(pathname)}
-      </h1>
+      <div className="flex flex-col min-w-0 flex-shrink-0">
+        <h1 className="font-display font-bold text-foreground text-[15px] tracking-tight truncate leading-tight">
+          {titleFor(pathname)}
+        </h1>
+        {pathname.startsWith('/lancamentos') && lancamentosTs && (
+          <span className="text-[10px] text-muted-foreground font-mono leading-none mt-0.5">
+            atualizado {timeAgo(lancamentosTs)}
+          </span>
+        )}
+      </div>
 
       {/* Busca */}
       <form onSubmit={submitSearch} className="flex-1 max-w-md mx-auto hidden sm:block">
@@ -151,7 +170,7 @@ export function Topbar({ email }: { email?: string }) {
             style={{ background: 'var(--primary)' }}
             aria-label="Conta"
           >
-            {(email?.[0] ?? 'U').toUpperCase()}
+            {(nome?.[0] ?? email?.[0] ?? 'U').toUpperCase()}
           </button>
 
           {userOpen && (
