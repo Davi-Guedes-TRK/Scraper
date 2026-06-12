@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import sql from '@/lib/db'
 import { log } from '@/lib/logger'
+import { criarCardOportunidade } from '@/lib/pipefy'
 
 const ALLOWED_TABLES = ['imoveis_olx', 'imoveis_dfimoveis', 'imoveis_wimoveis'] as const
 type AllowedTable = (typeof ALLOWED_TABLES)[number]
@@ -101,8 +102,31 @@ export async function POST(request: NextRequest) {
          RETURNING (xmax = 0) AS is_insert`,
         vals as never[],
       )
-      if (result[0]?.is_insert) inserted++
-      else updated++
+      if (result[0]?.is_insert) {
+        inserted++
+        const isLocacao  = String(filtered.tipo ?? '').toLowerCase().includes('loca')
+        const isCorretor = String(filtered.tipo_anunciante ?? '').toLowerCase().includes('corretor')
+        const hasPhone   = !!filtered.telefone
+        if (isLocacao && isCorretor && hasPhone) {
+          criarCardOportunidade({
+            link:            String(filtered.link),
+            titulo:          String(filtered.titulo ?? ''),
+            bairro:          String(filtered.bairro ?? ''),
+            cidade:          String(filtered.cidade ?? ''),
+            preco:           String(filtered.preco ?? ''),
+            area_m2:         filtered.area_m2 as string | null,
+            tipo_imovel:     String(filtered.tipo_imovel ?? ''),
+            tipo:            String(filtered.tipo ?? ''),
+            telefone:        String(filtered.telefone),
+            nome_anunciante: String(filtered.nome_anunciante ?? ''),
+            origem:          'Corretor',
+          }).catch(err => {
+            log('warn', 'scraper-ingest', 'falha ao criar card corretor', { link: filtered.link, error: err instanceof Error ? err.message : String(err) }).catch(() => {})
+          })
+        }
+      } else {
+        updated++
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       errors.push(`link=${filtered.link}: ${msg}`)

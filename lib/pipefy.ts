@@ -75,6 +75,7 @@ export type ImovelParaCard = {
   endereco?: string | null
   maps_link?: string | null
   numero_matricula?: string | null
+  origem?: string | null
 }
 
 export type CardCriado = { id: string; title: string; url: string }
@@ -90,9 +91,11 @@ export async function criarCardOportunidade(imovel: ImovelParaCard): Promise<Car
     bairroNorm ?? imovel.bairro ?? '',
   ].filter(Boolean).join(' — ')
 
+  const origemValue = imovel.origem?.trim() || 'Portal'
+
   const fields: { field_id: string; field_value: string }[] = [
     { field_id: 'endere_o_1',               field_value: String(endereco) },
-    { field_id: 'origem_da_oportunidade_1',  field_value: 'Portal' },
+    { field_id: 'origem_da_oportunidade_1',  field_value: origemValue },
   ]
 
   const preco = num(imovel.preco)
@@ -104,6 +107,7 @@ export async function criarCardOportunidade(imovel: ImovelParaCard): Promise<Car
   if (bairroNorm)              fields.push({ field_id: 'bairro_1',            field_value: bairroNorm })
   if (tipoNorm)                fields.push({ field_id: 'tipo_de_im_vel_1',    field_value: tipoNorm })
   if (imovel.numero_matricula) fields.push({ field_id: 'matr_cula_1',          field_value: String(imovel.numero_matricula) })
+  if (imovel.telefone)        fields.push({ field_id: 'telefone_contato_1',   field_value: String(imovel.telefone) })
   fields.push({ field_id: 'tem_cadastro_no_nido', field_value: 'Não' })
 
   const mutation = `
