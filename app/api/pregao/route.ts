@@ -106,9 +106,9 @@ export async function GET() {
       mat_solicitadas_total: f.mat_solicitadas_total, mat_recebidas_total: f.mat_recebidas_total,
       onus_solicitadas_total: o.onus_solicitadas_total, contatos_total: o.contato_ok,
     },
-    ticker: ticker as PregaoData['ticker'],
-    volume14d: volume as PregaoData['volume14d'],
-    parados: [...paradosMat, ...paradosOnus].sort((a, b) => b.dias - a.dias) as PregaoData['parados'],
+    ticker: ticker as unknown as PregaoData['ticker'],
+    volume14d: volume as unknown as PregaoData['volume14d'],
+    parados: [...paradosMat, ...paradosOnus].sort((a, b) => (b as any).dias - (a as any).dias) as PregaoData['parados'],
   }
   return NextResponse.json(data, { headers: { 'Cache-Control': 'no-store' } })
 }
