@@ -263,7 +263,7 @@ function RunPanel() {
   const isOLX = portal === 'olx'
 
   const sel = 'bg-muted border border-border text-foreground text-sm rounded-lg px-3 py-2 outline-none focus:border-primary w-full disabled:opacity-40'
-  const pill = (active: boolean) => `text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors disabled:opacity-40 ${
+  const pill = (active: boolean) => `text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors disabled:opacity-40 cursor-pointer ${
     active
       ? 'border-primary bg-primary/10 text-primary'
       : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/40'
@@ -390,12 +390,13 @@ function RunPanel() {
         <div className="flex gap-2">
           {running ? (
             <button onClick={stop}
-              className="bg-red-600 hover:bg-red-500 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors">
+              className="bg-red-600 hover:bg-red-500 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors cursor-pointer flex items-center gap-2">
+              <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" /></svg>
               Parar
             </button>
           ) : (
             <button onClick={start}
-              className="bg-primary hover:bg-primary-h text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors">
+              className="bg-primary hover:bg-primary-h text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors cursor-pointer">
               Iniciar coleta
             </button>
           )}
