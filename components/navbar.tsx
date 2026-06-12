@@ -5,14 +5,19 @@ import { usePathname } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { LogoMark, LogoHorizontal } from './logo'
 import { useNewPropertiesCtx } from './new-properties-provider'
+import type { Papel } from '@/lib/supabase/profile'
 
-const NAV_GROUPS = [
+type NavItem = { href: string; label: string; icon: React.ReactNode; roles?: Papel[] }
+type NavGroup = { label: string | null; items: NavItem[]; roles?: Papel[] }
+
+// Grupos organizados pela ordem do funil — de cima para baixo como o processo acontece
+const NAV_GROUPS: NavGroup[] = [
   {
     label: null,
     items: [
       {
         href: '/dashboard',
-        label: 'Dashboard',
+        label: 'Início',
         icon: (
           <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
             <rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" />
@@ -23,38 +28,45 @@ const NAV_GROUPS = [
     ],
   },
   {
-    label: 'Analítico',
-    items: [
-      {
-        href: '/analitico/funil',
-        label: 'Funil de Captação',
-        icon: (
-          <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h18M6 8h12M9 12h6M11 16h2M12 20h0" />
-          </svg>
-        ),
-      },
-      {
-        href: '/analitico/funil-inquilinos',
-        label: 'Funil de Inquilinos',
-        icon: (
-          <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-            <circle cx="9" cy="8" r="3" />
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 20a6 6 0 0112 0M16 7.5a3 3 0 010 5M21 20a6 6 0 00-3.6-5.5" />
-          </svg>
-        ),
-      },
-    ],
-  },
-  {
-    label: 'Captação',
+    label: 'Captar',
     items: [
       {
         href: '/triagem',
-        label: 'Portais',
+        label: 'Triagem',
         icon: (
           <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h10M4 18h7" />
+          </svg>
+        ),
+      },
+      {
+        href: '/geoportal',
+        label: 'Geoportal',
+        icon: (
+          <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l6 3V10m-6 7V4m0 0l6-3" />
+            <circle cx="15.5" cy="9.5" r="1" fill="currentColor" />
+          </svg>
+        ),
+        roles: ['operador', 'gestor', 'admin'],
+      },
+      {
+        href: '/busca-pessoa',
+        label: 'Busca Pessoa',
+        icon: (
+          <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+            <circle cx="11" cy="11" r="7" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 8a3 3 0 100 6 3 3 0 000-6z" />
+          </svg>
+        ),
+        roles: ['operador', 'gestor', 'admin'],
+      },
+      {
+        href: '/visitas',
+        label: 'Visitas',
+        icon: (
+          <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
           </svg>
         ),
       },
@@ -68,6 +80,20 @@ const NAV_GROUPS = [
           </svg>
         ),
       },
+      {
+        href: '/relatorio',
+        label: 'Cartório',
+        icon: (
+          <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        ),
+      },
+    ],
+  },
+  {
+    label: 'Carteiras',
+    items: [
       {
         href: '/captacao',
         label: 'Alugamos não Adm.',
@@ -96,51 +122,27 @@ const NAV_GROUPS = [
           </svg>
         ),
       },
-      {
-        href: '/busca-pessoa',
-        label: 'Busca Pessoa',
-        icon: (
-          <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-            <circle cx="11" cy="11" r="7" />
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 8a3 3 0 100 6 3 3 0 000-6z" />
-          </svg>
-        ),
-      },
-      {
-        href: '/geoportal',
-        label: 'Geoportal',
-        icon: (
-          <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l6 3V10m-6 7V4m0 0l6-3" />
-            <circle cx="15.5" cy="9.5" r="1" fill="currentColor" />
-          </svg>
-        ),
-      },
     ],
   },
   {
-    label: 'Campo',
+    label: 'Analisar',
     items: [
       {
-        href: '/visitas',
-        label: 'Visitas',
+        href: '/analitico/funil',
+        label: 'Funil de Captação',
         icon: (
           <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h18M6 8h12M9 12h6M11 16h2M12 20h0" />
           </svg>
         ),
       },
-    ],
-  },
-  {
-    label: 'Documentos',
-    items: [
       {
-        href: '/relatorio',
-        label: 'Cartório',
+        href: '/analitico/funil-inquilinos',
+        label: 'Funil de Inquilinos',
         icon: (
           <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            <circle cx="9" cy="8" r="3" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 20a6 6 0 0112 0M16 7.5a3 3 0 010 5M21 20a6 6 0 00-3.6-5.5" />
           </svg>
         ),
       },
@@ -148,6 +150,7 @@ const NAV_GROUPS = [
   },
   {
     label: 'Sistema',
+    roles: ['gestor', 'admin'],
     items: [
       {
         href: '/scrapers',
@@ -162,6 +165,16 @@ const NAV_GROUPS = [
   },
 ]
 
+function filterGroups(groups: NavGroup[], papel: Papel): NavGroup[] {
+  return groups
+    .filter(g => !g.roles || g.roles.includes(papel))
+    .map(g => ({
+      ...g,
+      items: g.items.filter(i => !i.roles || i.roles.includes(papel)),
+    }))
+    .filter(g => g.items.length > 0)
+}
+
 const STORAGE_KEY_COLLAPSED = 'nav-collapsed'
 const STORAGE_KEY_GROUPS = 'nav-groups-collapsed'
 
@@ -174,7 +187,7 @@ function loadGroupsState(): Record<string, boolean> {
   }
 }
 
-export function Navbar() {
+export function Navbar({ papel = 'admin' }: { papel?: Papel }) {
   const pathname = usePathname()
   const { count, markSeen } = useNewPropertiesCtx()
 
@@ -182,6 +195,8 @@ export function Navbar() {
   const [groupsCollapsed, setGroupsCollapsed] = useState<Record<string, boolean>>({})
   const [badgePulse, setBadgePulse] = useState(false)
   const prevCount = useRef(0)
+
+  const visibleGroups = filterGroups(NAV_GROUPS, papel)
 
   useEffect(() => {
     setCollapsed(localStorage.getItem(STORAGE_KEY_COLLAPSED) === '1')
@@ -240,7 +255,7 @@ export function Navbar() {
         className="flex-1 py-3 flex flex-col gap-1 overflow-y-auto overflow-x-hidden"
         style={{ padding: '0.75rem 0.5rem' }}
       >
-        {NAV_GROUPS.map((group, gi) => {
+        {visibleGroups.map((group, gi) => {
           const groupKey = group.label ?? `__ungrouped_${gi}`
           const isGroupCollapsed = group.label ? !!groupsCollapsed[group.label] : false
 
@@ -282,13 +297,16 @@ export function Navbar() {
                           collapsed ? 'justify-center w-9 h-9 mx-auto' : 'gap-2.5 px-2.5 py-2'
                         } ${
                           isActive
-                            ? 'text-foreground font-semibold'
+                            ? 'font-semibold'
                             : 'text-muted-foreground hover:text-foreground hover:bg-accent/60'
                         }`}
-                        style={isActive ? { background: 'var(--accent)' } : undefined}
+                        style={isActive ? {
+                          background: 'color-mix(in srgb, var(--chart-1) 12%, transparent)',
+                          color: 'var(--chart-1)',
+                        } : undefined}
                       >
                         {isActive && !collapsed && (
-                          <span className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r-full" style={{ background: 'var(--foreground)' }} />
+                          <span className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r-full" style={{ background: 'var(--chart-1)' }} />
                         )}
                         <span className="flex-shrink-0">{item.icon}</span>
                         {!collapsed && <span className="flex-1 text-[13px] truncate">{item.label}</span>}
