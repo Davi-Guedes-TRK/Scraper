@@ -42,7 +42,7 @@ export async function GET() {
           AND (creci IS NULL OR creci != '22784')
           AND coletado_em >= NOW() - (${CUTOFF_DAYS} || ' days')::interval
         ORDER BY coletado_em DESC
-        LIMIT 2000
+        LIMIT 5000
       `,
       sql<[{ total: number }]>`
         SELECT count(*)::int AS total
