@@ -20,12 +20,12 @@ export async function getProfile(userId: string): Promise<Profile> {
     .eq('id', userId)
     .single()
 
-  // Fallback: se o profile ainda não existe (antes da migration), assume admin
+  // Fallback: se o profile ainda não existe, força onboarding (seguro — não pula)
   return data ?? {
     id: userId,
     nome: null,
-    papel: 'admin' as Papel,
-    onboarding_completo: true,
+    papel: 'captador' as Papel,
+    onboarding_completo: false,
     tema: 'system',
   }
 }
