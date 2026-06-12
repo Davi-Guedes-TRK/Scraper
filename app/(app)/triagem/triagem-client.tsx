@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { classifyAnunciante, parsePreco, fmtBRL, timeAgo, allImgs, dedupKey, startOfToday } from '@/lib/formatters'
 import { portalLabel } from '@/lib/portals'
 import { parseEnderecoDF, ehCasaLote } from '@/lib/endereco-df'
@@ -54,6 +54,48 @@ function ToastStack({ toasts }: { toasts: Toast[] }) {
         }`}>{t.msg}</div>
       ))}
     </div>
+  )
+}
+
+// ── ConfirmModal ───────────────────────────────────────────────────────────────
+function ConfirmModal({ title, message, confirmLabel = 'Confirmar', onConfirm, onCancel }: {
+  title: string
+  message: string
+  confirmLabel?: string
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
+      <div className="rounded-xl border border-border shadow-xl p-6 w-[340px] flex flex-col gap-4"
+        style={{ background: 'var(--card)' }}>
+        <div>
+          <p className="text-sm font-semibold text-foreground">{title}</p>
+          <p className="text-xs text-muted-foreground mt-1">{message}</p>
+        </div>
+        <div className="flex gap-2 justify-end">
+          <button onClick={onCancel}
+            className="px-4 py-2 rounded-lg text-xs font-medium border border-border text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+            Cancelar
+          </button>
+          <button onClick={onConfirm}
+            className="px-4 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer"
+            style={{ background: 'var(--discard-bg)', color: 'var(--discard-fg)' }}>
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Spinner ────────────────────────────────────────────────────────────────────
+function Spinner() {
+  return (
+    <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+    </svg>
   )
 }
 
@@ -165,7 +207,7 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
   dups: string[]
   onApprove: (item: Imovel, data: { endereco: string; mapsLink: string; fonte?: string | null }) => Promise<void>
   onVisitar: (item: Imovel, data: { endereco: string; mapsLink: string; fonte?: string | null }) => Promise<void>
-  onDiscard: (item: Imovel) => Promise<void>
+  onDiscard: (item: Imovel) => void
   onClose: () => void
 }) {
   const imgs = allImgs(item.imagens)
@@ -253,7 +295,7 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
   const canSave = !saving && !!endereco.trim()
   const approve = async () => { setSaving(true); await onApprove(item, { endereco, mapsLink, fonte }); setSaving(false) }
   const visitar = async () => { setSaving(true); await onVisitar(item, { endereco, mapsLink, fonte }); setSaving(false) }
-  const discard = async () => { setSaving(true); await onDiscard(item); setSaving(false) }
+  const discard = () => { onDiscard(item) }
   const fsbo = classifyAnunciante(item)
 
   return (
@@ -476,19 +518,21 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
         {/* ── ações ── */}
         <div className="flex gap-2 p-3 flex-shrink-0" style={{ borderTop: '1px solid var(--border)' }}>
           <button onClick={discard} disabled={saving}
-            className="px-4 h-11 rounded-lg text-sm font-semibold transition-all disabled:opacity-40 hover:opacity-90 flex-shrink-0"
+            className="px-4 h-11 rounded-lg text-sm font-semibold transition-all disabled:opacity-40 hover:opacity-90 flex-shrink-0 cursor-pointer disabled:cursor-not-allowed"
             style={{ background: 'var(--discard-bg)', color: 'var(--discard-fg)' }}>
             Descartar
           </button>
           <button onClick={visitar} disabled={!canSave}
-            className="px-4 h-11 rounded-lg text-sm font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 flex-shrink-0"
+            className="px-4 h-11 rounded-lg text-sm font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 flex-shrink-0 cursor-pointer flex items-center gap-1.5"
             style={{ background: 'color-mix(in srgb, #0ea5e9 18%, var(--card))', color: '#0ea5e9', border: '1px solid color-mix(in srgb, #0ea5e9 40%, transparent)' }}>
+            {saving && <Spinner />}
             Visitar
           </button>
           <button onClick={approve} disabled={!canSave}
-            className="flex-1 h-11 rounded-lg text-sm font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
+            className="flex-1 h-11 rounded-lg text-sm font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 cursor-pointer flex items-center justify-center gap-1.5"
             style={{ background: 'var(--approve-bg)', color: 'var(--approve-fg)' }}>
-            {saving ? '…' : 'Aprovar'}
+            {saving && <Spinner />}
+            Aprovar
           </button>
         </div>
       </div>
@@ -695,6 +739,7 @@ function ImovelCard({ item, fsbo, dups, onReview, selected, checked, onToggleChe
 export function TriagemClient() {
   const { toasts, toast } = useToast()
   const searchParams = useSearchParams()
+  const router = useRouter()
   const q = (searchParams.get('q') ?? '').toLowerCase().trim()
   const [items, setItems] = useState<Imovel[]>([])
   const [total, setTotal] = useState(0)
@@ -705,18 +750,32 @@ export function TriagemClient() {
   const [reviewMapsLink, setReviewMapsLink] = useState('')
   const [selectedLinks, setSelectedLinks] = useState<Set<string>>(new Set())
   const highlightDone = useRef(false)
+  const [discardTarget, setDiscardTarget] = useState<Imovel | 'batch' | null>(null)
 
-  const [filterPortal, setFilterPortal] = useState('Todos')
-  const [filterPrecoMin, setFilterPrecoMin] = useState(0)
-  const [filterPrecoMax, setFilterPrecoMax] = useState(0)
-  const [filterHoje, setFilterHoje] = useState(false)
-  const [sort, setSort] = useState('endereco')
-  const [filterPublicacao, setFilterPublicacao] = useState(0)
-  const [filterTipo, setFilterTipo] = useState('Todos')
-  const [filterBairro, setFilterBairro] = useState('Todos')
-  const [filterProprietario, setFilterProprietario] = useState(false)
-  const [filterNovos, setFilterNovos] = useState(() => searchParams.get('novos') === '1')
+  // Filtros sincronizados com URL
+  const filterPortal = searchParams.get('portal') ?? 'Todos'
+  const filterTipo = searchParams.get('tipo') ?? 'Todos'
+  const filterBairro = searchParams.get('bairro') ?? 'Todos'
+  const filterPrecoMin = Number(searchParams.get('pmin') ?? 0)
+  const filterPrecoMax = Number(searchParams.get('pmax') ?? 0)
+  const filterHoje = searchParams.get('hoje') === '1'
+  const filterProprietario = searchParams.get('prop') === '1'
+  const filterNovos = searchParams.get('novos') === '1'
+  const filterPublicacao = Number(searchParams.get('pub') ?? 0)
+  const sort = searchParams.get('sort') ?? 'endereco'
   const [lastSeen] = useState(() => localStorage.getItem('triagem_last_seen') ?? new Date(0).toISOString())
+
+  const setFilter = useCallback((key: string, value: string | null) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (value === null || value === '' || value === 'Todos' || value === '0' || value === 'false') {
+      params.delete(key)
+    } else {
+      params.set(key, value)
+    }
+    params.delete('page')
+    router.replace(`?${params.toString()}`, { scroll: false })
+    setPage(1)
+  }, [searchParams, router])
 
   // Populate endereço from pistas when selected item changes
   useEffect(() => {
@@ -873,12 +932,24 @@ export function TriagemClient() {
     const ok = await updateStatus(item, 'para_visitar', { endereco: data.endereco || undefined, maps_link: data.mapsLink || undefined, endereco_fonte: data.fonte ?? undefined })
     if (ok) setReviewItem(null)
   }
-  const handleDiscard = async (item: Imovel) => {
+  const handleDiscard = (item: Imovel) => {
+    setDiscardTarget(item)
+  }
+
+  const confirmDiscard = async () => {
+    if (!discardTarget || discardTarget === 'batch') return
+    const item = discardTarget
+    setDiscardTarget(null)
     const ok = await updateStatus(item, 'descartado')
     if (ok) setReviewItem(null)
   }
 
-  const batchDiscard = async () => {
+  const batchDiscard = () => {
+    setDiscardTarget('batch')
+  }
+
+  const confirmBatchDiscard = async () => {
+    setDiscardTarget(null)
     const links = [...selectedLinks]
     const toDiscard = items.filter(i => links.includes(i.link))
     let ok = 0
@@ -916,7 +987,7 @@ export function TriagemClient() {
     navigateTo: (_: number) => {},
     handleApprove: async (_i: Imovel, _d: { endereco: string; mapsLink: string }) => {},
     handleVisitar: async (_i: Imovel, _d: { endereco: string; mapsLink: string }) => {},
-    handleDiscard: async (_i: Imovel) => {},
+    handleDiscard: (_i: Imovel) => {},
   })
   useEffect(() => {
     kbRef.current = { reviewItem, reviewEndereco, reviewMapsLink, navigateTo, handleApprove, handleVisitar, handleDiscard }
@@ -963,11 +1034,11 @@ export function TriagemClient() {
             <div className="ml-auto flex items-center gap-2">
               <span className="text-[11px] font-medium text-foreground">{selectedLinks.size} sel.</span>
               <button onClick={batchDiscard}
-                className="text-[11px] px-2 py-0.5 rounded border border-border text-muted-foreground hover:text-foreground transition-colors">
+                className="text-[11px] px-2 py-0.5 rounded border border-border text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
                 Descartar
               </button>
               <button onClick={() => setSelectedLinks(new Set())}
-                className="text-[11px] text-muted-foreground hover:text-foreground transition-colors leading-none">✕</button>
+                className="text-[11px] text-muted-foreground hover:text-foreground transition-colors leading-none cursor-pointer">✕</button>
             </div>
           )}
         </div>
@@ -975,19 +1046,24 @@ export function TriagemClient() {
         {/* Filtros */}
         <div className="px-4 py-2 flex-shrink-0 flex flex-wrap gap-2 items-center"
           style={{ borderBottom: '1px solid var(--border)', background: 'var(--sidebar)' }}>
-          <select value={filterPortal} onChange={e => { setFilterPortal(e.target.value); setPage(1) }} className={selectClass}>
+          <select value={filterPortal} onChange={e => setFilter('portal', e.target.value)} className={selectClass}>
             <option value="Todos">Portal: todos</option>
             {portaisPresentes.map(p => <option key={p} value={p}>{portalLabel(p)}</option>)}
           </select>
-          <select value={filterTipo} onChange={e => { setFilterTipo(e.target.value); setPage(1) }} className={selectClass}>
+          <select value={filterTipo} onChange={e => setFilter('tipo', e.target.value)} className={selectClass}>
             <option value="Todos">Tipo: todos</option>
             {tiposImovel.filter(v => v !== 'Todos').map(v => <option key={v}>{v}</option>)}
           </select>
           <select
             value={`${filterPrecoMin}-${filterPrecoMax}`}
             onChange={e => {
-              const [min, max] = e.target.value.split('-').map(Number)
-              setFilterPrecoMin(min); setFilterPrecoMax(max); setPage(1)
+              const [min, max] = e.target.value.split('-')
+              const params = new URLSearchParams(searchParams.toString())
+              if (min === '0' && max === '0') { params.delete('pmin'); params.delete('pmax') }
+              else { params.set('pmin', min); params.set('pmax', max) }
+              params.delete('page')
+              router.replace(`?${params.toString()}`, { scroll: false })
+              setPage(1)
             }}
             className={selectClass}
           >
@@ -998,11 +1074,11 @@ export function TriagemClient() {
             <option value="10000-20000">R$ 10k – 20k</option>
             <option value="20000-0">Acima de R$ 20k</option>
           </select>
-          <select value={filterBairro} onChange={e => { setFilterBairro(e.target.value); setPage(1) }} className={selectClass}>
+          <select value={filterBairro} onChange={e => setFilter('bairro', e.target.value)} className={selectClass}>
             <option value="Todos">Região: todas</option>
             {bairros.filter(v => v !== 'Todos').map(v => <option key={v}>{v}</option>)}
           </select>
-          <select value={sort} onChange={e => { setSort(e.target.value); setPage(1) }} className={selectClass}>
+          <select value={sort} onChange={e => setFilter('sort', e.target.value)} className={selectClass}>
             <option value="endereco">Endereço</option>
             <option value="preco">Maior preço</option>
             <option value="publicacao">Publicação</option>
@@ -1010,8 +1086,8 @@ export function TriagemClient() {
           </select>
           <div className="flex gap-1">
             {[{ label: 'Todos', val: 0 }, { label: '1d', val: 1 }, { label: '3d', val: 3 }, { label: '7d', val: 7 }].map(({ label, val }) => (
-              <button key={val} onClick={() => { setFilterPublicacao(val); setPage(1) }}
-                className={`text-[11px] px-2 py-1 rounded border transition-colors ${
+              <button key={val} onClick={() => setFilter('pub', String(val))}
+                className={`text-[11px] px-2 py-1 rounded border transition-colors cursor-pointer ${
                   filterPublicacao === val
                     ? 'bg-foreground border-foreground text-background'
                     : 'border-border text-muted-foreground hover:text-foreground'
@@ -1021,16 +1097,16 @@ export function TriagemClient() {
             ))}
           </div>
           <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-muted-foreground hover:text-foreground transition-colors">
-            <input type="checkbox" checked={filterProprietario} onChange={e => { setFilterProprietario(e.target.checked); setPage(1) }} className="w-3 h-3" />
+            <input type="checkbox" checked={filterProprietario} onChange={e => setFilter('prop', e.target.checked ? '1' : null)} className="w-3 h-3" />
             Proprietários
           </label>
           <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-muted-foreground hover:text-foreground transition-colors">
-            <input type="checkbox" checked={filterHoje} onChange={e => { setFilterHoje(e.target.checked); setPage(1) }} className="w-3 h-3" />
+            <input type="checkbox" checked={filterHoje} onChange={e => setFilter('hoje', e.target.checked ? '1' : null)} className="w-3 h-3" />
             Hoje
           </label>
           <button
-            onClick={() => { setFilterNovos(n => !n); setPage(1) }}
-            className={`text-[11px] px-2.5 py-1 rounded-full border font-medium transition-colors ${
+            onClick={() => setFilter('novos', filterNovos ? null : '1')}
+            className={`text-[11px] px-2.5 py-1 rounded-full border font-medium transition-colors cursor-pointer ${
               filterNovos
                 ? 'bg-foreground border-foreground text-background'
                 : 'border-border text-muted-foreground hover:text-foreground'
@@ -1128,6 +1204,25 @@ export function TriagemClient() {
       </div>
 
       <ToastStack toasts={toasts} />
+
+      {discardTarget && discardTarget !== 'batch' && (
+        <ConfirmModal
+          title="Descartar imóvel?"
+          message={`"${discardTarget.titulo || discardTarget.link}" será movido para descartados.`}
+          confirmLabel="Descartar"
+          onConfirm={confirmDiscard}
+          onCancel={() => setDiscardTarget(null)}
+        />
+      )}
+      {discardTarget === 'batch' && (
+        <ConfirmModal
+          title={`Descartar ${selectedLinks.size} imóvel${selectedLinks.size !== 1 ? 'eis' : ''}?`}
+          message="Esses imóveis serão movidos para descartados."
+          confirmLabel="Descartar todos"
+          onConfirm={confirmBatchDiscard}
+          onCancel={() => setDiscardTarget(null)}
+        />
+      )}
     </div>
   )
 }
