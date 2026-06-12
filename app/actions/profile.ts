@@ -14,13 +14,13 @@ export async function saveProfile(
   const nome = (formData.get('nome') as string | null)?.trim() || null
   const tema = (formData.get('tema') as string | null) ?? 'system'
 
-  // upsert: creates the row if it doesn't exist, updates if it does
   const { error } = await supabase
     .from('profiles')
-    .upsert({ id: user.id, nome, tema, onboarding_completo: true })
+    .update({ nome, tema, onboarding_completo: true })
+    .eq('id', user.id)
 
   if (error) {
-    console.error('[saveProfile] upsert failed:', error)
+    console.error('[saveProfile] update failed:', error)
     return { error: 'Não foi possível salvar. Tente novamente.' }
   }
 
