@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState, useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'motion/react'
 import { saveProfile } from '@/app/actions/profile'
@@ -133,28 +133,43 @@ export function OnboardingClient({ papel, nomeInicial }: { papel: Papel; nomeIni
   const router = useRouter()
   const [state, action, pending] = useActionState(saveProfile, { error: null })
 
+  const [submitted, setSubmitted] = useState(false)
+  const [skipping, setSkipping] = useState(false)
+
   const tourSlides = TOUR_STEPS[papel] ?? TOUR_STEPS.admin
 
-  async function handlePerfilSubmit(e: React.FormEvent<HTMLFormElement>) {
+  // After action completes, check state to advance
+  useEffect(() => {
+    if (!submitted && !skipping) return
+    if (pending) return // still running
+    if (!state.error) {
+      if (skipping) {
+        router.push('/dashboard')
+        router.refresh()
+      } else {
+        setStep('tour')
+      }
+    }
+    setSubmitted(false)
+    setSkipping(false)
+  }, [state, pending])
+
+  function handlePerfilSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const fd = new FormData()
     fd.set('nome', nome)
     fd.set('tema', tema)
-    const result = await action(fd)
-    // Only advance if save succeeded (no error)
-    if (!result?.error) {
-      setStep('tour')
-    }
+    setSubmitted(true)
+    action(fd)
   }
 
-  async function handlePular() {
+  function handlePular() {
     // Save profile with onboarding_completo=true before redirecting
     const fd = new FormData()
     fd.set('nome', nome || '')
     fd.set('tema', tema)
-    await action(fd)
-    router.push('/dashboard')
-    router.refresh()
+    setSkipping(true)
+    action(fd)
   }
 
   function handleProximo() {
