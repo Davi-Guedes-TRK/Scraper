@@ -224,7 +224,7 @@ export function InLocoClient() {
       <div className="flex flex-wrap gap-1.5">
         {TIPOS.map(t => (
           <button key={t} onClick={() => setTipo(tipo === t ? '' : t)}
-            className="px-3 h-8 rounded-full text-[12px] font-medium transition-colors"
+            className="px-3 h-8 rounded-full text-[12px] font-medium transition-colors cursor-pointer"
             style={tipo === t
               ? { background: 'var(--primary)', color: '#fff' }
               : { background: 'var(--secondary)', border: '1px solid var(--border)', color: 'var(--muted-foreground)' }}>
@@ -237,7 +237,7 @@ export function InLocoClient() {
       <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden"
         onChange={e => { const f = e.target.files?.[0]; if (f) onPhoto(f); e.target.value = '' }} />
       <button onClick={() => fileRef.current?.click()}
-        className="w-full h-32 rounded-2xl font-bold text-white text-lg flex flex-col items-center justify-center gap-2 transition-transform active:scale-[0.98]"
+        className="w-full h-32 rounded-2xl font-bold text-white text-lg flex flex-col items-center justify-center gap-2 transition-transform active:scale-[0.98] cursor-pointer"
         style={{ background: 'var(--primary)' }}>
         <svg className="w-9 h-9" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -259,6 +259,9 @@ export function InLocoClient() {
       <a href="/in-loco/revisar" className="text-[12px] text-primary hover:underline text-center -mt-2">Revisar / completar capturas →</a>
 
       {/* minhas capturas */}
+      {capturas.length === 0 && (
+        <p className="text-center text-xs text-muted-foreground/50 py-2">Nenhuma captura ainda neste dispositivo.</p>
+      )}
       {capturas.length > 0 && (
         <div className="flex flex-col gap-2">
           <p className="eyebrow text-muted-foreground/50">Minhas capturas ({capturas.length})</p>

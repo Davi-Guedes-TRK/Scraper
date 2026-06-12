@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 
 type Lote = { lote: string | null; conjunto: string | null; area_proj: number | null; end_cart: string | null }
 type Candidato = {
@@ -34,21 +35,37 @@ const FIELDS = [
 ] as const
 
 export function GeoportalClient() {
-  const [form, setForm] = useState<Record<string, string>>({ endereco: '', quadra: '', conjunto: '', casa_lote: '', area_m2: '' })
+  const searchParams = useSearchParams()
+  const router = useRouter()
+
+  const [form, setForm] = useState<Record<string, string>>({
+    endereco:  searchParams.get('endereco')  ?? '',
+    quadra:    searchParams.get('quadra')    ?? '',
+    conjunto:  searchParams.get('conjunto')  ?? '',
+    casa_lote: searchParams.get('casa_lote') ?? '',
+    area_m2:   searchParams.get('area_m2')   ?? '',
+  })
   const [loading, setLoading] = useState(false)
   const [res, setRes] = useState<Resultado | null>(null)
   const [erro, setErro] = useState<string | null>(null)
 
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
 
-  const buscar = async () => {
+  const syncUrl = useCallback((f: Record<string, string>) => {
+    const params = new URLSearchParams()
+    Object.entries(f).forEach(([k, v]) => { if (v.trim()) params.set(k, v) })
+    router.replace(`?${params.toString()}`, { scroll: false })
+  }, [router])
+
+  const buscar = async (f = form) => {
+    syncUrl(f)
     setLoading(true); setErro(null); setRes(null)
     const body: Record<string, unknown> = {}
-    if (form.endereco)  body.endereco  = form.endereco
-    if (form.quadra)    body.quadra    = form.quadra
-    if (form.conjunto)  body.conjunto  = form.conjunto
-    if (form.casa_lote) body.casa_lote = form.casa_lote
-    if (form.area_m2)   body.area_m2   = parseFloat(form.area_m2.replace(',', '.'))
+    if (f.endereco)  body.endereco  = f.endereco
+    if (f.quadra)    body.quadra    = f.quadra
+    if (f.conjunto)  body.conjunto  = f.conjunto
+    if (f.casa_lote) body.casa_lote = f.casa_lote
+    if (f.area_m2)   body.area_m2   = parseFloat(f.area_m2.replace(',', '.'))
     try {
       const r = await fetch('/api/geoportal/candidatos', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
@@ -90,9 +107,9 @@ export function GeoportalClient() {
           ))}
         </div>
         <button
-          onClick={buscar}
+          onClick={() => buscar()}
           disabled={loading}
-          className="mt-4 h-9 px-5 rounded-lg text-sm font-semibold bg-[var(--chart-1)] text-white disabled:opacity-40 hover:opacity-90 transition-opacity flex items-center gap-2"
+          className="mt-4 h-9 px-5 rounded-lg text-sm font-semibold bg-[var(--chart-1)] text-white disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-opacity flex items-center gap-2 cursor-pointer"
         >
           {loading
             ? <><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" /></svg>Buscando…</>
@@ -100,9 +117,26 @@ export function GeoportalClient() {
         </button>
       </div>
 
-      {erro && <div className="rounded-lg border border-red-500/20 bg-red-500/10 text-red-400 text-sm px-4 py-3 mb-4">{erro}</div>}
+      {erro && (
+        <div className="rounded-lg border border-red-500/20 bg-red-500/10 text-red-400 text-sm px-4 py-3 mb-4 flex items-center justify-between gap-3">
+          <span>{erro}</span>
+          <button onClick={() => buscar()} className="text-xs font-medium underline hover:no-underline cursor-pointer shrink-0">
+            Tentar novamente
+          </button>
+        </div>
+      )}
 
-      {res && (
+      {res && res.candidatos.length === 0 && (
+        <div className="text-center py-16 rounded-xl border border-border">
+          <svg className="w-8 h-8 mx-auto mb-3 text-muted-foreground/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 15.803M10.5 7.5v6m3-3h-6" />
+          </svg>
+          <p className="text-sm font-semibold text-foreground">Nenhum lote encontrado</p>
+          <p className="text-xs text-muted-foreground mt-1">Tente informar mais campos ou verificar a quadra/conjunto.</p>
+        </div>
+      )}
+
+      {res && res.candidatos.length > 0 && (
         <div>
           <div className="flex items-center gap-3 mb-4">
             <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${CONF[res.confianca].cls}`}>{CONF[res.confianca].label}</span>
@@ -114,7 +148,7 @@ export function GeoportalClient() {
               const melhor = i === 0
               const pct = Math.round(c.score * 100)
               return (
-                <div key={i} className={`rounded-lg border p-3 ${melhor ? 'border-[var(--chart-1)]/40 bg-[var(--chart-1)]/5' : 'border-white/8 bg-card'}`}>
+                <div key={i} className={`rounded-lg border p-3 cursor-pointer transition-opacity hover:opacity-90 ${melhor ? 'border-[var(--chart-1)]/40 bg-[var(--chart-1)]/5' : 'border-white/8 bg-card'}`}>
                   <div className="flex items-center justify-between gap-3 mb-2">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-[11px] font-mono text-muted-foreground w-5 shrink-0">#{i + 1}</span>

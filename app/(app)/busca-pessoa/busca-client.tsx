@@ -180,7 +180,7 @@ export function BuscaPessoaClient() {
         <button
           onClick={search}
           disabled={loading || (!tipo)}
-          className="h-10 px-4 rounded-lg text-sm font-semibold bg-[var(--chart-1)] text-white disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-opacity flex items-center gap-2 min-w-[90px] justify-center"
+          className="h-10 px-4 rounded-lg text-sm font-semibold bg-[var(--chart-1)] text-white disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-opacity flex items-center gap-2 min-w-[90px] justify-center cursor-pointer"
         >
           {loading ? (
             <>
@@ -201,8 +201,11 @@ export function BuscaPessoaClient() {
       )}
 
       {error && (
-        <div className="rounded-lg border border-red-500/20 bg-red-500/10 text-red-400 text-sm px-4 py-3 mb-4">
-          {error}
+        <div className="rounded-lg border border-red-500/20 bg-red-500/10 text-red-400 text-sm px-4 py-3 mb-4 flex items-center justify-between gap-3">
+          <span>{error}</span>
+          <button onClick={search} className="text-xs font-medium underline hover:no-underline cursor-pointer shrink-0">
+            Tentar novamente
+          </button>
         </div>
       )}
 
