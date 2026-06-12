@@ -35,10 +35,10 @@ Regra: bug novo entra AQUI (com prioridade), não em mensagem solta. Sessões fu
 ### P0 — quebrado ou bloqueando produção
 | # | Bug | Causa conhecida | Fix |
 |---|-----|----------------|-----|
-| B1 | **"Lago Sul" sumiu do filtro da triagem** | Dropdown é dinâmico: `triagem-client.tsx:751` monta a lista só com os bairros dos itens carregados via `getRegiao()`. Sem item de Lago Sul na fila (ou cortado pelo limit do GET) → opção some. | Mesclar lista fixa de RAs canônicas (igual `lancamentos-client.tsx:8`) com as dinâmicas; opções sem itens aparecem desabilitadas ou com contagem 0. |
-| B2 | **Apps Script do cartório desatualizado no Google** | Correção da URL (`erp-trk.vercel.app`) só existe no repo; o que RODA é o que está colado no editor do Google. | Re-colar `scripts/cartorio_apps_script.js` no editor (ação manual do Davi, 5 min). Sem isso o inbound de matrícula não chega. |
-| B3 | **Webhook Pipefy não registrado** | Código pronto (`lib/pipefy-sync.ts`, `/api/pipefy/webhook`), secret no Vercel, mas o webhook nunca foi registrado no Pipefy. | `node scripts/_register_pipefy_webhook.mjs` com token fresco (`credentials/pipefy_token.txt`). |
-| B4 | ~~Desambiguação por setor (SHIS/SHIN)~~ **RESOLVIDO** (jun/12) | Foi commitada em `e0c09fa feat(geoportal): desambigua quadra por setor (SHIS/SHIN)`. | Só garantir `vercel --prod` (último deploy registrado era 92182ce, anterior ao commit). |
+| B1 | ~~"Lago Sul" sumiu do filtro da triagem~~ **RESOLVIDO** (jun/12) | Dropdown era só-dinâmico (`getRegiao()` sobre os itens carregados); sem item de Lago Sul na fila a opção sumia. | Fix em `140c841`: `BAIRROS_FIXOS` (8 RAs TRK) mesclada com a lista dinâmica. Deployado. |
+| B2 | **Apps Script do cartório desatualizado no Google** | Correção da URL (`erp-trk.vercel.app`) só existe no repo; o que RODA é o que está colado no editor do Google. | Re-colar `scripts/cartorio_apps_script.js` no editor (ação manual do Davi, 5 min). Sem isso o inbound de matrícula não chega. ⚠️ ÚNICO P0 restante. |
+| B3 | ~~Webhook Pipefy não registrado~~ **RESOLVIDO** | Já estava registrado (id 300685412, "erp-trk-realtime") — verificado em jun/12 com token fresco. Gotcha: `_register_pipefy_webhook.mjs` lê `PIPEFY_TOKEN` do `.env.local` (stale); o refresh grava em `credentials/pipefy_token.txt` — passar via `$env:PIPEFY_TOKEN`. | — |
+| B4 | ~~Desambiguação por setor (SHIS/SHIN)~~ **RESOLVIDO** (jun/12) | Commitada em `e0c09fa`. | Deployado em produção (jun/12). |
 
 ### P1 — dados errados / funcionalidade degradada
 | # | Bug | Detalhe |
