@@ -212,7 +212,11 @@ Fase 6 (polimento)                ← contínuo, fechamento
 - [x] Tarefa 1.1 — docs/JORNADAS.md
 - [x] Fase 1 — Fundação de acesso (commit 4b0cbe2 — migration SQL pendente de executar no Supabase)
 - [x] Fase 2 — Navegação por jornada
-- [ ] Fase 3 — Estados e feedback (0/14 páginas)
-- [ ] Fase 4 — Mobile Campo
-- [ ] Fase 5 — Dashboard por papel
-- [ ] Fase 6 — Polimento
+- [x] Fase 3 — Estados e feedback (triagem, visitas, relatorio, geoportal, busca-pessoa, in-loco, funis, lancamentos, scrapers)
+- [x] Fase 4 — Mobile Campo
+  - [x] 5.1 Bottom nav + sidebar hidden mobile
+  - [x] 5.2 Visitas: tabs Mapa/Rota, bottom sheet "Registrar resultado" (4 opções), "Navegar" CTA grande (≥44px), offline queue localStorage
+  - [ ] 5.3 In Loco mobile (autosave rascunho, formulário coluna única) — pendente
+  - [ ] Tabelas → cards empilhados em md (triagem, relatorio) — pendente
+- [x] Fase 5 — Dashboard por papel (captador/operador/gestor)
+- [x] Fase 6 — Polimento (login + logo, a11y htmlFor/autocomplete/role=alert, focus-visible ring)
