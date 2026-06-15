@@ -1,0 +1,32 @@
+name: Dedup pHash — Cluster Semanal
+
+on:
+  schedule:
+    - cron: '0 15 * * 0'   # 12:00 BRT domingo — após scrapers da semana
+  workflow_dispatch:
+
+concurrency:
+  group: dedup-cluster
+  cancel-in-progress: false
+
+jobs:
+  dedup-cluster:
+    name: Agrupar imóveis duplicados por pHash
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: scripts/requirements.txt
+      - run: pip install -r scripts/requirements.txt
+      - name: Backfill hashes novos
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python scripts/dedup_phash.py --backfill-only --apply
+      - name: Cluster + colapso
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python scripts/dedup_phash.py --cluster-only --apply

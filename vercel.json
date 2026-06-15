@@ -12,6 +12,7 @@
     { "path": "/api/cron/workflow?w=zap-sync",             "schedule": "0 13 * * *"   },
     { "path": "/api/cron/workflow?w=pipefy-sync",          "schedule": "0 14 * * *"   },
     { "path": "/api/cron/workflow?w=pipefy-token-refresh", "schedule": "0 9 */2 * *"  },
-    { "path": "/api/cron/workflow?w=pipefy-sync",          "schedule": "0 20 * * *"   }
+    { "path": "/api/cron/workflow?w=pipefy-sync",          "schedule": "0 20 * * *"   },
+    { "path": "/api/cron/workflow?w=dedup-cluster",        "schedule": "0 15 * * 0"   }
   ]
 }

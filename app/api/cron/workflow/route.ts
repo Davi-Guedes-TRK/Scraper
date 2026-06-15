@@ -18,6 +18,7 @@ const WORKFLOWS: Record<string, { label: string; brt: string }> = {
   'pipefy-token-refresh': { label: 'Pipefy Token',       brt: '06:00' },
   'validar-links':        { label: 'Validar Links',      brt: '02:00' },
   'auto-cartorio-2oficio':{ label: 'Auto 2º Ofício',     brt: '14:00' },
+  'dedup-cluster':        { label: 'Dedup pHash',         brt: 'dom 12:00' },
 }
 
 const REPO = 'Davi-Guedes-TRK/Scraper'
