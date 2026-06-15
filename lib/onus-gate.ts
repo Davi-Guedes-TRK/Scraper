@@ -6,6 +6,7 @@
 import sql from './db'
 import { buscarImovelNoDw } from './dw-dedup'
 import { atualizarCardOportunidade } from './pipefy'
+import { fichaRisco } from './ficha-risco'
 import { notifyGChat, cartorioMsg } from './gchat'
 import { log } from './logger'
 
@@ -34,10 +35,27 @@ export async function cardIdPorLink(link: string): Promise<string | null> {
   return rows[0]?.card_id ?? null
 }
 
+/** Risco geológico do imóvel (best-effort) — usa lat/lng do imoveis_todos.
+ *  Sinaliza imóvel perigoso ANTES da captação (badge no Pregão). */
+async function avaliarRisco(link: string): Promise<{ nivel: string | null; resumo: string | null }> {
+  try {
+    const rows = await sql<{ lat: number | null; lng: number | null }[]>`
+      SELECT lat, lng FROM imoveis_todos WHERE link = ${link} LIMIT 1`
+    const { lat, lng } = rows[0] ?? {}
+    if (lat == null || lng == null) return { nivel: null, resumo: null }
+    const f = await fichaRisco(lat, lng)
+    const resumo = f.riscos.map(r => `${r.tipo}: ${r.classe}`).join(' · ') || null
+    return { nivel: f.nivel, resumo }
+  } catch {
+    return { nivel: null, resumo: null }
+  }
+}
+
 export async function rodarGateOnus(p: GateOnusInput): Promise<GateOnusResult> {
   const dedup = await buscarImovelNoDw(p.endereco)
   const codigos = dedup.matches.map(m => m.codigo_imovel)
   const cardId = p.cardId ?? await cardIdPorLink(p.link).catch(() => null)
+  const risco = await avaliarRisco(p.link)
 
   await sql`
     INSERT INTO onus_pipeline ${sql({
@@ -51,6 +69,8 @@ export async function rodarGateOnus(p: GateOnusInput): Promise<GateOnusResult> {
       dedup_nivel: dedup.nivel,
       dedup_codigos: codigos,
       dedup_em: new Date(),
+      risco_nivel: risco.nivel,
+      risco_resumo: risco.resumo,
     })}
     ON CONFLICT (link) DO UPDATE SET
       matricula = EXCLUDED.matricula,
@@ -58,7 +78,13 @@ export async function rodarGateOnus(p: GateOnusInput): Promise<GateOnusResult> {
       dedup_nivel = EXCLUDED.dedup_nivel,
       dedup_codigos = EXCLUDED.dedup_codigos,
       dedup_em = EXCLUDED.dedup_em,
+      risco_nivel = COALESCE(EXCLUDED.risco_nivel, onus_pipeline.risco_nivel),
+      risco_resumo = COALESCE(EXCLUDED.risco_resumo, onus_pipeline.risco_resumo),
       atualizado_em = now()`
+
+  if (risco.nivel === 'alto') {
+    await notifyGChat(`⚠️ *Imóvel com RISCO ALTO* — ${p.endereco}\n${risco.resumo ?? ''}`).catch(() => {})
+  }
 
   // Espelha o resultado no card (best-effort: o gate não pode travar o inbound)
   if (cardId) {

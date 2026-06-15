@@ -23,16 +23,18 @@ export type PregaoData = {
     mat_solicitadas_total: number; mat_recebidas_total: number
     onus_solicitadas_total: number; contatos_total: number
   }
+  risco: { alto: number; medio: number; baixo: number }
   ticker: Array<{ link: string; titulo: string | null; regiao: string | null; preco: string | null; portal: string; coletado_em: string }>
   volume14d: Array<{ dia: string; n: number }>
   parados: Array<{ tipo: string; endereco: string; dias: number; link: string }>
+  riscosAltos: Array<{ endereco: string; resumo: string | null; matricula: string | null; link: string }>
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function rows<T>(result: any): T[] { return result as T[] }
 
 export async function GET() {
-  const [funilRows, onusRows, tickerRows, volumeRows, paradosMatRows, paradosOnusRows] = await Promise.all([
+  const [funilRows, onusRows, tickerRows, volumeRows, paradosMatRows, paradosOnusRows, riscoRows, riscosAltosRows] = await Promise.all([
     sql`
       SELECT
         count(*) FILTER (WHERE status_triagem = 'pendente')  ::int AS na_fila,
@@ -89,14 +91,27 @@ export async function GET() {
       WHERE onus_solicitada_em IS NOT NULL AND onus_recebida_em IS NULL
         AND onus_solicitada_em < now() - interval '7 days'
       ORDER BY onus_solicitada_em LIMIT 10`,
+    sql`
+      SELECT
+        count(*) FILTER (WHERE risco_nivel = 'alto') ::int AS alto,
+        count(*) FILTER (WHERE risco_nivel = 'medio')::int AS medio,
+        count(*) FILTER (WHERE risco_nivel = 'baixo')::int AS baixo
+      FROM onus_pipeline`,
+    sql`
+      SELECT coalesce(endereco, link) AS endereco, risco_resumo AS resumo, matricula, link
+      FROM onus_pipeline
+      WHERE risco_nivel = 'alto'
+      ORDER BY atualizado_em DESC LIMIT 10`,
   ])
 
   const f = funilRows[0]
   const o = onusRows[0]
+  const r = riscoRows[0]
   const ticker = rows<PregaoData['ticker'][number]>(tickerRows)
   const volume = rows<PregaoData['volume14d'][number]>(volumeRows)
   const paradosMat = rows<PregaoData['parados'][number]>(paradosMatRows)
   const paradosOnus = rows<PregaoData['parados'][number]>(paradosOnusRows)
+  const riscosAltos = rows<PregaoData['riscosAltos'][number]>(riscosAltosRows)
 
   const data: PregaoData = {
     agora: new Date().toISOString(),
@@ -113,9 +128,11 @@ export async function GET() {
       mat_solicitadas_total: f.mat_solicitadas_total, mat_recebidas_total: f.mat_recebidas_total,
       onus_solicitadas_total: o.onus_solicitadas_total, contatos_total: o.contato_ok,
     },
+    risco: { alto: r.alto, medio: r.medio, baixo: r.baixo },
     ticker,
     volume14d: volume,
     parados: [...paradosMat, ...paradosOnus].sort((a, b) => b.dias - a.dias),
+    riscosAltos,
   }
   return NextResponse.json(data, { headers: { 'Cache-Control': 'no-store' } })
 }

@@ -206,6 +206,7 @@ type GrauRisco = 'Alta' | 'Média' | 'Baixa'
 type FichaRiscoData = {
   riscos: { tipo: string; classe: GrauRisco; fonte: string | null; ano: number | null }[]
   geologia: { unidade: string | null; ambiente_tectonico: string | null; idade: string | null; litotipos: string | null } | null
+  pocos: { quantidade: number; aquifero: string | null; profundidade_max: number | null } | null
   nivel: 'alto' | 'medio' | 'baixo' | 'nenhum'
   avaliado: boolean
 }
@@ -281,8 +282,8 @@ function FichaImovel({ coord }: { coord: { lat: number; lng: number } }) {
     return () => { vivo = false }
   }, [coord.lat, coord.lng])
 
-  // nada a mostrar: sem risco E sem geologia (não polui o painel)
-  if (!loading && ficha && ficha.riscos.length === 0 && !ficha.geologia) return null
+  // nada a mostrar: sem risco, sem geologia E sem poços (não polui o painel)
+  if (!loading && ficha && ficha.riscos.length === 0 && !ficha.geologia && !ficha.pocos) return null
   if (!loading && !ficha) return null
 
   const nivel = ficha ? NIVEL_INFO[ficha.nivel] : null
@@ -329,7 +330,20 @@ function FichaImovel({ coord }: { coord: { lat: number; lng: number } }) {
         </div>
       )}
 
-      <p className="text-[9px] text-muted-foreground/60 mt-2">fonte: cartas de suscetibilidade SGB/CPRM · escala regional (alerta de zona, não de lote)</p>
+      {ficha?.pocos && (
+        <div className="flex items-center gap-1.5 mt-2 pt-2" style={{ borderTop: '1px solid var(--border)' }}>
+          <svg className="w-3 h-3 flex-shrink-0" style={{ color: '#0ea5e9' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 3c-2 4-5 7-5 11a5 5 0 0010 0c0-4-3-7-5-11z" />
+          </svg>
+          <span className="text-[10px] text-foreground">
+            <b>{ficha.pocos.quantidade}</b> poço{ficha.pocos.quantidade > 1 ? 's' : ''} SIAGAS por perto
+            {ficha.pocos.aquifero && <span className="text-muted-foreground"> · aquífero {ficha.pocos.aquifero}</span>}
+            {ficha.pocos.profundidade_max != null && <span className="text-muted-foreground"> · até {ficha.pocos.profundidade_max}m</span>}
+          </span>
+        </div>
+      )}
+
+      <p className="text-[9px] text-muted-foreground/60 mt-2">fonte: cartas de suscetibilidade SGB/CPRM + poços SIAGAS · escala regional (alerta de zona, não de lote)</p>
     </div>
   )
 }
@@ -445,18 +459,8 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
     setFonte(null)
     setCandidatos([]); setCandConf(null); setCoord(null)
 
-    // pistas_ia tem quadra/conjunto/casa_lote já extraídos pelo AI — prioridade sobre regex
-    const pistas0 = (item.pistas_ia ?? {}) as Record<string, unknown>
-    const pisQuadra   = typeof pistas0.quadra    === 'string' ? pistas0.quadra    : null
-    const pisConjunto = typeof pistas0.conjunto  === 'string' ? pistas0.conjunto  : null
-    const pisCasaLote = typeof pistas0.casa_lote === 'string' ? pistas0.casa_lote : null
-
     const txt = `${item.bairro ?? ''} ${item.titulo ?? ''}`.trim()
-    const parsed = parseEnderecoDF(txt)
-    const quadra    = pisQuadra   ?? parsed.quadra
-    const conjunto  = pisConjunto ?? parsed.conjunto
-    const casa_lote = pisCasaLote ?? parsed.casa_lote
-    const setor     = parsed.setor
+    const { setor, quadra, conjunto, casa_lote } = parseEnderecoDF(txt)
     const area_m2   = item.area_m2 ? parseFloat(String(item.area_m2).replace(',', '.')) : undefined
 
     // flag local: evita busca inicial sobrescrever resultado já enriquecido com descrição

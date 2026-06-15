@@ -183,6 +183,12 @@ export function PregaoClient() {
           <Indice rotulo="Certidões pedidas" valor={i ? nf.format(certidoes) : '—'} />
           <Indice rotulo="Contatos gerados" valor={i ? nf.format(i.contatos_total) : '—'} />
           {custoPorContato && <Indice rotulo="Certidões/contato" valor={custoPorContato} />}
+          {data && data.risco.alto > 0 && (
+            <div className="flex items-baseline gap-2 px-4 py-2 whitespace-nowrap" style={{ borderLeft: `1px solid ${GRADE}` }}>
+              <span className="pregao-rotulo" style={{ color: VERMELHO }}>⚠ Risco alto</span>
+              <span className="font-mono text-sm font-semibold tabular-nums" style={{ color: VERMELHO }}>{nf.format(data.risco.alto)}</span>
+            </div>
+          )}
         </div>
 
         {/* ── Book do funil ── */}
@@ -247,6 +253,24 @@ export function PregaoClient() {
             </div>
           </section>
         </div>
+
+        {/* ── Risco geológico alto (sinaliza imóvel perigoso antes da captação) ── */}
+        {data && data.riscosAltos.length > 0 && (
+          <section className="relative z-20 px-5 py-4" style={{ borderTop: `1px solid ${GRADE}`, background: 'rgba(220,38,38,.06)' }}>
+            <h2 className="pregao-rotulo m-0 mb-2" style={{ color: VERMELHO }}>⚠ Risco geológico alto — conferir antes de captar</h2>
+            <table className="w-full font-mono text-[12px]">
+              <tbody>
+                {data.riscosAltos.map((rk, idx) => (
+                  <tr key={rk.link} style={{ borderTop: idx ? `1px solid ${GRADE}` : 'none' }}>
+                    <td className="py-1.5 pr-2 truncate max-w-0 w-1/2" style={{ color: 'rgba(255,255,255,.85)' }}>{rk.endereco}</td>
+                    <td className="py-1.5 pr-2 truncate" style={{ color: VERMELHO }}>{rk.resumo ?? '—'}</td>
+                    <td className="py-1.5 text-right text-[10px] tabular-nums whitespace-nowrap" style={{ color: 'rgba(255,255,255,.4)' }}>{rk.matricula ? `mat ${rk.matricula}` : ''}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        )}
 
         {/* ── Rodapé ── */}
         <footer className="relative z-20 flex items-center justify-between px-5 py-2 font-mono text-[10px]" style={{ borderTop: `1px solid ${GRADE}`, color: 'rgba(255,255,255,.3)' }}>

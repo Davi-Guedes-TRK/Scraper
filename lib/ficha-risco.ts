@@ -2,7 +2,7 @@
 // inundação, contexto geológico) a partir das cartas do SGB/CPRM. NÃO é score de
 // valor; é alarme. Cacheada (Redis, 30d) porque o WFS do SGB oscila e o dado é
 // estável. Degradação silenciosa: ponto sem feição = "sem risco mapeado".
-import { sgbNoPonto } from './wfs-sgb'
+import { sgbNoPonto, sgbNaBbox } from './wfs-sgb'
 import { withCache } from './redis'
 
 export type GrauRisco = 'Alta' | 'Média' | 'Baixa'
@@ -13,9 +13,15 @@ export type Geologia = {
   idade: string | null
   litotipos: string | null
 }
+export type Pocos = {
+  quantidade: number          // poços SIAGAS num raio ~1km
+  aquifero: string | null     // aquífero mais comum entre eles
+  profundidade_max: number | null
+}
 export type FichaRisco = {
   riscos: RiscoItem[]
   geologia: Geologia | null
+  pocos: Pocos | null
   nivel: 'alto' | 'medio' | 'baixo' | 'nenhum'
   avaliado: boolean   // true = consultamos as cartas (mesmo que 0 riscos)
 }
@@ -30,6 +36,7 @@ const CAMADAS: Array<{ typeName: string; tipo: string }> = [
 
 type PropRisco = { classe?: string; fonte?: string; ano?: number }
 type PropGeo = { nome?: string; ambiente_tectonico?: string; idade_min?: string; idade_max?: string; litotipos?: string }
+type PropPoco = { aquifero?: string; profundidade_m?: number }
 
 function normGrau(c: string | undefined): GrauRisco | null {
   if (!c) return null
@@ -72,9 +79,22 @@ async function consultar(lat: number, lng: number): Promise<FichaRisco> {
     }
   } catch { /* ignora */ }
 
+  let pocos: Pocos | null = null
+  try {
+    const ps = await sgbNaBbox<PropPoco>('hidrogeologia:siagas', lat, lng, 0.009, 50, ['aquifero', 'profundidade_m'])
+    if (ps.length) {
+      // aquífero mais frequente
+      const cont = new Map<string, number>()
+      for (const p of ps) if (p.aquifero) cont.set(p.aquifero, (cont.get(p.aquifero) ?? 0) + 1)
+      const aquifero = [...cont.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
+      const prof = ps.map(p => p.profundidade_m).filter((n): n is number => typeof n === 'number' && n > 0)
+      pocos = { quantidade: ps.length, aquifero, profundidade_max: prof.length ? Math.max(...prof) : null }
+    }
+  } catch { /* ignora */ }
+
   const piorGeral = riscos.reduce((m, r) => Math.max(m, PESO[r.classe]), 0)
   const nivel = piorGeral === 3 ? 'alto' : piorGeral === 2 ? 'medio' : piorGeral === 1 ? 'baixo' : 'nenhum'
-  return { riscos, geologia, nivel, avaliado: true }
+  return { riscos, geologia, pocos, nivel, avaliado: true }
 }
 
 export async function fichaRisco(lat: number, lng: number): Promise<FichaRisco> {
