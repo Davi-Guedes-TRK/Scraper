@@ -25,6 +25,8 @@ type ImovelRow = {
   creci: string | null
   nome_anunciante: string | null
   tipo_anunciante: string | null
+  sem_exclusividade: boolean | null
+  grupo_id: string | null
 }
 
 type TriagemResponse = { items: ImovelRow[]; total: number }
@@ -35,7 +37,8 @@ export async function GET() {
       sql<ImovelRow[]>`
         SELECT link, portal, titulo, preco, bairro, cidade, area_m2, quartos,
                imagens, coletado_em, data_publicacao, pistas_ia,
-               tipo_imovel, creci, nome_anunciante, tipo_anunciante
+               tipo_imovel, creci, nome_anunciante, tipo_anunciante,
+               sem_exclusividade, grupo_id
         FROM imoveis_todos
         WHERE status_triagem = 'pendente'
           AND portal <> 'chavesnamao'

@@ -28,6 +28,8 @@ type Imovel = {
   creci?: string | null
   nome_anunciante?: string | null
   tipo_anunciante?: string | null
+  sem_exclusividade?: boolean | null
+  grupo_id?: string | null
 }
 
 // ── Toast ──────────────────────────────────────────────────────────────────────
@@ -442,34 +444,59 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
     setDescricao(null)
     setFonte(null)
     setCandidatos([]); setCandConf(null); setCoord(null)
-    fetch(`/api/triagem/detalhe?link=${encodeURIComponent(item.link)}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d?.descricao) setDescricao(d.descricao) })
-      .catch(() => {})
 
-    // Candidatos do Geoportal a partir do COMEÇO DE ENDEREÇO do próprio anúncio
-    // (bairro/título do DFImóveis/Chaves trazem "QR 516 Conjunto 17" etc.)
+    // pistas_ia tem quadra/conjunto/casa_lote já extraídos pelo AI — prioridade sobre regex
+    const pistas0 = (item.pistas_ia ?? {}) as Record<string, unknown>
+    const pisQuadra   = typeof pistas0.quadra    === 'string' ? pistas0.quadra    : null
+    const pisConjunto = typeof pistas0.conjunto  === 'string' ? pistas0.conjunto  : null
+    const pisCasaLote = typeof pistas0.casa_lote === 'string' ? pistas0.casa_lote : null
+
     const txt = `${item.bairro ?? ''} ${item.titulo ?? ''}`.trim()
-    const { setor, quadra, casa_lote } = parseEnderecoDF(txt)
-    // Candidato de lote só para casa/lote — apartamento/sala não tem lote próprio
-    if (quadra && ehCasaLote(item.tipo_imovel)) {
+    const parsed = parseEnderecoDF(txt)
+    const quadra    = pisQuadra   ?? parsed.quadra
+    const conjunto  = pisConjunto ?? parsed.conjunto
+    const casa_lote = pisCasaLote ?? parsed.casa_lote
+    const setor     = parsed.setor
+    const area_m2   = item.area_m2 ? parseFloat(String(item.area_m2).replace(',', '.')) : undefined
+
+    // flag local: evita busca inicial sobrescrever resultado já enriquecido com descrição
+    let enrichedDone = false
+
+    const chamarCandidatos = (descricao?: string) => {
+      if (!quadra || !ehCasaLote(item.tipo_imovel)) return
+      const isEnriched = !!descricao
       setBuscandoCand(true)
       fetch('/api/geoportal/candidatos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          setor,          // desambigua a quadra (SHIS=Lago Sul vs SRIA vs Indústria…)
-          quadra,
-          casa_lote,
-          endereco: txt,  // texto do anúncio → o scorer credita conjunto/tokens
-          area_m2: item.area_m2 ? parseFloat(String(item.area_m2).replace(',', '.')) : undefined,
-        }),
+        body: JSON.stringify({ setor, quadra, conjunto, casa_lote, endereco: txt, area_m2,
+          ...(descricao ? { descricao } : {}) }),
       })
         .then(r => r.ok ? r.json() : null)
-        .then(j => { if (j) { setCandidatos((j.candidatos ?? []).slice(0, 6)); setCandConf(j.confianca ?? null) } })
+        .then(j => {
+          if (j && (!enrichedDone || isEnriched)) {
+            if (isEnriched) enrichedDone = true
+            setCandidatos((j.candidatos ?? []).slice(0, 6))
+            setCandConf(j.confianca ?? null)
+          }
+        })
         .catch(() => {})
         .finally(() => setBuscandoCand(false))
     }
+
+    // busca inicial rápida (sem descrição)
+    chamarCandidatos()
+
+    // busca a descrição e, se existir, re-executa com dados enriquecidos
+    fetch(`/api/triagem/detalhe?link=${encodeURIComponent(item.link)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d?.descricao) {
+          setDescricao(d.descricao)
+          chamarCandidatos(d.descricao)
+        }
+      })
+      .catch(() => {})
   }, [item.link])
 
   const preco = parsePreco(item.preco)
@@ -496,6 +523,18 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
 
         {/* ── header ── */}
         <div className="flex-shrink-0" style={{ borderBottom: '1px solid var(--border)', background: 'var(--sidebar)' }}>
+          {/* Sem exclusividade banner */}
+          {item.sem_exclusividade && (
+            <div className="px-4 py-1.5 flex items-center gap-2"
+              style={{ background: 'color-mix(in srgb, var(--chart-1) 10%, var(--card))', borderBottom: '1px solid color-mix(in srgb, var(--chart-1) 25%, transparent)' }}>
+              <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ color: 'var(--chart-1)' }}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+              </svg>
+              <span className="text-[11px] font-semibold" style={{ color: 'var(--chart-1)' }}>
+                Sem exclusividade · anunciado por múltiplas corretoras
+              </span>
+            </div>
+          )}
           {/* Dup banner */}
           {dups.length > 0 && (
             <div className="px-4 py-1.5 flex items-center gap-2"
@@ -519,6 +558,9 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
                   )}
                   {fsbo === 'corretor' && (
                     <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium bg-muted text-muted-foreground">Corretor</span>
+                  )}
+                  {item.sem_exclusividade && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold" style={{ background: 'color-mix(in srgb, var(--chart-1) 15%, transparent)', color: 'var(--chart-1)' }}>Sem exclusividade</span>
                   )}
                 </div>
                 <p className="text-sm font-semibold text-foreground leading-tight">{item.titulo || '(sem título)'}</p>
@@ -909,6 +951,9 @@ function ImovelCard({ item, fsbo, dups, onReview, selected, checked, onToggleChe
             )}
             {hasPistas && (
               <span className="text-[9px] bg-amber-50 text-amber-600 border border-amber-200 px-1.5 py-0.5 rounded-full">IA</span>
+            )}
+            {item.sem_exclusividade && (
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold" style={{ background: 'color-mix(in srgb, var(--chart-1) 15%, transparent)', color: 'var(--chart-1)' }}>Sem excl.</span>
             )}
             <PortalBadge portal={item.portal} />
           </div>
