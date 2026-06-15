@@ -730,7 +730,7 @@ function GeoportalCandidates({ item, descricao, endereco, setEndereco, fonte, se
         .then(j => {
           if (j && (!enrichedDone || isEnriched)) {
             if (isEnriched) enrichedDone = true
-            setCandidatos((j.candidatos ?? []).slice(0, 6))
+            setCandidatos((j.candidatos ?? []).slice(0, 50))
             setCandConf(j.confianca ?? null)
           }
         })
@@ -761,7 +761,7 @@ function GeoportalCandidates({ item, descricao, endereco, setEndereco, fonte, se
           </svg>
         )}
       </div>
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1 max-h-[320px] overflow-y-auto pr-1">
         {candidatos.map((c, i) => {
           const end = c.endereco ?? c.lote.end_cart
           const sel = !!end && endereco === end && fonte === 'geoportal'
