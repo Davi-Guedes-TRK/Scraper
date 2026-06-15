@@ -17,11 +17,13 @@ export async function saveProfile(
 
   try {
     await sql`
-      UPDATE profiles
-      SET nome = ${nome},
-          tema = ${tema},
-          onboarding_completo = true
-      WHERE id = ${user.id}
+      INSERT INTO profiles (id, email, nome, tema, onboarding_completo)
+      VALUES (${user.id}, ${user.email ?? ''}, ${nome}, ${tema}, true)
+      ON CONFLICT (id) DO UPDATE
+        SET nome               = EXCLUDED.nome,
+            tema               = EXCLUDED.tema,
+            onboarding_completo = true,
+            updated_at         = now()
     `
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e)
