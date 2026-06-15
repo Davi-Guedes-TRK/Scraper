@@ -704,7 +704,7 @@ function GeoportalCandidates({ item, descricao, endereco, setEndereco, fonte, se
   setFonte: (s: string | null) => void
   setCoord: (c: { lat: number; lng: number } | null) => void
 }) {
-  type CandGeo = { endereco: string | null; score: number; loteMatch: boolean; centro?: [number, number] | null; lote: { area_proj: number | null; end_cart: string | null } }
+  type CandGeo = { endereco: string | null; score: number; loteMatch: boolean; piscina?: boolean | null; centro?: [number, number] | null; lote: { area_proj: number | null; end_cart: string | null } }
   const [candidatos, setCandidatos] = useState<CandGeo[]>([])
   const [candConf, setCandConf] = useState<string | null>(null)
   const [buscandoCand, setBuscandoCand] = useState(false)
@@ -771,6 +771,8 @@ function GeoportalCandidates({ item, descricao, endereco, setEndereco, fonte, se
               <div className="flex items-center gap-1.5">
                 <span className="text-[11px] text-foreground font-medium truncate flex-1">{end ?? '—'}</span>
                 {c.loteMatch && <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-green-100 text-green-700 shrink-0 leading-none">lote ✓</span>}
+                {c.piscina === true && <span className="text-[9px] shrink-0" title="Piscina confirmada pelo Geoportal">&#x1F3CA;</span>}
+                {c.piscina === false && <span className="text-[9px] opacity-30 shrink-0 line-through" title="Sem piscina no Geoportal">&#x1F3CA;</span>}
                 <span className="text-[10px] font-bold tabular-nums shrink-0" style={{ color: 'var(--chart-1)' }}>{Math.round(c.score * 100)}%</span>
               </div>
               {c.lote.area_proj != null && <span className="text-[9px] text-muted-foreground font-mono">{c.lote.area_proj}m²</span>}
@@ -816,6 +818,17 @@ function ContextSidebar({
           setFonte={setFonte}
           setCoord={setCoord}
         />
+        {!coord && (
+          <div className="rounded-lg p-2.5 border border-dashed flex items-start gap-2" style={{ borderColor: 'var(--border)' }}>
+            <svg className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: 'var(--muted-foreground)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <circle cx="12" cy="11" r="2.5" />
+            </svg>
+            <p className="text-[10px] text-muted-foreground/80 leading-snug">
+              Cole o <b>link do Google Maps</b> abaixo (ou clique num candidato do Geoportal) para ver a <b>Ficha de Risco</b> geológico (SGB/CPRM + poços SIAGAS) e imagens da <b>rua</b> (Mapillary).
+            </p>
+          </div>
+        )}
         {coord && <FichaImovel coord={coord} />}
         {coord && <MapillaryStrip coord={coord} />}
       </div>
