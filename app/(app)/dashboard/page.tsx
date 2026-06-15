@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getProfile } from '@/lib/supabase/profile'
 import { classifyAnunciante, daysAgo, startOfToday } from '@/lib/formatters'
 import { PORTALS, portalKeys } from '@/lib/portals'
 import { withCache } from '@/lib/redis'
@@ -107,9 +108,15 @@ async function getDashboardData() {
 }
 
 export default async function DashboardPage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const profile = user ? await getProfile(user.id) : null
+  const papel = profile?.papel ?? 'captador'
+
   const { funnelCounts, alertas, chartData, fila, coletados7d, coletaDelta } = await getDashboardData()
   return (
     <DashboardClient
+      papel={papel}
       funnelCounts={funnelCounts}
       alertas={alertas}
       chartData={chartData as { dia: string }[]}

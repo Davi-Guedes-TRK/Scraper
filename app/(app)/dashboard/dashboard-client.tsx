@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { StatTile } from '@/components/ui/stat-tile'
 import { parsePreco, fmtBRL } from '@/lib/formatters'
+import type { Papel } from '@/lib/supabase/profile'
 
 const DashboardChart = dynamic(
   () => import('./dashboard-chart').then(m => m.DashboardChart),
@@ -93,9 +94,150 @@ function PropertyRow({ item }: { item: FilaItem }) {
   )
 }
 
+// ── Hero "Próxima ação" para Captador ─────────────────────────────────────────
+function NextActionHero({ funnelCounts }: { funnelCounts: Record<string, number> }) {
+  const pendentes   = funnelCounts.pendentes   ?? 0
+  const paraVisitar = funnelCounts.paraVisitar ?? 0
+
+  if (pendentes > 0) {
+    return (
+      <div
+        className="rounded-xl p-5 flex flex-col gap-3"
+        style={{ background: 'color-mix(in srgb, var(--chart-1) 10%, var(--background))', border: '1px solid color-mix(in srgb, var(--chart-1) 25%, transparent)' }}
+      >
+        <div>
+          <p className="eyebrow" style={{ color: 'var(--chart-1)' }}>Próxima ação</p>
+          <p className="text-2xl font-extrabold font-display text-foreground mt-0.5">
+            {pendentes} imóve{pendentes === 1 ? 'l' : 'is'} aguardando triagem
+          </p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Revise os anúncios novos e decida se vai visitar ou descartar.
+          </p>
+        </div>
+        <Link
+          href="/triagem"
+          className="inline-flex items-center gap-2 self-start px-5 py-2.5 rounded-lg text-sm font-bold transition-opacity hover:opacity-80 cursor-pointer"
+          style={{ background: 'var(--chart-1)', color: '#fff' }}
+        >
+          Ir para a Triagem
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </Link>
+      </div>
+    )
+  }
+
+  if (paraVisitar > 0) {
+    return (
+      <div
+        className="rounded-xl p-5 flex flex-col gap-3"
+        style={{ background: 'color-mix(in srgb, #0ea5e9 10%, var(--background))', border: '1px solid color-mix(in srgb, #0ea5e9 25%, transparent)' }}
+      >
+        <div>
+          <p className="eyebrow" style={{ color: '#0ea5e9' }}>Próxima ação</p>
+          <p className="text-2xl font-extrabold font-display text-foreground mt-0.5">
+            {paraVisitar} imóve{paraVisitar === 1 ? 'l' : 'is'} para visitar
+          </p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Planeje sua rota e registre as visitas no campo.
+          </p>
+        </div>
+        <Link
+          href="/visitas"
+          className="inline-flex items-center gap-2 self-start px-5 py-2.5 rounded-lg text-sm font-bold text-white transition-opacity hover:opacity-80 cursor-pointer"
+          style={{ background: '#0ea5e9' }}
+        >
+          Ver rota de visitas
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </Link>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className="rounded-xl p-5 flex items-center gap-4"
+      style={{ background: 'color-mix(in srgb, var(--success) 10%, var(--background))', border: '1px solid color-mix(in srgb, var(--success) 25%, transparent)' }}
+    >
+      <svg className="w-8 h-8 flex-shrink-0" style={{ color: 'var(--success)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+      <div>
+        <p className="font-bold text-foreground">Tudo em dia!</p>
+        <p className="text-sm text-muted-foreground">Nenhum imóvel aguardando ação. Aguarde novos anúncios.</p>
+      </div>
+    </div>
+  )
+}
+
+// ── Cartório Hero para Operador ───────────────────────────────────────────────
+function CartorioHero({ funnelCounts }: { funnelCounts: Record<string, number> }) {
+  const visitados   = funnelCounts.visitados   ?? 0
+  const aprovados   = funnelCounts.aprovados   ?? 0
+  const solicitados = funnelCounts.solicitados ?? 0
+  const recebidos   = funnelCounts.recebidos   ?? 0
+  const pendingAction = aprovados + visitados
+
+  return (
+    <div
+      className="rounded-xl p-5 flex flex-col gap-3"
+      style={{ background: 'color-mix(in srgb, #8b5cf6 10%, var(--background))', border: '1px solid color-mix(in srgb, #8b5cf6 25%, transparent)' }}
+    >
+      <div>
+        <p className="eyebrow" style={{ color: '#8b5cf6' }}>Cartório · Próxima ação</p>
+        {pendingAction > 0 ? (
+          <>
+            <p className="text-2xl font-extrabold font-display text-foreground mt-0.5">
+              {pendingAction} imóve{pendingAction === 1 ? 'l' : 'is'} aguardando processamento
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {visitados > 0 && `${visitados} com visita, sem aprovação. `}
+              {aprovados > 0 && `${aprovados} aprovados aguardando matrícula.`}
+            </p>
+          </>
+        ) : solicitados > 0 ? (
+          <>
+            <p className="text-2xl font-extrabold font-display text-foreground mt-0.5">
+              {solicitados} matrícula{solicitados === 1 ? '' : 's'} solicitada{solicitados === 1 ? '' : 's'}
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">Aguardando retorno do cartório.</p>
+          </>
+        ) : (
+          <>
+            <p className="text-2xl font-extrabold font-display text-foreground mt-0.5">Fila limpa</p>
+            <p className="text-sm text-muted-foreground mt-1">{recebidos} doc{recebidos === 1 ? 'umento' : 'umentos'} recebido{recebidos === 1 ? '' : 's'} esta semana.</p>
+          </>
+        )}
+      </div>
+      <div className="flex gap-2 flex-wrap">
+        <Link
+          href="/relatorio"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold text-white transition-opacity hover:opacity-80 cursor-pointer"
+          style={{ background: '#8b5cf6' }}
+        >
+          Abrir Cartório
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </Link>
+        {aprovados > 0 && (
+          <Link href="/relatorio" className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold border transition-colors hover:bg-accent cursor-pointer" style={{ borderColor: 'var(--border)', color: 'var(--foreground)' }}>
+            Ver aprovados ({aprovados})
+          </Link>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Props ─────────────────────────────────────────────────────────────────────
 export function DashboardClient({
-  funnelCounts, alertas, chartData, fila, coletados7d, coletaDelta,
+  papel, funnelCounts, alertas, chartData, fila, coletados7d, coletaDelta,
 }: {
+  papel: Papel
   funnelCounts: Record<string, number>
   alertas: Alert[]
   chartData: { dia: string }[]
@@ -105,10 +247,91 @@ export function DashboardClient({
 }) {
   const total = Math.max(1, STAGES.reduce((s, st) => s + (funnelCounts[st.key] ?? 0), 0))
 
+  // ── Captador ──────────────────────────────────────────────────────────────
+  if (papel === 'captador') {
+    return (
+      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 max-w-xl mx-auto w-full">
+        <div>
+          <p className="eyebrow text-muted-foreground">Bom dia, captador</p>
+          <h2 className="text-lg font-bold text-foreground font-display">Painel de Campo</h2>
+        </div>
+
+        <NextActionHero funnelCounts={funnelCounts} />
+
+        {/* KPIs simplificados */}
+        <div className="grid grid-cols-2 gap-2.5">
+          {STAGES.slice(0, 4).map(st => (
+            <StatTile
+              key={st.key}
+              label={st.label}
+              value={funnelCounts[st.key] ?? 0}
+              sublabel={st.sub}
+              accent={st.accent}
+              href={st.href}
+              share={((funnelCounts[st.key] ?? 0) / total) * 100}
+            />
+          ))}
+        </div>
+
+        {/* Fila rápida */}
+        {fila.length > 0 && (
+          <div className="card rounded-lg overflow-hidden">
+            <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
+              <p className="text-xs font-semibold text-foreground">Próximos na fila</p>
+            </div>
+            <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+              {fila.slice(0, 5).map(item => <PropertyRow key={`${item.portal}-${item.link}`} item={item} />)}
+            </div>
+            <div className="px-4 py-3 border-t" style={{ borderColor: 'var(--border)' }}>
+              <Link href="/triagem" className="text-xs font-semibold cursor-pointer hover:underline" style={{ color: 'var(--chart-1)' }}>
+                Ver todos na triagem →
+              </Link>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // ── Operador ──────────────────────────────────────────────────────────────
+  if (papel === 'operador') {
+    return (
+      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 max-w-2xl mx-auto w-full">
+        <div>
+          <p className="eyebrow text-muted-foreground">Operações</p>
+          <h2 className="text-lg font-bold text-foreground font-display">Painel do Operador</h2>
+        </div>
+
+        <CartorioHero funnelCounts={funnelCounts} />
+
+        {/* KPIs cartório */}
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+          {STAGES.slice(2).map(st => (
+            <StatTile
+              key={st.key}
+              label={st.label}
+              value={funnelCounts[st.key] ?? 0}
+              sublabel={st.sub}
+              accent={st.accent}
+              href={st.href}
+              share={((funnelCounts[st.key] ?? 0) / total) * 100}
+            />
+          ))}
+        </div>
+
+        {/* Gráfico (resumido) */}
+        <div className="card rounded-lg p-3">
+          <h3 className="font-semibold text-foreground text-xs mb-2">Coleta — últimos 7 dias</h3>
+          <DashboardChart data={chartData} />
+        </div>
+      </div>
+    )
+  }
+
+  // ── Gestor / Admin — visão completa ───────────────────────────────────────
   return (
     <div className="flex overflow-hidden" style={{ height: 'calc(100vh - 3.5rem)' }}>
 
-      {/* ── CENTRO — KPIs + gráfico ───────────────────────────── */}
       <main className="flex-1 overflow-y-auto min-w-0 p-4" style={{ background: 'var(--background)' }}>
         <div className="flex items-center justify-between mb-3">
           <div>
@@ -128,7 +351,6 @@ export function DashboardClient({
           </Link>
         </div>
 
-        {/* KPIs 2×3 */}
         <div className="grid grid-cols-3 gap-2.5 mb-3">
           {STAGES.map(st => (
             <StatTile
@@ -143,7 +365,6 @@ export function DashboardClient({
           ))}
         </div>
 
-        {/* Gráfico */}
         <div className="card rounded-lg p-3 mb-3">
           <div className="flex items-start justify-between mb-2">
             <div>
@@ -167,7 +388,6 @@ export function DashboardClient({
           <DashboardChart data={chartData} />
         </div>
 
-        {/* Barras status */}
         <div className="flex gap-2.5">
           <div className="flex-1 rounded-lg px-3 py-2.5 flex items-center justify-between"
                style={{ background: 'color-mix(in srgb, var(--destructive) 12%, var(--background))' }}>
@@ -184,14 +404,24 @@ export function DashboardClient({
             </span>
           </div>
         </div>
+
+        {/* Fila de triagem (gestores também veem) */}
+        {fila.length > 0 && (
+          <div className="card rounded-lg overflow-hidden mt-3">
+            <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
+              <p className="text-xs font-semibold text-foreground">Últimos na fila</p>
+            </div>
+            <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+              {fila.map(item => <PropertyRow key={`${item.portal}-${item.link}`} item={item} />)}
+            </div>
+          </div>
+        )}
       </main>
 
-      {/* ── DIREITO — stat + funil + captados hoje ────────────── */}
       <aside
         className="w-64 flex-shrink-0 flex flex-col overflow-hidden"
         style={{ background: 'var(--sidebar)', borderLeft: '1px solid var(--sidebar-border)' }}
       >
-        {/* Stat 7d */}
         <div className="px-4 py-4 flex-shrink-0" style={{ borderBottom: '1px solid var(--sidebar-border)' }}>
           <p className="text-[32px] font-extrabold font-display tabular text-foreground leading-none">
             {coletados7d}
@@ -207,7 +437,6 @@ export function DashboardClient({
           )}
         </div>
 
-        {/* Funil mini */}
         <div className="px-4 py-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--sidebar-border)' }}>
           <p className="eyebrow text-muted-foreground mb-2">Funil</p>
           <div className="flex flex-col gap-1.5">
@@ -227,7 +456,6 @@ export function DashboardClient({
           </div>
         </div>
 
-        {/* Captados hoje */}
         <div
           className="px-4 py-2 flex-shrink-0 flex items-center gap-2"
           style={{ borderBottom: '1px solid var(--sidebar-border)' }}
@@ -253,10 +481,7 @@ export function DashboardClient({
               >
                 <div
                   className="w-6 h-6 rounded flex-shrink-0 flex items-center justify-center text-[10px] font-bold"
-                  style={{
-                    background: 'var(--foreground)',
-                    color: 'var(--background)',
-                  }}
+                  style={{ background: 'var(--foreground)', color: 'var(--background)' }}
                 >
                   {(item.titulo || item.bairro || '?')[0].toUpperCase()}
                 </div>
