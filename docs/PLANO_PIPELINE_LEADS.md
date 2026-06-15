@@ -94,9 +94,33 @@ Página `/pregao` (menu Analisar) — terminal de bolsa CRT verde-fósforo, poll
 | API | Uso no pipeline | Observação |
 |-----|----------------|------------|
 | **Mapillary** ✅ (jun/15) | Strip street-level NA triagem (`lib/mapillary.ts` + `/api/mapillary` + `MapillaryStrip` no ReviewPanel). Aparece quando há coordenada: pin do Maps (resolve-maps já devolvia lat/lng) OU centroide do candidato do geoportal clicado. ⚠️ **Falta só `MAPILLARY_TOKEN`** no `.env.local`+Vercel (grátis em mapillary.com/dashboard/developers) — sem ele o strip é no-op silencioso. | API v4 Graph; bbox ~90m; ordena por distância. |
-| **IBGE (CNEFE + setores censitários)** | CNEFE = cadastro nacional de endereços → mais uma fonte p/ validar/normalizar endereço; renda média do setor censitário → score de potencial do lead. | APIs públicas, sem auth. |
-| **SIAGAS (CPRM)** | Poços tubulares cadastrados por coordenada — casa no Lago Sul com poço outorgado é sinal de padrão alto + dado p/ a ficha do imóvel. | Confirmado (jun/12): junto com o WFS da CPRM. |
-| **WFS CPRM** | Serviço Geológico do Brasil (confirmado jun/12) — camadas geológicas/hidrogeológicas via GeoServer da CPRM, complementa SIAGAS no enriquecimento do lote. | `geoportal.cprm.gov.br` / GeoSGB. |
+| **IBGE (CNEFE + setores censitários)** | CNEFE = cadastro nacional de endereços → mais uma fonte p/ validar/normalizar endereço; renda média do setor censitário → score de potencial do lead. | APIs públicas, sem auth. Pausado (decisão jun/15: prioridade é ficha de risco, não score). |
+| **SGB/CPRM + SIAGAS → Ficha de Risco** | **Objetivo (decisão jun/15): trazer imóveis com PROBLEMA** — alertar, não valorizar. Ver "Fase 5b" abaixo. | Hosts certos: `geoservicos.sgb.gov.br/geoserver/wfs` + `siagasweb.sgb.gov.br` (os `cprm.gov.br` morreram). |
+
+### Fase 5b — Ficha de Risco do imóvel (SGB/CPRM + SIAGAS) — PLANO (jun/15)
+**Objetivo:** ao validar um endereço na triagem, mostrar uma **ficha de risco geológico** do ponto — alertar sobre imóvel problemático (área de deslizamento, inundação, solo, contexto geológico). NÃO é score de valor; é alarme.
+
+**Correção técnica:** Brasília fica no meio da placa Sul-Americana — sem limite de placas/terremoto destrutivo. Os riscos REAIS e mapeados que importam: suscetibilidade a **movimento de massa**, **inundação**, **enxurrada/corrida de massa**, e contexto geológico (unidade/ambiente tectônico, solo).
+
+**Descoberta feita (endpoints reais + DF confirmado coberto):**
+- GeoServer WFS do SGB: `https://geoservicos.sgb.gov.br/geoserver/wfs` (mesmo padrão do `lib/wfs-idedf.ts` que já temos).
+- Camadas úteis (todas cobrem o DF — testado por bbox em Brasília):
+  - `gestao-territorial:suscet_movimento_de_massa` (64 feições DF) — atributo **`classe`** = grau (baixa/média/alta), + `processo`, `fonte`, `ano`.
+  - `gestao-territorial:suscet_inundacao` (131 feições DF) — mesmo schema.
+  - `gestao-territorial:suscet_enxurrada` e `suscet_corrida_de_massa` — idem.
+  - `geosgb:litoestratigrafia_1m` — `nome`, `ambiente_tectonico`, `idade`, `litotipos` (escala 1:1M = só contexto regional, NÃO precisão de lote).
+- SIAGAS em `siagasweb.sgb.gov.br` (poços tubulares) — **falta descobrir o GetFeature/REST por bbox** (sub-passo); é dado de contexto (lençol freático), não o alarme principal.
+- ⚠️ O GeoServer do IDE-DF que já usamos (catalogo.ipe.df.gov.br) **não tem** camadas de risco — só uso do solo/hídrico. O risco vem do SGB.
+
+**Implementação (reusa o que existe):**
+1. **Verificar atributo `classe`**: 1 GetFeature confirmando os valores reais do grau (baixa/média/alta) e se o DF tem feições de grau alto.
+2. `lib/wfs-sgb.ts` — cliente WFS do SGB espelhando `wfs-idedf.ts`. Point-in-polygon via **bbox minúscula** ao redor do ponto (robusto: não depende do nome da coluna de geometria; polígono de suscetibilidade cobre área, então bbox±~5m intersectando = ponto na zona).
+3. `lib/ficha-risco.ts` — `fichaRisco(lat,lng)` consulta as 4 camadas de suscetibilidade + litoestratigrafia (+ SIAGAS poços por bbox) → `{ riscos:[{tipo,classe,fonte,ano}], geologia:{unidade,ambiente_tectonico,idade}, pocos_proximos, nivel:'alto'|'medio'|'baixo'|'nenhum' }` (nivel = pior classe). **Cache obrigatório** via `lib/redis.ts` (`withCache`, TTL ~30d — dado raramente muda; e os WFS gov oscilam/502). Degradação silenciosa (no-op) se cair, igual Mapillary/geoportal. Não inventar: ponto sem feição = "sem risco mapeado", não "seguro".
+4. `/api/ficha-risco` POST `{lat,lng}`.
+5. **Triagem**: bloco `FichaRiscoBlock` no ReviewPanel, disparado pelo MESMO `coord` do Mapillary (pin do Maps ou centroide do candidato). Cabeçalho vermelho se `nivel='alto'`; lista os riscos + unidade geológica + ambiente tectônico.
+6. **(Fase 2, opcional) persistir**: gravar `risco_nivel`/`risco_resumo` no approve → badge ⚠️ no Pregão (ticker/parados) e no `onus_pipeline`, pra um imóvel perigoso ser sinalizado antes da captação.
+
+**Esforço:** passos 1–5 ≈ uma sessão (cliente WFS + orquestração + UI; padrão já existe). Passo 6 é incremento posterior.
 
 ---
 
