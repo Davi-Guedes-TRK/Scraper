@@ -9,6 +9,7 @@
 
 import { buscarCandidatos, type Candidato } from './wfs-idedf'
 import { parseEnderecoDF } from './endereco-df'
+import { consultarPiscinasCTM } from './cadastro-territorial'
 
 export type CandidatoPontuado = Candidato & {
   score: number
@@ -60,9 +61,12 @@ function addrScore(ref: Set<string>, cand: string | null): number {
   return hit / ref.size
 }
 
-/** Proximidade de área: 0% de diferença = 1, 100%+ de diferença = 0. null se faltar dado. */
+/** Proximidade de área: 0% de diferença = 1, 100%+ de diferença = 0. null se faltar dado.
+ *  Retorna null quando a área do anúncio é < 50% da área do lote — indica área construída
+ *  vs área de terreno (escalas incompatíveis); nesses casos o score é ignorado. */
 function areaScore(areaM2: number | null | undefined, areaProj: number | null): number | null {
   if (!areaM2 || !areaProj) return null
+  if (areaM2 < areaProj * 0.5) return null  // área construída vs terreno — não comparar
   return Math.max(0, 1 - Math.abs(areaProj - areaM2) / areaM2)
 }
 
@@ -103,18 +107,33 @@ export async function acharCandidatos(opts: {
   const ref     = tokens([opts.endereco, quadra, conjunto, setor, casa_lote].filter(Boolean).join(' '))
   const refLote = loteNum(casa_lote) ?? loteNum(opts.endereco)
 
-  const candidatos: CandidatoPontuado[] = brutos
+  let pontuados: CandidatoPontuado[] = brutos
     .map(c => {
       const a  = areaScore(area_m2, c.lote.area_proj)
       const ad = addrScore(ref, c.endereco ?? c.lote.end_cart)
-      // O número do lote é o identificador único dentro do conjunto: se bate, desempata.
       const loteMatch = refLote != null && loteNum(c.lote.lote) === refLote
-      // Endereço 0.6 + área 0.4 (sem área, 100% endereço); +0.4 se o lote bate (cap 1).
       const base  = a != null ? ad * 0.6 + a * 0.4 : ad
       const score = Math.min(1, base + (loteMatch ? 0.4 : 0))
       return { ...c, score, areaScore: a, addrScore: ad, loteMatch, piscina: null as boolean | null }
     })
-    .sort((x, y) => y.score - x.score)
+
+  // Enriquece com piscina via CTM quando a descrição sugere piscina (2 chamadas HTTP extras).
+  if (desc.piscina && pontuados.length) {
+    try {
+      const piscinaMap = await consultarPiscinasCTM(brutos)
+      pontuados = pontuados.map((c, i) => {
+        const temPiscina = piscinaMap[i]
+        let score = c.score
+        if (temPiscina === true)  score = Math.min(1, score + 0.30)
+        if (temPiscina === false) score = Math.max(0, score - 0.15)
+        return { ...c, piscina: temPiscina, score }
+      })
+    } catch {
+      // CTM indisponível — mantém scores originais, piscina=null
+    }
+  }
+
+  const candidatos = pontuados.sort((x, y) => y.score - x.score)
 
   const melhor  = candidatos[0] ?? null
   const segundo = candidatos[1] ?? null
@@ -123,7 +142,7 @@ export async function acharCandidatos(opts: {
   if (melhor) {
     const gap = melhor.score - (segundo?.score ?? 0)
     const loteDecisivo = melhor.loteMatch && candidatos.filter(c => c.loteMatch).length === 1
-    if (loteDecisivo)                          confianca = 'alta'   // lote único que bate → decisivo
+    if (loteDecisivo)                          confianca = 'alta'
     else if (melhor.score >= 0.7 && gap >= 0.2) confianca = 'alta'
     else if (melhor.score >= 0.5)              confianca = 'media'
     else                                       confianca = 'baixa'
@@ -132,10 +151,14 @@ export async function acharCandidatos(opts: {
   return { candidatos, melhor, confianca, piscinaDescricao: desc.piscina }
 }
 
-// ── Camada de visão (piscina, telhado, etc.) — SEAM, NÃO implementado ────────────
-// Exige ortofoto/satélite + segmentação (SAM 2) rodando em GPU (Colab T4), fora do
-// serverless. Quando existir, anota cada candidato com piscina:true/false e o score
-// acima passa a ponderá-la. Mantido como no-op explícito para NÃO inventar piscina.
+// Anota cada candidato com piscina via CTM (cadastro territorial IDE-DF).
+// SAM 2 (visão por ortofoto) é a camada complementar futura para quando CTM não cobrir.
 export async function anotarPiscina(cands: CandidatoPontuado[]): Promise<CandidatoPontuado[]> {
-  return cands  // piscina permanece null = não avaliado
+  if (!cands.length) return cands
+  try {
+    const piscinaMap = await consultarPiscinasCTM(cands)
+    return cands.map((c, i) => ({ ...c, piscina: piscinaMap[i] ?? null }))
+  } catch {
+    return cands
+  }
 }
