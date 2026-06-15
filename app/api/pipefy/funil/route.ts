@@ -127,30 +127,7 @@ export async function GET(req: NextRequest) {
       FROM pipefy_captacoes
     `,
 
-    // Anúncios ativos no mercado (imoveis_todos) nas regiões do funil. cidade = RA (slug);
-    // normaliza (sem acento/caixa/separador) pra casar "lago-sul" com "Lago Sul" do Pipefy.
-    // DEDUP por imóvel único (título normalizado + área/quartos/vagas) — o mesmo imóvel
-    // aparece em 2 portais. Retorna CONTAGEM (~717) e SOMA do preço (preco é texto BR -> parse).
-    sql`
-      SELECT count(*)::int AS total, COALESCE(sum(p), 0)::float8 AS valor
-      FROM (
-        SELECT DISTINCT ON (
-                 lower(regexp_replace(translate(it.titulo, 'ÁÀÂÃÉÊÍÓÔÕÚÜÇáàâãéêíóôõúüç', 'AAAAEEIOOOUUCaaaaeeiooouuc'), '[^A-Za-z0-9]', '', 'g')),
-                 it.area_m2, it.quartos, it.vagas)
-               nullif(regexp_replace(split_part(it.preco, ',', 1), '[^0-9]', '', 'g'), '')::numeric AS p
-        FROM imoveis_todos it
-        WHERE it.ativo
-          AND lower(regexp_replace(translate(it.cidade, 'ÁÀÂÃÉÊÍÓÔÕÚÜÇáàâãéêíóôõúüç', 'AAAAEEIOOOUUCaaaaeeiooouuc'), '[^A-Za-z0-9]', '', 'g')) IN (
-            SELECT lower(regexp_replace(translate(bairro, 'ÁÀÂÃÉÊÍÓÔÕÚÜÇáàâãéêíóôõúüç', 'AAAAEEIOOOUUCaaaaeeiooouuc'), '[^A-Za-z0-9]', '', 'g'))
-            FROM pipefy_captacoes
-            WHERE bairro IS NOT NULL
-              AND (${bairro} = 'Todos' OR bairro = ${bairro})
-          )
-        ORDER BY
-          lower(regexp_replace(translate(it.titulo, 'ÁÀÂÃÉÊÍÓÔÕÚÜÇáàâãéêíóôõúüç', 'AAAAEEIOOOUUCaaaaeeiooouuc'), '[^A-Za-z0-9]', '', 'g')),
-          it.area_m2, it.quartos, it.vagas, it.preco DESC NULLS LAST
-      ) d
-    `,
+    sql`SELECT count(*)::int AS total, COALESCE(sum(valor), 0)::float8 AS valor FROM dil_imoveis`,
   ])
 
   const f = filtrosRow[0] as { bairros: string[] | null; tipos: string[] | null }
