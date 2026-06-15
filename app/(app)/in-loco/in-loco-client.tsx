@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 const TIPOS = ['Casa', 'Apartamento', 'Comercial', 'Terreno', 'Outro']
+const DRAFT_KEY = 'inloco_draft_tipo'
 type Toast = { id: number; msg: string; type: 'ok' | 'err' }
 
 // ───────────────────────── foto: comprime no celular (fotos de 8–12 MP estouram a memória) ──
@@ -120,7 +121,9 @@ export function InLocoClient() {
   const [userId, setUserId] = useState<string | null>(null)
   const coordsRef = useRef<{ lat: number; lng: number; acc: number } | null>(null)
   const [gpsAcc, setGpsAcc] = useState<number | null>(null)
-  const [tipo, setTipo] = useState('')
+  const [tipo, setTipo] = useState(() => {
+    try { return localStorage.getItem(DRAFT_KEY) ?? '' } catch { return '' }
+  })
   const [filaCount, setFilaCount] = useState(0)
   const [syncing, setSyncing] = useState(false)
   const [capturas, setCapturas] = useState<Captura[]>([])
@@ -220,17 +223,28 @@ export function InLocoClient() {
         <p className="text-muted-foreground text-sm mt-0.5">Tire a foto — salva na hora com o GPS, <strong className="text-foreground">mesmo sem sinal</strong>. O endereço resolve sozinho depois.</p>
       </div>
 
-      {/* tipo (opcional, fica marcado pras próximas) */}
-      <div className="flex flex-wrap gap-1.5">
-        {TIPOS.map(t => (
-          <button key={t} onClick={() => setTipo(tipo === t ? '' : t)}
-            className="px-3 h-8 rounded-full text-[12px] font-medium transition-colors cursor-pointer"
-            style={tipo === t
-              ? { background: 'var(--primary)', color: '#fff' }
-              : { background: 'var(--secondary)', border: '1px solid var(--border)', color: 'var(--muted-foreground)' }}>
-            {t}
-          </button>
-        ))}
+      {/* tipo (opcional, fica marcado pras próximas — autosave em localStorage) */}
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">Tipo de imóvel</p>
+        <div className="flex flex-wrap gap-2">
+          {TIPOS.map(t => (
+            <button key={t}
+              onClick={() => {
+                const next = tipo === t ? '' : t
+                setTipo(next)
+                try { if (next) localStorage.setItem(DRAFT_KEY, next); else localStorage.removeItem(DRAFT_KEY) } catch { /* ok */ }
+              }}
+              className="px-4 rounded-full text-sm font-semibold transition-colors cursor-pointer"
+              style={{
+                minHeight: 44,
+                background: tipo === t ? 'var(--primary)' : 'var(--secondary)',
+                border: `1px solid ${tipo === t ? 'transparent' : 'var(--border)'}`,
+                color: tipo === t ? 'var(--primary-foreground)' : 'var(--muted-foreground)',
+              }}>
+              {t}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* BOTÃO CAPTURAR */}
@@ -248,11 +262,39 @@ export function InLocoClient() {
 
       {/* status GPS + fila */}
       <div className="flex items-center justify-between text-[11px] -mt-1 px-1">
-        <span className="text-muted-foreground">
-          {gpsAcc == null ? '📍 buscando GPS…' : `📍 GPS pronto · ±${Math.round(gpsAcc)} m`}
+        <span className="flex items-center gap-1.5 text-muted-foreground">
+          {gpsAcc == null ? (
+            <>
+              <svg className="w-3.5 h-3.5 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+              </svg>
+              Buscando GPS…
+            </>
+          ) : (
+            <>
+              <svg className="w-3.5 h-3.5" style={{ color: 'var(--success)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+              </svg>
+              <span style={{ color: 'var(--success)' }}>GPS pronto</span>
+              <span className="text-muted-foreground/60">±{Math.round(gpsAcc)} m</span>
+            </>
+          )}
         </span>
-        <span className="font-mono" style={{ color: filaCount ? 'var(--primary)' : 'var(--muted-foreground)' }}>
-          {syncing ? 'enviando…' : filaCount ? `${filaCount} na fila` : 'tudo enviado ✓'}
+        <span className="flex items-center gap-1 font-mono" style={{ color: filaCount ? 'var(--chart-1)' : 'var(--muted-foreground)' }}>
+          {syncing ? (
+            <><span className="w-3 h-3 border-2 border-current/30 border-t-current rounded-full animate-spin" />enviando…</>
+          ) : filaCount ? (
+            <><span className="w-1.5 h-1.5 rounded-full bg-current" />{filaCount} na fila</>
+          ) : (
+            <>
+              <svg className="w-3 h-3" style={{ color: 'var(--success)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+              </svg>
+              <span style={{ color: 'var(--success)' }}>tudo enviado</span>
+            </>
+          )}
         </span>
       </div>
 
@@ -260,7 +302,13 @@ export function InLocoClient() {
 
       {/* minhas capturas */}
       {capturas.length === 0 && (
-        <p className="text-center text-xs text-muted-foreground/50 py-2">Nenhuma captura ainda neste dispositivo.</p>
+        <div className="text-center py-8 flex flex-col items-center gap-2">
+          <svg className="w-10 h-10 text-muted-foreground/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.4}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+            <circle cx="12" cy="13" r="3.2" />
+          </svg>
+          <p className="text-xs text-muted-foreground">Nenhuma captura ainda neste dispositivo.</p>
+        </div>
       )}
       {capturas.length > 0 && (
         <div className="flex flex-col gap-2">
@@ -291,7 +339,7 @@ export function InLocoClient() {
       )}
 
       {toasts.length > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 flex flex-col gap-2 z-50 pointer-events-none">
+        <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 flex flex-col gap-2 z-50 pointer-events-none">
           {toasts.map(t => (
             <div key={t.id} className={`px-4 py-2.5 rounded-lg text-sm font-medium shadow-lg text-white ${t.type === 'ok' ? 'bg-green-600' : 'bg-red-600'}`}>{t.msg}</div>
           ))}
