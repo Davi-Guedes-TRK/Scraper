@@ -242,7 +242,7 @@ export function Navbar({ papel = 'admin' }: { papel?: Papel }) {
 
   return (
     <aside
-      className="flex-shrink-0 flex flex-col h-screen sticky top-0 z-20 transition-[width] duration-200"
+      className="flex-shrink-0 hidden md:flex flex-col h-screen sticky top-0 z-20 transition-[width] duration-200"
       style={{
         width: collapsed ? '3.25rem' : '14rem',
         background: 'var(--sidebar)',

@@ -8,6 +8,7 @@ import { Topbar } from '@/components/topbar'
 import { DataSourceBar } from '@/components/data-source-bar'
 import { NewPropertiesProvider } from '@/components/new-properties-provider'
 import { WelcomeOverlay } from '@/components/welcome-overlay'
+import { BottomNav } from '@/components/bottom-nav'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -27,9 +28,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <div className="flex-1 flex flex-col min-w-0 min-h-0 h-screen">
           <Topbar email={user.email} nome={profile.nome} />
           <DataSourceBar />
-          <main className="flex-1 overflow-auto min-h-0">{children}</main>
+          <main className="flex-1 overflow-auto min-h-0 pb-14 md:pb-0">{children}</main>
         </div>
       </div>
+      <BottomNav papel={profile.papel} />
     </NewPropertiesProvider>
   )
 }
