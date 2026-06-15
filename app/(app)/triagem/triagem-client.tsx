@@ -30,6 +30,11 @@ type Imovel = {
   tipo_anunciante?: string | null
   sem_exclusividade?: boolean | null
   grupo_id?: string | null
+  endereco?: string | null
+  maps_link?: string | null
+  endereco_fonte?: string | null
+  lat?: number | null
+  lng?: number | null
 }
 
 // ── Toast ──────────────────────────────────────────────────────────────────────
@@ -404,12 +409,18 @@ function MapillaryStrip({ coord }: { coord: { lat: number; lng: number } }) {
 }
 
 // ── ReviewPanel ────────────────────────────────────────────────────────────────
-function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups, onApprove, onVisitar, onDiscard, onClose }: {
+function ReviewPanel({ item, descricao, endereco, setEndereco, mapsLink, setMapsLink, resolving, setResolving, fonte, setFonte, setCoord, dups, onApprove, onVisitar, onDiscard, onClose }: {
   item: Imovel
+  descricao: string | null
   endereco: string
   setEndereco: (s: string) => void
   mapsLink: string
   setMapsLink: (s: string) => void
+  resolving: boolean
+  setResolving: (b: boolean) => void
+  fonte: string | null
+  setFonte: (s: string | null) => void
+  setCoord: (c: { lat: number; lng: number } | null) => void
   dups: string[]
   onApprove: (item: Imovel, data: { endereco: string; mapsLink: string; fonte?: string | null }) => Promise<void>
   onVisitar: (item: Imovel, data: { endereco: string; mapsLink: string; fonte?: string | null }) => Promise<void>
@@ -421,14 +432,6 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
   const [zoom, setZoom] = useState(false)
   const [zoomIdx, setZoomIdx] = useState(0)
   const [matriculaOpen, setMatriculaOpen] = useState(false)
-  const [descricao, setDescricao] = useState<string | null>(null)
-  const [resolving, setResolving] = useState(false)
-  const [fonte, setFonte] = useState<string | null>(null)  // confiança do endereço: 'geoportal' | 'maps' | null
-  type CandGeo = { endereco: string | null; score: number; loteMatch: boolean; centro?: [number, number] | null; lote: { area_proj: number | null; end_cart: string | null } }
-  const [candidatos, setCandidatos] = useState<CandGeo[]>([])
-  const [candConf, setCandConf] = useState<string | null>(null)
-  const [buscandoCand, setBuscandoCand] = useState(false)
-  const [coord, setCoord] = useState<{ lat: number; lng: number } | null>(null)  // p/ street-level Mapillary
 
   const MAPS_RE = /maps\.app\.goo\.gl\/|(?:www\.)?google\.com\/maps/
 
@@ -445,63 +448,13 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
       if (!res.ok) return
       const data: { endereco: string | null; mapsLink: string; lat?: number | null; lng?: number | null; source?: 'geoportal' | 'maps' | null } = await res.json()
       if (data.mapsLink) setMapsLink(data.mapsLink)
-      // Geoportal = endereço oficial do DF -> sobrescreve o palpite das pistas; place-name só preenche se vazio
       if (data.endereco && (data.source === 'geoportal' || !endereco.trim())) setEndereco(data.endereco)
-      setFonte(data.source ?? null)  // marca a confiança para o gate de auto-envio ao cartório
-      if (data.lat != null && data.lng != null) setCoord({ lat: data.lat, lng: data.lng })  // libera street-level
+      setFonte(data.source ?? null)
+      if (data.lat != null && data.lng != null) setCoord({ lat: data.lat, lng: data.lng })
     } catch { /* ignore */ } finally {
       setResolving(false)
     }
   }
-
-  useEffect(() => {
-    setDescricao(null)
-    setFonte(null)
-    setCandidatos([]); setCandConf(null); setCoord(null)
-
-    const txt = `${item.bairro ?? ''} ${item.titulo ?? ''}`.trim()
-    const { setor, quadra, conjunto, casa_lote } = parseEnderecoDF(txt)
-    const area_m2   = item.area_m2 ? parseFloat(String(item.area_m2).replace(',', '.')) : undefined
-
-    // flag local: evita busca inicial sobrescrever resultado já enriquecido com descrição
-    let enrichedDone = false
-
-    const chamarCandidatos = (descricao?: string) => {
-      if (!quadra || !ehCasaLote(item.tipo_imovel)) return
-      const isEnriched = !!descricao
-      setBuscandoCand(true)
-      fetch('/api/geoportal/candidatos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ setor, quadra, conjunto, casa_lote, endereco: txt, area_m2,
-          ...(descricao ? { descricao } : {}) }),
-      })
-        .then(r => r.ok ? r.json() : null)
-        .then(j => {
-          if (j && (!enrichedDone || isEnriched)) {
-            if (isEnriched) enrichedDone = true
-            setCandidatos((j.candidatos ?? []).slice(0, 6))
-            setCandConf(j.confianca ?? null)
-          }
-        })
-        .catch(() => {})
-        .finally(() => setBuscandoCand(false))
-    }
-
-    // busca inicial rápida (sem descrição)
-    chamarCandidatos()
-
-    // busca a descrição e, se existir, re-executa com dados enriquecidos
-    fetch(`/api/triagem/detalhe?link=${encodeURIComponent(item.link)}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        if (d?.descricao) {
-          setDescricao(d.descricao)
-          chamarCandidatos(d.descricao)
-        }
-      })
-      .catch(() => {})
-  }, [item.link])
 
   const preco = parsePreco(item.preco)
   const pistas = (item.pistas_ia ?? {}) as Record<string, unknown>
@@ -527,7 +480,6 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
 
         {/* ── header ── */}
         <div className="flex-shrink-0" style={{ borderBottom: '1px solid var(--border)', background: 'var(--sidebar)' }}>
-          {/* Sem exclusividade banner */}
           {item.sem_exclusividade && (
             <div className="px-4 py-1.5 flex items-center gap-2"
               style={{ background: 'color-mix(in srgb, var(--chart-1) 10%, var(--card))', borderBottom: '1px solid color-mix(in srgb, var(--chart-1) 25%, transparent)' }}>
@@ -539,7 +491,6 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
               </span>
             </div>
           )}
-          {/* Dup banner */}
           {dups.length > 0 && (
             <div className="px-4 py-1.5 flex items-center gap-2"
               style={{ background: 'color-mix(in srgb, #f59e0b 12%, var(--card))', borderBottom: '1px solid color-mix(in srgb, #f59e0b 25%, transparent)' }}>
@@ -636,47 +587,6 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
               )}
             </div>
           )}
-
-          {(buscandoCand || candidatos.length > 0) && (
-            <div className="rounded-lg p-2.5 border" style={{ background: 'color-mix(in srgb, var(--chart-1) 7%, var(--card))', borderColor: 'color-mix(in srgb, var(--chart-1) 30%, transparent)' }}>
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <p className="text-[9px] font-bold uppercase tracking-wider font-mono" style={{ color: 'var(--chart-1)' }}>Candidatos do Geoportal</p>
-                {candConf && (
-                  <span className={`text-[8px] px-1 py-0.5 rounded font-mono font-bold uppercase leading-none ${
-                    candConf === 'alta' ? 'bg-green-100 text-green-700' :
-                    candConf === 'media' ? 'bg-amber-100 text-amber-700' : 'bg-zinc-100 text-zinc-500'
-                  }`}>{candConf}</span>
-                )}
-                {buscandoCand && (
-                  <svg className="w-3 h-3 animate-spin text-muted-foreground ml-auto" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                  </svg>
-                )}
-              </div>
-              <div className="flex flex-col gap-1">
-                {candidatos.map((c, i) => {
-                  const end = c.endereco ?? c.lote.end_cart
-                  const sel = !!end && endereco === end && fonte === 'geoportal'
-                  return (
-                    <button key={i} onClick={() => { if (end) { setEndereco(end); setFonte('geoportal'); if (c.centro) setCoord({ lat: c.centro[1], lng: c.centro[0] }) } }}
-                      className={`w-full text-left rounded-md px-2 py-1.5 border transition-colors ${sel ? 'border-[var(--chart-1)] bg-[var(--chart-1)]/10' : 'border-border hover:bg-muted'}`}>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[11px] text-foreground font-medium truncate flex-1">{end ?? '—'}</span>
-                        {c.loteMatch && <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-green-100 text-green-700 shrink-0 leading-none">lote ✓</span>}
-                        <span className="text-[10px] font-bold tabular-nums shrink-0" style={{ color: 'var(--chart-1)' }}>{Math.round(c.score * 100)}%</span>
-                      </div>
-                      {c.lote.area_proj != null && <span className="text-[9px] text-muted-foreground font-mono">{c.lote.area_proj}m²</span>}
-                    </button>
-                  )
-                })}
-              </div>
-              <p className="text-[9px] text-muted-foreground/60 mt-1.5">clique para preencher o endereço (marca confiança Geoportal)</p>
-            </div>
-          )}
-
-          {coord && <FichaImovel coord={coord} />}
-          {coord && <MapillaryStrip coord={coord} />}
 
           {descricao && (
             <div className="rounded-lg border border-border overflow-hidden" style={{ background: 'var(--muted)' }}>
@@ -781,6 +691,135 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
       {zoom && <Lightbox imgs={imgs} startIdx={zoomIdx} title={item.titulo} onClose={() => setZoom(false)} />}
       {matriculaOpen && <MatriculaModal item={item} onClose={() => setMatriculaOpen(false)} />}
     </>
+  )
+}
+
+// ── GeoportalCandidates ────────────────────────────────────────────────────────
+function GeoportalCandidates({ item, descricao, endereco, setEndereco, fonte, setFonte, setCoord }: {
+  item: Imovel
+  descricao: string | null
+  endereco: string
+  setEndereco: (s: string) => void
+  fonte: string | null
+  setFonte: (s: string | null) => void
+  setCoord: (c: { lat: number; lng: number } | null) => void
+}) {
+  type CandGeo = { endereco: string | null; score: number; loteMatch: boolean; centro?: [number, number] | null; lote: { area_proj: number | null; end_cart: string | null } }
+  const [candidatos, setCandidatos] = useState<CandGeo[]>([])
+  const [candConf, setCandConf] = useState<string | null>(null)
+  const [buscandoCand, setBuscandoCand] = useState(false)
+
+  useEffect(() => {
+    setCandidatos([]); setCandConf(null)
+    const txt = `${item.bairro ?? ''} ${item.titulo ?? ''}`.trim()
+    const { setor, quadra, conjunto, casa_lote } = parseEnderecoDF(txt)
+    const area_m2 = item.area_m2 ? parseFloat(String(item.area_m2).replace(',', '.')) : undefined
+
+    let enrichedDone = false
+
+    const chamarCandidatos = (desc?: string) => {
+      if (!quadra || !ehCasaLote(item.tipo_imovel)) return
+      const isEnriched = !!desc
+      setBuscandoCand(true)
+      fetch('/api/geoportal/candidatos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ setor, quadra, conjunto, casa_lote, endereco: txt, area_m2, ...(desc ? { descricao: desc } : {}) }),
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(j => {
+          if (j && (!enrichedDone || isEnriched)) {
+            if (isEnriched) enrichedDone = true
+            setCandidatos((j.candidatos ?? []).slice(0, 6))
+            setCandConf(j.confianca ?? null)
+          }
+        })
+        .catch(() => {})
+        .finally(() => setBuscandoCand(false))
+    }
+
+    chamarCandidatos()
+    if (descricao) chamarCandidatos(descricao)
+  }, [item.link, descricao]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!buscandoCand && candidatos.length === 0) return null
+
+  return (
+    <div className="rounded-lg p-2.5 border" style={{ background: 'color-mix(in srgb, var(--chart-1) 7%, var(--card))', borderColor: 'color-mix(in srgb, var(--chart-1) 30%, transparent)' }}>
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <p className="text-[9px] font-bold uppercase tracking-wider font-mono" style={{ color: 'var(--chart-1)' }}>Candidatos do Geoportal</p>
+        {candConf && (
+          <span className={`text-[8px] px-1 py-0.5 rounded font-mono font-bold uppercase leading-none ${
+            candConf === 'alta' ? 'bg-green-100 text-green-700' :
+            candConf === 'media' ? 'bg-amber-100 text-amber-700' : 'bg-zinc-100 text-zinc-500'
+          }`}>{candConf}</span>
+        )}
+        {buscandoCand && (
+          <svg className="w-3 h-3 animate-spin text-muted-foreground ml-auto" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+          </svg>
+        )}
+      </div>
+      <div className="flex flex-col gap-1">
+        {candidatos.map((c, i) => {
+          const end = c.endereco ?? c.lote.end_cart
+          const sel = !!end && endereco === end && fonte === 'geoportal'
+          return (
+            <button key={i} onClick={() => { if (end) { setEndereco(end); setFonte('geoportal'); if (c.centro) setCoord({ lat: c.centro[1], lng: c.centro[0] }) } }}
+              className={`w-full text-left rounded-md px-2 py-1.5 border transition-colors ${sel ? 'border-[var(--chart-1)] bg-[var(--chart-1)]/10' : 'border-border hover:bg-muted'}`}>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] text-foreground font-medium truncate flex-1">{end ?? '—'}</span>
+                {c.loteMatch && <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-green-100 text-green-700 shrink-0 leading-none">lote ✓</span>}
+                <span className="text-[10px] font-bold tabular-nums shrink-0" style={{ color: 'var(--chart-1)' }}>{Math.round(c.score * 100)}%</span>
+              </div>
+              {c.lote.area_proj != null && <span className="text-[9px] text-muted-foreground font-mono">{c.lote.area_proj}m²</span>}
+            </button>
+          )
+        })}
+      </div>
+      <p className="text-[9px] text-muted-foreground/60 mt-1.5">clique para preencher o endereço (marca confiança Geoportal)</p>
+    </div>
+  )
+}
+
+// ── ContextSidebar ─────────────────────────────────────────────────────────────
+function ContextSidebar({ 
+  item, descricao, endereco, setEndereco, fonte, setFonte, coord, setCoord, items, total
+}: {
+  item: Imovel | null
+  descricao: string | null
+  endereco: string
+  setEndereco: (s: string) => void
+  fonte: string | null
+  setFonte: (s: string | null) => void
+  coord: { lat: number; lng: number } | null
+  setCoord: (c: { lat: number; lng: number } | null) => void
+  items: Imovel[]
+  total: number
+}) {
+  if (!item) {
+    return <StatsPanel items={items} total={total} reviewItem={null} />
+  }
+
+  return (
+    <div className="flex flex-col h-full overflow-y-auto">
+      <StatsPanel items={items} total={total} reviewItem={item} />
+      
+      <div className="px-4 py-3 flex flex-col gap-3 flex-shrink-0" style={{ borderTop: '1px solid var(--sidebar-border)' }}>
+        <GeoportalCandidates 
+          item={item} 
+          descricao={descricao} 
+          endereco={endereco} 
+          setEndereco={setEndereco}
+          fonte={fonte}
+          setFonte={setFonte}
+          setCoord={setCoord}
+        />
+        {coord && <FichaImovel coord={coord} />}
+        {coord && <MapillaryStrip coord={coord} />}
+      </div>
+    </div>
   )
 }
 
@@ -990,6 +1029,10 @@ export function TriagemClient() {
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [reviewItem, setReviewItem] = useState<Imovel | null>(null)
+  const [reviewResolving, setReviewResolving] = useState(false)
+  const [reviewFonte, setReviewFonte] = useState<string | null>(null)
+  const [reviewCoord, setReviewCoord] = useState<{ lat: number; lng: number } | null>(null)
+  const [reviewDescricao, setReviewDescricao] = useState<string | null>(null)
   const [reviewEndereco, setReviewEndereco] = useState('')
   const [reviewMapsLink, setReviewMapsLink] = useState('')
   const [selectedLinks, setSelectedLinks] = useState<Set<string>>(new Set())
@@ -1021,13 +1064,33 @@ export function TriagemClient() {
     setPage(1)
   }, [searchParams, router])
 
-  // Populate endereço from pistas when selected item changes
+  // Populate endereço from pistas and fetch descrição
   useEffect(() => {
-    if (!reviewItem) return
+    if (!reviewItem) {
+      setReviewEndereco('')
+      setReviewMapsLink('')
+      setReviewFonte(null)
+      setReviewCoord(null)
+      setReviewDescricao(null)
+      return
+    }
+
     const p = (reviewItem.pistas_ia ?? {}) as Record<string, string>
     const parts = [p.quadra, p.conjunto, p.casa_lote].filter(Boolean)
-    setReviewEndereco(parts.length ? parts.join(', ') : '')
-    setReviewMapsLink('')
+    setReviewEndereco(reviewItem.endereco || (parts.length ? parts.join(', ') : ''))
+    setReviewMapsLink(reviewItem.maps_link || '')
+    setReviewFonte(reviewItem.endereco_fonte || null)
+    setReviewCoord(reviewItem.lat && reviewItem.lng ? { lat: reviewItem.lat, lng: reviewItem.lng } : null)
+    setReviewDescricao(null)
+
+    let vivo = true
+    fetch(`/api/triagem/detalhe?link=${encodeURIComponent(reviewItem.link)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (vivo && d?.descricao) setReviewDescricao(d.descricao)
+      })
+      .catch(() => {})
+    return () => { vivo = false }
   }, [reviewItem?.link]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -1417,10 +1480,16 @@ export function TriagemClient() {
         {reviewItem ? (
           <ReviewPanel
             item={reviewItem}
+            descricao={reviewDescricao}
             endereco={reviewEndereco}
             setEndereco={setReviewEndereco}
             mapsLink={reviewMapsLink}
             setMapsLink={setReviewMapsLink}
+            resolving={reviewResolving}
+            setResolving={setReviewResolving}
+            fonte={reviewFonte}
+            setFonte={setReviewFonte}
+            setCoord={setReviewCoord}
             dups={dupPortals(reviewItem)}
             onApprove={handleApprove}
             onVisitar={handleVisitar}
@@ -1442,9 +1511,20 @@ export function TriagemClient() {
       </div>
 
       {/* ── STATS (direita) ──────────────────────────────────── */}
-      <div className="w-[240px] flex-shrink-0 flex flex-col overflow-hidden"
+      <div className="w-[280px] flex-shrink-0 flex flex-col overflow-hidden"
         style={{ borderLeft: '1px solid var(--sidebar-border)', background: 'var(--sidebar)' }}>
-        <StatsPanel items={items} total={total} reviewItem={reviewItem} />
+        <ContextSidebar 
+          item={reviewItem}
+          descricao={reviewDescricao}
+          endereco={reviewEndereco}
+          setEndereco={setReviewEndereco}
+          fonte={reviewFonte}
+          setFonte={setReviewFonte}
+          coord={reviewCoord}
+          setCoord={setReviewCoord}
+          items={items}
+          total={total}
+        />
       </div>
 
       <ToastStack toasts={toasts} />
