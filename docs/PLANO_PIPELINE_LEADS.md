@@ -122,7 +122,9 @@ Página `/pregao` (menu Analisar) — terminal de bolsa CRT verde-fósforo, poll
 
 **Esforço:** passos 1–5 ≈ uma sessão (cliente WFS + orquestração + UI; padrão já existe). Passo 6 é incremento posterior.
 
-**STATUS ✅ CONSTRUÍDA (jun/15):** `lib/wfs-sgb.ts` + `lib/ficha-risco.ts` (cache Redis 30d) + `/api/ficha-risco` + componente visual `FichaImovel` no ReviewPanel (medidor de grau por risco + estratos geológicos estilizados com unidade/idade/ambiente tectônico). Disparada pelo mesmo `coord` do Mapillary. Valores reais confirmados: `classe`=Alta/Média/Baixa; Plano Piloto/Lago Sul = mov. de massa "Baixa", geologia Unidade Paranoá (idade 1000–1600 Ma). Degradação silenciosa (SGB cai → no-op). Falta: SIAGAS (poços) e persistência/badge no Pregão (passo 6).
+**STATUS ✅ CONSTRUÍDA (jun/15):** `lib/wfs-sgb.ts` + `lib/ficha-risco.ts` (cache Redis 30d) + `/api/ficha-risco` + componente visual `FichaImovel` no ReviewPanel (medidor de grau por risco + estratos geológicos estilizados com unidade/idade/ambiente tectônico). Disparada pelo mesmo `coord` do Mapillary. Valores reais confirmados: `classe`=Alta/Média/Baixa; Plano Piloto/Lago Sul = mov. de massa "Baixa", geologia Unidade Paranoá (idade 1000–1600 Ma). Degradação silenciosa (SGB cai → no-op).
+
+**STATUS ✅ PASSO 6 (jun/15):** **SIAGAS** integrado — camada `hidrogeologia:siagas` no mesmo GeoServer; a ficha mostra "N poços SIAGAS por perto · aquífero X · até Ym". **Risco persistido**: colunas `risco_nivel`/`risco_resumo` no `onus_pipeline` (`scripts/sql/add_risco_onus_pipeline.sql`), preenchidas no gate (`lib/onus-gate.ts` busca lat/lng do imoveis_todos → fichaRisco) + GChat alerta em risco alto. **Pregão sinaliza**: índice "⚠ Risco alto" + painel "Risco geológico alto — conferir antes de captar". Backfill das linhas existentes feito (`scripts/_backfill_risco.mjs`; 10/19 com lat/lng, todas baixo). Falta (futuro): badge de risco também no card Pipefy.
 
 ---
 
