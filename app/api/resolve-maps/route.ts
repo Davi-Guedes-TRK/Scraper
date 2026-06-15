@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import { consultarLotePorPonto } from '@/lib/wfs-idedf'
 
 const GEOPORTAL_URL =
   'https://www.geoservicos.ide.df.gov.br/arcgis/rest/services/Publico/CADASTRO_TERRITORIAL/MapServer/10/query'
@@ -17,21 +18,6 @@ async function queryGeoportal(lat: number, lng: number): Promise<string | null> 
     if (!res.ok) return null
     const data = await res.json()
     return (data.features?.[0]?.attributes?.pu_end_usual as string) ?? null
-  } catch {
-    return null
-  }
-}
-
-// Fallback de endereço quando o Geoportal-DF não cobre o ponto (reverse geocode)
-async function reverseNominatim(lat: number, lng: number): Promise<string | null> {
-  try {
-    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, {
-      headers: { 'User-Agent': 'PainelCaptacao/1.0 TRK-Imoveis', 'Accept-Language': 'pt-BR,pt;q=0.9' },
-      signal: AbortSignal.timeout(8000),
-    })
-    if (!res.ok) return null
-    const d = await res.json() as { display_name?: string }
-    return d.display_name ?? null
   } catch {
     return null
   }
@@ -68,22 +54,29 @@ export async function POST(req: NextRequest) {
   const lat = pinMatch ? parseFloat(pinMatch[1]) : viewMatch ? parseFloat(viewMatch[1]) : qMatch ? parseFloat(qMatch[1]) : null
   const lng = pinMatch ? parseFloat(pinMatch[2]) : viewMatch ? parseFloat(viewMatch[2]) : qMatch ? parseFloat(qMatch[2]) : null
 
-  // Primary: query Geoportal IDE-DF for pu_end_usual
   let endereco: string | null = null
   let source: 'geoportal' | 'maps' | null = null
 
   if (lat !== null && lng !== null) {
-    endereco = await queryGeoportal(lat, lng)
-    if (endereco) source = 'geoportal'
+    // 1. Lote do IDE-DF: ponto DENTRO do lote, ou o lote mais próximo (~50m) se o
+    //    pin caiu na rua. Devolve o endereço OFICIAL e limpo do DF (não OSM).
+    try {
+      const r = await consultarLotePorPonto(lat, lng)
+      if (r.encontrado) {
+        endereco = r.endereco_siturb || r.endereco_cart
+        if (endereco) source = 'geoportal'
+      }
+    } catch { /* WFS do IDE-DF oscila (502); segue para o secundário */ }
+
+    // 2. Secundário: camada de endereço usual do IDE-DF (ArcGIS).
+    if (!endereco) {
+      endereco = await queryGeoportal(lat, lng)
+      if (endereco) source = 'geoportal'
+    }
   }
 
-  // Fallback intermediário: reverse geocode quando há coordenada mas o Geoportal-DF não cobriu o ponto
-  if (!endereco && lat !== null && lng !== null) {
-    endereco = await reverseNominatim(lat, lng)
-    if (endereco) source = 'maps'
-  }
-
-  // Fallback: extract place name from the Maps URL path
+  // 3. Último recurso: nome do lugar do próprio URL do Maps.
+  //    (Nominatim removido — não devolve o lote, inútil para o cartório.)
   if (!endereco) {
     const placeMatch = finalUrl.match(/\/maps\/place\/([^/@?]+)/)
     if (placeMatch) {
