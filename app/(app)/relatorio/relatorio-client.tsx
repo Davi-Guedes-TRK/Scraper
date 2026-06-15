@@ -793,8 +793,8 @@ export function RelatorioClient() {
           onTratar={(cand) => setTratarCand(cand)}
         />
       ) : (
-        <div className="bg-white border border-[#d0d7de] rounded-lg overflow-hidden shadow-sm">
-          <table className="w-full text-sm">
+        <div className="bg-white border border-[#d0d7de] rounded-lg overflow-hidden shadow-sm overflow-x-auto">
+          <table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr className="border-b border-[#d0d7de] text-xs text-[#656d76] bg-[#f6f8fa]">
                 <th className="px-4 py-2.5 text-left w-8">
