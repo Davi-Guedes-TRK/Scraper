@@ -43,6 +43,9 @@ export async function GET() {
         WHERE status_triagem = 'pendente'
           AND portal <> 'chavesnamao'
           AND (creci IS NULL OR creci != '22784')
+          -- TRK administra LOCAÇÃO: fora anúncios de venda (por tipo ou tipo_imovel)
+          AND coalesce(tipo, '') NOT ILIKE 'venda'
+          AND coalesce(tipo_imovel, '') NOT ILIKE 'venda%'
           AND coletado_em >= NOW() - (${CUTOFF_DAYS} || ' days')::interval
         ORDER BY coletado_em DESC
         LIMIT 5000
@@ -53,6 +56,8 @@ export async function GET() {
         WHERE status_triagem = 'pendente'
           AND portal <> 'chavesnamao'
           AND (creci IS NULL OR creci != '22784')
+          AND coalesce(tipo, '') NOT ILIKE 'venda'
+          AND coalesce(tipo_imovel, '') NOT ILIKE 'venda%'
           AND coletado_em >= NOW() - (${CUTOFF_DAYS} || ' days')::interval
       `,
     ])
