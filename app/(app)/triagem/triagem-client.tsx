@@ -197,6 +197,141 @@ function Lightbox({ imgs, startIdx, title, onClose }: {
   )
 }
 
+// ── FichaImovel (risco geológico) ────────────────────────────────────────────────
+// Alerta visual sobre imóvel problemático — cartas de suscetibilidade do SGB/CPRM.
+// Disparada pela coordenada (pin do Maps ou centroide do lote). No-op se sem dado.
+type GrauRisco = 'Alta' | 'Média' | 'Baixa'
+type FichaRiscoData = {
+  riscos: { tipo: string; classe: GrauRisco; fonte: string | null; ano: number | null }[]
+  geologia: { unidade: string | null; ambiente_tectonico: string | null; idade: string | null; litotipos: string | null } | null
+  nivel: 'alto' | 'medio' | 'baixo' | 'nenhum'
+  avaliado: boolean
+}
+
+const GRAU_COR: Record<GrauRisco, string> = { Baixa: '#16a34a', Média: '#f59e0b', Alta: '#dc2626' }
+const NIVEL_INFO: Record<FichaRiscoData['nivel'], { cor: string; label: string }> = {
+  alto:   { cor: '#dc2626', label: 'RISCO ALTO' },
+  medio:  { cor: '#f59e0b', label: 'RISCO MÉDIO' },
+  baixo:  { cor: '#16a34a', label: 'RISCO BAIXO' },
+  nenhum: { cor: '#71717a', label: 'SEM RISCO MAPEADO' },
+}
+
+function MedidorGrau({ classe }: { classe: GrauRisco }) {
+  const ordem: GrauRisco[] = ['Baixa', 'Média', 'Alta']
+  const ativo = ordem.indexOf(classe)
+  return (
+    <div className="flex gap-0.5">
+      {ordem.map((g, i) => (
+        <span key={g} className="h-1.5 w-5 rounded-full transition-colors"
+          style={{ background: i <= ativo ? GRAU_COR[classe] : 'var(--border)' }} />
+      ))}
+    </div>
+  )
+}
+
+// Estratos rochosos estilizados — leitura "geológica" rápida do terreno do lote.
+function Estratos({ geologia }: { geologia: NonNullable<FichaRiscoData['geologia']> }) {
+  const bandas = ['#8a6d4b', '#a98467', '#c4a484', '#9c7a54', '#b08968']
+  return (
+    <div className="flex gap-2.5">
+      <div className="relative w-12 h-16 rounded-md overflow-hidden border border-border flex-shrink-0 shadow-inner">
+        {bandas.map((c, i) => (
+          <div key={i} className="w-full" style={{
+            height: `${100 / bandas.length}%`, background: c,
+            transform: i % 2 ? 'skewY(-2deg)' : 'skewY(1.5deg)',
+          }} />
+        ))}
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(255,255,255,.18), transparent 40%, rgba(0,0,0,.22))' }} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-semibold text-foreground leading-tight">{geologia.unidade ?? 'Unidade não identificada'}</p>
+        <div className="flex flex-wrap gap-1 mt-1">
+          {geologia.idade && (
+            <span className="text-[8px] font-mono px-1 py-0.5 rounded bg-muted text-muted-foreground leading-none">{geologia.idade} Ma</span>
+          )}
+          {geologia.ambiente_tectonico && (
+            <span className="text-[8px] font-mono px-1 py-0.5 rounded bg-muted text-muted-foreground leading-none">{geologia.ambiente_tectonico}</span>
+          )}
+        </div>
+        {geologia.litotipos && (
+          <p className="text-[9px] text-muted-foreground/80 mt-1 leading-snug line-clamp-2">{geologia.litotipos}</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function FichaImovel({ coord }: { coord: { lat: number; lng: number } }) {
+  const [ficha, setFicha] = useState<FichaRiscoData | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    let vivo = true
+    setLoading(true); setFicha(null)
+    fetch('/api/ficha-risco', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(coord),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (vivo && d) setFicha(d) })
+      .catch(() => {})
+      .finally(() => { if (vivo) setLoading(false) })
+    return () => { vivo = false }
+  }, [coord.lat, coord.lng])
+
+  // nada a mostrar: sem risco E sem geologia (não polui o painel)
+  if (!loading && ficha && ficha.riscos.length === 0 && !ficha.geologia) return null
+  if (!loading && !ficha) return null
+
+  const nivel = ficha ? NIVEL_INFO[ficha.nivel] : null
+
+  return (
+    <div className="rounded-lg p-2.5 border" style={{
+      background: nivel && ficha!.nivel === 'alto'
+        ? 'color-mix(in srgb, #dc2626 9%, var(--card))'
+        : 'color-mix(in srgb, #0ea5e9 6%, var(--card))',
+      borderColor: nivel ? `color-mix(in srgb, ${nivel.cor} 35%, transparent)` : 'var(--border)',
+    }}>
+      <div className="flex items-center gap-1.5 mb-2">
+        <p className="text-[9px] font-bold uppercase tracking-wider font-mono" style={{ color: nivel?.cor ?? 'var(--muted-foreground)' }}>
+          Ficha do Imóvel · Risco
+        </p>
+        {nivel && !loading && (
+          <span className="text-[8px] font-bold px-1.5 py-0.5 rounded uppercase leading-none text-white" style={{ background: nivel.cor }}>
+            {nivel.label}
+          </span>
+        )}
+        {loading && (
+          <svg className="w-3 h-3 animate-spin text-muted-foreground ml-auto" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+          </svg>
+        )}
+      </div>
+
+      {ficha && ficha.riscos.length > 0 && (
+        <div className="flex flex-col gap-1.5 mb-2">
+          {ficha.riscos.map(r => (
+            <div key={r.tipo} className="flex items-center gap-2">
+              <span className="text-[10px] text-foreground flex-1 truncate">{r.tipo}</span>
+              <span className="text-[9px] font-mono font-semibold" style={{ color: GRAU_COR[r.classe] }}>{r.classe}</span>
+              <MedidorGrau classe={r.classe} />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {ficha?.geologia && (
+        <div className="pt-2" style={{ borderTop: ficha.riscos.length ? '1px solid var(--border)' : 'none' }}>
+          <Estratos geologia={ficha.geologia} />
+        </div>
+      )}
+
+      <p className="text-[9px] text-muted-foreground/60 mt-2">fonte: cartas de suscetibilidade SGB/CPRM · escala regional (alerta de zona, não de lote)</p>
+    </div>
+  )
+}
+
 // ── MapillaryStrip ───────────────────────────────────────────────────────────────
 // Street-level aberto perto do ponto (pin do Maps ou centroide do lote): reduz o
 // ida-e-volta ao Google Maps na validação de endereço. No-op silencioso sem token.
@@ -494,6 +629,7 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
             </div>
           )}
 
+          {coord && <FichaImovel coord={coord} />}
           {coord && <MapillaryStrip coord={coord} />}
 
           {descricao && (

@@ -122,6 +122,8 @@ Página `/pregao` (menu Analisar) — terminal de bolsa CRT verde-fósforo, poll
 
 **Esforço:** passos 1–5 ≈ uma sessão (cliente WFS + orquestração + UI; padrão já existe). Passo 6 é incremento posterior.
 
+**STATUS ✅ CONSTRUÍDA (jun/15):** `lib/wfs-sgb.ts` + `lib/ficha-risco.ts` (cache Redis 30d) + `/api/ficha-risco` + componente visual `FichaImovel` no ReviewPanel (medidor de grau por risco + estratos geológicos estilizados com unidade/idade/ambiente tectônico). Disparada pelo mesmo `coord` do Mapillary. Valores reais confirmados: `classe`=Alta/Média/Baixa; Plano Piloto/Lago Sul = mov. de massa "Baixa", geologia Unidade Paranoá (idade 1000–1600 Ma). Degradação silenciosa (SGB cai → no-op). Falta: SIAGAS (poços) e persistência/badge no Pregão (passo 6).
+
 ---
 
 ## Riscos / decisões em aberto
