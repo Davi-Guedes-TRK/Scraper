@@ -216,7 +216,7 @@ Fase 6 (polimento)                ← contínuo, fechamento
 - [x] Fase 4 — Mobile Campo
   - [x] 5.1 Bottom nav + sidebar hidden mobile
   - [x] 5.2 Visitas: tabs Mapa/Rota, bottom sheet "Registrar resultado" (4 opções), "Navegar" CTA grande (≥44px), offline queue localStorage
-  - [ ] 5.3 In Loco mobile (autosave rascunho, formulário coluna única) — pendente
-  - [ ] Tabelas → cards empilhados em md (triagem, relatorio) — pendente
+  - [x] 5.3 In Loco mobile (tipo ≥44px, autosave localStorage, ícones SVG, empty state, toast acima do BottomNav)
+  - [x] Tabelas → overflow-x-auto + min-w no relatório; triagem já era card-based
 - [x] Fase 5 — Dashboard por papel (captador/operador/gestor)
 - [x] Fase 6 — Polimento (login + logo, a11y htmlFor/autocomplete/role=alert, focus-visible ring)
