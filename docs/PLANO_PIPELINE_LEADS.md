@@ -83,13 +83,12 @@ Estado em `onus_pipeline` (tabela nova — evita mexer nas 7 tabelas+view). Flux
 4. **Cadeia de contato**: nome → `dw_pessoas` (espelho; Nido não tem CPF, match por nome) → senão CPF → `lookupCPF` (Telegram, já existia) → senão GChat pede busca manual. Contato + ônus + co-proprietários → card COM-Oportunidades (`atualizarCardOportunidade` em `lib/pipefy.ts`).
 5. **Apps Script reescrito** (`scripts/cartorio_apps_script.js`): rastreio por timestamp de MENSAGEM (Script Properties) em vez de label por thread — ônus que chega como resposta em thread já processada não se perde. ⚠️ **Re-colar no editor do Google** (de novo).
 
-### Fase 4 — Dashboard "bolsa de valores"
-Página `/pregao` (ou reformular `/dashboard`): o funil como um pregão em tempo real.
-- **Ticker** no topo: leads novos do dia rolando (estilo letreiro de cotações), com setor/RA e preço.
-- **Painel por etapa** (colunas tipo book de ofertas): triagem → matrícula solicitada → recebida → dedup → ônus → proprietário identificado → contato no card. Contagem + idade média em cada etapa, com alerta visual (vermelho) p/ lead parado >N dias.
-- **Índices**: leads/dia por portal, taxa de conversão etapa-a-etapa, custo acumulado em certidões vs leads completos ("custo por lead"), tempo médio anúncio→contato.
-- Dados: Supabase (status já existem nas tabelas); realtime via polling 30s ou Supabase Realtime.
-- Skill `frontend-design` p/ o visual; verde/vermelho de pregão, números grandes, monospace.
+### Fase 4 — Dashboard "pregão" ✅ CONSTRUÍDA (jun/15)
+Página `/pregao` (menu Analisar) — terminal de bolsa CRT verde-fósforo, polling 30s.
+- `GET /api/pregao` (`app/api/pregao/route.ts`): agrega `imoveis_todos` + `onus_pipeline` em 6 queries paralelas. `force-dynamic`, `no-store`.
+- `app/(app)/pregao/pregao-client.tsx`: **fita** (ticker de leads do dia, RA+preço curto K/M), **índices** (leads hoje/7d com Δ%, matrículas recebidas/pedidas, certidões pedidas, contatos, certidões/contato = custo por contato), **book do funil** em 8 colunas (na fila → aprovado → matrícula pedida/OK → gate dedup tricolor → ônus pedida/OK → contato), **blotter de parados >7d** (ação humana, vermelho ≥14d) e **volume 14d** em barras. Fonte de display: Barlow Condensed (adicionada ao layout) + JetBrains Mono.
+- Validado contra dados reais: 7.970 na fila, 42 aprovados, 19 matrículas, espera ~4d. `onus_pipeline` zerado até o 1º lead fluir.
+- Futuro: leads/dia POR portal (hoje é total); conversão etapa-a-etapa explícita; quando o volume crescer, trocar polling por Supabase Realtime.
 
 ### Fase 5 — Novas APIs (enriquecimento e redução do trabalho humano)
 | API | Uso no pipeline | Observação |
