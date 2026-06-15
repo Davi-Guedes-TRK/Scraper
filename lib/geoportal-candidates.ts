@@ -8,6 +8,7 @@
 // de auto-envio ao cartório (auto-envia só quando há candidato de confiança alta).
 
 import { buscarCandidatos, type Candidato } from './wfs-idedf'
+import { parseEnderecoDF } from './endereco-df'
 
 export type CandidatoPontuado = Candidato & {
   score: number
@@ -21,6 +22,7 @@ export type ResultadoCandidatos = {
   candidatos: CandidatoPontuado[]
   melhor: CandidatoPontuado | null
   confianca: 'alta' | 'media' | 'baixa' | 'nenhuma'
+  piscinaDescricao: boolean  // descrição menciona piscina; usado quando SAM2 estiver integrado
 }
 
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
@@ -64,21 +66,46 @@ function areaScore(areaM2: number | null | undefined, areaProj: number | null): 
   return Math.max(0, 1 - Math.abs(areaProj - areaM2) / areaM2)
 }
 
+// Extrai área (m²), piscina e pistas de endereço do texto da descrição do anúncio.
+function parsarDescricao(desc: string | null | undefined): {
+  area_m2?: number; piscina: boolean
+  quadra?: string; conjunto?: string; setor?: string; casa_lote?: string
+} {
+  if (!desc) return { piscina: false }
+  const n = norm(desc)
+  // "300m²" / "300 m2" / "300 metros quadrados" — 2-5 dígitos evita match em ano ou telefone
+  const m = n.match(/\b(\d{2,5})(?:[.,]\d+)?\s*(?:m[²2]|metros?\s+quadrados?)\b/)
+  const area_m2 = m ? parseFloat(m[1].replace(',', '.')) : undefined
+  const piscina = /piscin/.test(n)
+  const { setor, quadra, conjunto, casa_lote } = parseEnderecoDF(desc)
+  return { area_m2, piscina, setor, quadra, conjunto, casa_lote }
+}
+
 export async function acharCandidatos(opts: {
   lat?: number; lng?: number
   quadra?: string | null; conjunto?: string | null; setor?: string | null
   casa_lote?: string | null
   endereco?: string | null
   area_m2?: number | null
+  descricao?: string | null
 }): Promise<ResultadoCandidatos> {
-  const brutos = await buscarCandidatos(opts)
+  const desc = parsarDescricao(opts.descricao)
 
-  const ref     = tokens([opts.endereco, opts.quadra, opts.conjunto, opts.setor, opts.casa_lote].filter(Boolean).join(' '))
-  const refLote = loteNum(opts.casa_lote) ?? loteNum(opts.endereco)
+  // Enriquece opts com dados da descrição quando o campo está ausente
+  const quadra    = opts.quadra    ?? desc.quadra    ?? null
+  const conjunto  = opts.conjunto  ?? desc.conjunto  ?? null
+  const setor     = opts.setor     ?? desc.setor     ?? null
+  const casa_lote = opts.casa_lote ?? desc.casa_lote ?? null
+  const area_m2   = opts.area_m2   ?? desc.area_m2   ?? null
+
+  const brutos = await buscarCandidatos({ ...opts, quadra, conjunto, setor })
+
+  const ref     = tokens([opts.endereco, quadra, conjunto, setor, casa_lote].filter(Boolean).join(' '))
+  const refLote = loteNum(casa_lote) ?? loteNum(opts.endereco)
 
   const candidatos: CandidatoPontuado[] = brutos
     .map(c => {
-      const a  = areaScore(opts.area_m2, c.lote.area_proj)
+      const a  = areaScore(area_m2, c.lote.area_proj)
       const ad = addrScore(ref, c.endereco ?? c.lote.end_cart)
       // O número do lote é o identificador único dentro do conjunto: se bate, desempata.
       const loteMatch = refLote != null && loteNum(c.lote.lote) === refLote
@@ -102,7 +129,7 @@ export async function acharCandidatos(opts: {
     else                                       confianca = 'baixa'
   }
 
-  return { candidatos, melhor, confianca }
+  return { candidatos, melhor, confianca, piscinaDescricao: desc.piscina }
 }
 
 // ── Camada de visão (piscina, telhado, etc.) — SEAM, NÃO implementado ────────────

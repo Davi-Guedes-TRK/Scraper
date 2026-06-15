@@ -177,6 +177,20 @@ export async function buscarCandidatos(opts: {
     if (!clauses.length) return []
     const r = await wfsQuery({ maxFeatures: String(limite), CQL_FILTER: clauses.join(' AND ') })
     features = r.features ?? []
+
+    // Fallback: o cadastro do IDE-DF usa formato de cartório ("QI 10/26") enquanto
+    // os anúncios usam o endereço usual ("QI 26"). Se a busca exata retornar vazio
+    // e a quadra for "QI N" ou "QL N", tenta buscar como sufixo: quadra ILIKE '%/N'.
+    if (features.length === 0 && opts.quadra) {
+      const m = opts.quadra.match(/^(Q[A-Z]{0,3})\s+(\d+)$/i)
+      if (m) {
+        const num = m[2]
+        const fallbackClauses: string[] = [`quadra ILIKE '%/${num}'`]
+        if (opts.setor) fallbackClauses.push(`setor ILIKE '%${esc(opts.setor)}%'`)
+        const r2 = await wfsQuery({ maxFeatures: String(limite), CQL_FILTER: fallbackClauses.join(' AND ') })
+        features = r2.features ?? []
+      }
+    }
   } else {
     return []
   }

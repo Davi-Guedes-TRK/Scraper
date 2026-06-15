@@ -4,14 +4,14 @@ import { acharCandidatos } from '@/lib/geoportal-candidates'
 export const runtime = 'nodejs'
 export const maxDuration = 20
 
-// POST { lat?, lng?, quadra?, conjunto?, setor?, endereco?, area_m2? }
-// → { candidatos[], melhor, confianca }
+// POST { lat?, lng?, quadra?, conjunto?, setor?, endereco?, area_m2?, descricao? }
+// → { candidatos[], melhor, confianca, piscinaDescricao }
 // Traz os lotes prováveis do IDE-DF para um endereço impreciso e os ranqueia.
 export async function POST(req: NextRequest) {
   let body: {
     lat?: number; lng?: number
     quadra?: string; conjunto?: string; setor?: string; casa_lote?: string
-    endereco?: string; area_m2?: number
+    endereco?: string; area_m2?: number; descricao?: string
   }
   try { body = await req.json() } catch {
     return NextResponse.json({ error: 'Body inválido' }, { status: 400 })
