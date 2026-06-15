@@ -178,17 +178,30 @@ export async function buscarCandidatos(opts: {
     const r = await wfsQuery({ maxFeatures: String(limite), CQL_FILTER: clauses.join(' AND ') })
     features = r.features ?? []
 
-    // Fallback: o cadastro do IDE-DF usa formato de cartório ("QI 10/26") enquanto
-    // os anúncios usam o endereço usual ("QI 26"). Se a busca exata retornar vazio
-    // e a quadra for "QI N" ou "QL N", tenta buscar como sufixo: quadra ILIKE '%/N'.
+    // Fallback: o cadastro do IDE-DF usa dois sistemas de endereço:
+    //   - end_cart (cartório): "SHIS QI 10/26 LT 8"  (quadra = "QI 10/26")
+    //   - end_siturb (usual):  "SHIS QI 26 CJ 14 LT 8"
+    // Os anúncios usam o formato USUAL. Quando a busca por campo `quadra` falhar,
+    // monta busca por `end_siturb` que usa o mesmo formato dos anúncios.
     if (features.length === 0 && opts.quadra) {
       const m = opts.quadra.match(/^(Q[A-Z]{0,3})\s+(\d+)$/i)
       if (m) {
-        const num = m[2]
-        const fallbackClauses: string[] = [`quadra ILIKE '%/${num}'`]
+        const prefix = m[1].toUpperCase()  // "QI", "QL", etc.
+        const num = m[2]                    // "5", "26", etc.
+        // Monta: end_siturb ILIKE '%QI 5 CJ 19%' (com conjunto) ou '%QI 26%' (sem)
+        const cj = opts.conjunto ? ` CJ ${opts.conjunto}` : ''
+        const siturb = `${prefix} ${num}${cj}`
+        const fallbackClauses: string[] = [`end_siturb ILIKE '%${esc(siturb)}%'`]
         if (opts.setor) fallbackClauses.push(`setor ILIKE '%${esc(opts.setor)}%'`)
         const r2 = await wfsQuery({ maxFeatures: String(limite), CQL_FILTER: fallbackClauses.join(' AND ') })
         features = r2.features ?? []
+
+        // Último recurso sem conjunto (pode ser que o anúncio tem conjunto mas no cadastro
+        // o campo end_siturb não tem): tenta só quadra+setor via end_siturb
+        if (features.length === 0 && cj) {
+          const r3 = await wfsQuery({ maxFeatures: String(limite), CQL_FILTER: [`end_siturb ILIKE '%${esc(`${prefix} ${num}`)}%'`, ...(opts.setor ? [`setor ILIKE '%${esc(opts.setor)}%'`] : [])].join(' AND ') })
+          features = r3.features ?? []
+        }
       }
     }
   } else {
