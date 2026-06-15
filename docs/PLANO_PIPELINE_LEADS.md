@@ -93,7 +93,7 @@ Página `/pregao` (menu Analisar) — terminal de bolsa CRT verde-fósforo, poll
 ### Fase 5 — Novas APIs (enriquecimento e redução do trabalho humano)
 | API | Uso no pipeline | Observação |
 |-----|----------------|------------|
-| **Mapillary** | Imagens street-level grátis embutidas NA triagem (ao lado dos candidatos do geoportal) — reduz o ida-e-volta ao Google Maps no único passo humano. | API key grátis; cobertura em Brasília é razoável nas vias principais. |
+| **Mapillary** ✅ (jun/15) | Strip street-level NA triagem (`lib/mapillary.ts` + `/api/mapillary` + `MapillaryStrip` no ReviewPanel). Aparece quando há coordenada: pin do Maps (resolve-maps já devolvia lat/lng) OU centroide do candidato do geoportal clicado. ⚠️ **Falta só `MAPILLARY_TOKEN`** no `.env.local`+Vercel (grátis em mapillary.com/dashboard/developers) — sem ele o strip é no-op silencioso. | API v4 Graph; bbox ~90m; ordena por distância. |
 | **IBGE (CNEFE + setores censitários)** | CNEFE = cadastro nacional de endereços → mais uma fonte p/ validar/normalizar endereço; renda média do setor censitário → score de potencial do lead. | APIs públicas, sem auth. |
 | **SIAGAS (CPRM)** | Poços tubulares cadastrados por coordenada — casa no Lago Sul com poço outorgado é sinal de padrão alto + dado p/ a ficha do imóvel. | Confirmado (jun/12): junto com o WFS da CPRM. |
 | **WFS CPRM** | Serviço Geológico do Brasil (confirmado jun/12) — camadas geológicas/hidrogeológicas via GeoServer da CPRM, complementa SIAGAS no enriquecimento do lote. | `geoportal.cprm.gov.br` / GeoSGB. |

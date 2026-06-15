@@ -197,6 +197,61 @@ function Lightbox({ imgs, startIdx, title, onClose }: {
   )
 }
 
+// ── MapillaryStrip ───────────────────────────────────────────────────────────────
+// Street-level aberto perto do ponto (pin do Maps ou centroide do lote): reduz o
+// ida-e-volta ao Google Maps na validação de endereço. No-op silencioso sem token.
+function MapillaryStrip({ coord }: { coord: { lat: number; lng: number } }) {
+  type Img = { id: string; thumb: string; distancia_m: number; viewer: string }
+  const [imgs, setImgs] = useState<Img[]>([])
+  const [loading, setLoading] = useState(false)
+  const [semToken, setSemToken] = useState(false)
+  const [done, setDone] = useState(false)
+
+  useEffect(() => {
+    let vivo = true
+    setLoading(true); setDone(false)
+    fetch('/api/mapillary', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(coord),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (vivo && d) { setImgs(d.imagens ?? []); setSemToken(!!d.semToken) } })
+      .catch(() => {})
+      .finally(() => { if (vivo) { setLoading(false); setDone(true) } })
+    return () => { vivo = false }
+  }, [coord.lat, coord.lng])
+
+  if (semToken) return null  // recurso desligado até MAPILLARY_TOKEN existir
+  if (done && imgs.length === 0 && !loading) return null  // sem cobertura aqui
+
+  return (
+    <div className="rounded-lg p-2.5 border" style={{ background: 'color-mix(in srgb, #7c3aed 7%, var(--card))', borderColor: 'color-mix(in srgb, #7c3aed 30%, transparent)' }}>
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <p className="text-[9px] font-bold uppercase tracking-wider font-mono" style={{ color: '#7c3aed' }}>Rua (Mapillary)</p>
+        {loading && (
+          <svg className="w-3 h-3 animate-spin text-muted-foreground ml-auto" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+          </svg>
+        )}
+      </div>
+      {imgs.length > 0 && (
+        <div className="flex gap-1.5 overflow-x-auto pb-1">
+          {imgs.map(im => (
+            <a key={im.id} href={im.viewer} target="_blank" rel="noreferrer"
+              className="relative flex-shrink-0 w-28 h-20 rounded-md overflow-hidden border border-border hover:border-[#7c3aed] transition-colors group">
+              <img src={im.thumb} alt="" className="w-full h-full object-cover group-hover:opacity-85 transition-opacity"
+                onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+              <span className="absolute bottom-0 right-0 text-[8px] font-mono px-1 leading-tight bg-black/60 text-white rounded-tl">{im.distancia_m}m</span>
+            </a>
+          ))}
+        </div>
+      )}
+      <p className="text-[9px] text-muted-foreground/60 mt-1">imagens abertas perto do ponto · clique p/ abrir no Mapillary</p>
+    </div>
+  )
+}
+
 // ── ReviewPanel ────────────────────────────────────────────────────────────────
 function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups, onApprove, onVisitar, onDiscard, onClose }: {
   item: Imovel
@@ -218,10 +273,11 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
   const [descricao, setDescricao] = useState<string | null>(null)
   const [resolving, setResolving] = useState(false)
   const [fonte, setFonte] = useState<string | null>(null)  // confiança do endereço: 'geoportal' | 'maps' | null
-  type CandGeo = { endereco: string | null; score: number; loteMatch: boolean; lote: { area_proj: number | null; end_cart: string | null } }
+  type CandGeo = { endereco: string | null; score: number; loteMatch: boolean; centro?: [number, number] | null; lote: { area_proj: number | null; end_cart: string | null } }
   const [candidatos, setCandidatos] = useState<CandGeo[]>([])
   const [candConf, setCandConf] = useState<string | null>(null)
   const [buscandoCand, setBuscandoCand] = useState(false)
+  const [coord, setCoord] = useState<{ lat: number; lng: number } | null>(null)  // p/ street-level Mapillary
 
   const MAPS_RE = /maps\.app\.goo\.gl\/|(?:www\.)?google\.com\/maps/
 
@@ -236,11 +292,12 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
         body: JSON.stringify({ url: val }),
       })
       if (!res.ok) return
-      const data: { endereco: string | null; mapsLink: string; source?: 'geoportal' | 'maps' | null } = await res.json()
+      const data: { endereco: string | null; mapsLink: string; lat?: number | null; lng?: number | null; source?: 'geoportal' | 'maps' | null } = await res.json()
       if (data.mapsLink) setMapsLink(data.mapsLink)
       // Geoportal = endereço oficial do DF -> sobrescreve o palpite das pistas; place-name só preenche se vazio
       if (data.endereco && (data.source === 'geoportal' || !endereco.trim())) setEndereco(data.endereco)
       setFonte(data.source ?? null)  // marca a confiança para o gate de auto-envio ao cartório
+      if (data.lat != null && data.lng != null) setCoord({ lat: data.lat, lng: data.lng })  // libera street-level
     } catch { /* ignore */ } finally {
       setResolving(false)
     }
@@ -249,7 +306,7 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
   useEffect(() => {
     setDescricao(null)
     setFonte(null)
-    setCandidatos([]); setCandConf(null)
+    setCandidatos([]); setCandConf(null); setCoord(null)
     fetch(`/api/triagem/detalhe?link=${encodeURIComponent(item.link)}`)
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.descricao) setDescricao(d.descricao) })
@@ -421,7 +478,7 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
                   const end = c.endereco ?? c.lote.end_cart
                   const sel = !!end && endereco === end && fonte === 'geoportal'
                   return (
-                    <button key={i} onClick={() => { if (end) { setEndereco(end); setFonte('geoportal') } }}
+                    <button key={i} onClick={() => { if (end) { setEndereco(end); setFonte('geoportal'); if (c.centro) setCoord({ lat: c.centro[1], lng: c.centro[0] }) } }}
                       className={`w-full text-left rounded-md px-2 py-1.5 border transition-colors ${sel ? 'border-[var(--chart-1)] bg-[var(--chart-1)]/10' : 'border-border hover:bg-muted'}`}>
                       <div className="flex items-center gap-1.5">
                         <span className="text-[11px] text-foreground font-medium truncate flex-1">{end ?? '—'}</span>
@@ -436,6 +493,8 @@ function ReviewPanel({ item, endereco, setEndereco, mapsLink, setMapsLink, dups,
               <p className="text-[9px] text-muted-foreground/60 mt-1.5">clique para preencher o endereço (marca confiança Geoportal)</p>
             </div>
           )}
+
+          {coord && <MapillaryStrip coord={coord} />}
 
           {descricao && (
             <div className="rounded-lg border border-border overflow-hidden" style={{ background: 'var(--muted)' }}>
