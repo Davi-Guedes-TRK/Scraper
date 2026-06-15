@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import type { Papel } from '@/lib/supabase/profile'
 
 const TABS = [
@@ -28,6 +29,7 @@ const TABS = [
   {
     href: '/visitas',
     label: 'Visitas',
+    badge: true,
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
@@ -57,6 +59,16 @@ const TABS = [
 
 export function BottomNav({ papel: _papel }: { papel?: Papel }) {
   const pathname = usePathname()
+  const [visitasCount, setVisitasCount] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/visitas/count')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (!cancelled && d) setVisitasCount(d.count ?? 0) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
   return (
     <nav
@@ -65,18 +77,29 @@ export function BottomNav({ papel: _papel }: { papel?: Papel }) {
     >
       {TABS.map(tab => {
         const isActive = tab.exact ? pathname === tab.href : pathname.startsWith(tab.href)
+        const count = tab.badge ? visitasCount : 0
         return (
           <Link
             key={tab.href}
             href={tab.href}
-            className="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 cursor-pointer transition-colors"
+            className="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 cursor-pointer transition-colors relative"
             style={{
               color: isActive ? 'var(--chart-1)' : 'var(--muted-foreground)',
               fontSize: '10px',
               fontWeight: isActive ? 600 : 400,
             }}
           >
-            {tab.icon}
+            <span className="relative">
+              {tab.icon}
+              {count > 0 && (
+                <span
+                  className="absolute -top-1 -right-1.5 min-w-[14px] h-[14px] rounded-full flex items-center justify-center text-white font-bold leading-none px-[3px]"
+                  style={{ fontSize: '8px', background: 'var(--chart-1)' }}
+                >
+                  {count > 99 ? '99+' : count}
+                </span>
+              )}
+            </span>
             <span>{tab.label}</span>
           </Link>
         )
