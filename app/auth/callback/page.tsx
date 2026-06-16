@@ -1,26 +1,46 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-// Ponto de chegada de links do Supabase (convite, magic link).
-// O token vem no hash fragment (#access_token=...&type=invite) — invisível ao servidor.
-// O createBrowserClient detecta o hash e estabelece a sessão automaticamente.
-// Para convites: redireciona para /reset-senha (usuário precisa definir senha).
-// Para os demais: vai para / (roteamento normal cuida do onboarding).
 export default function AuthCallbackPage() {
   const router = useRouter()
+  const [expired, setExpired] = useState(false)
 
   useEffect(() => {
+    // Detecta erro no hash (ex: link expirado enviado pelo Supabase)
+    const params = new URLSearchParams(window.location.hash.slice(1))
+    if (params.get('error')) {
+      setExpired(true)
+      return
+    }
+
     const supabase = createClient()
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!session) return
-      const type = new URLSearchParams(window.location.hash.slice(1)).get('type')
+      const type = params.get('type') || new URLSearchParams(window.location.hash.slice(1)).get('type')
       router.replace(type === 'invite' ? '/reset-senha' : '/')
     })
-    return () => subscription.unsubscribe()
+
+    // Fallback: se em 5s não houve sessão, link provavelmente expirou
+    const t = setTimeout(() => setExpired(true), 5000)
+    return () => { subscription.unsubscribe(); clearTimeout(t) }
   }, [router])
+
+  if (expired) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-4">
+        <p className="text-slate-600 text-sm text-center">Link expirado ou inválido.</p>
+        <button
+          onClick={() => router.replace('/login')}
+          className="text-sm font-semibold underline text-slate-700"
+        >
+          Voltar para o login
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center">
