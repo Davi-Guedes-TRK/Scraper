@@ -3,6 +3,7 @@ import { portalTable, portalKeys } from '@/lib/portals'
 import { oficioFor } from '@/lib/oficios'
 import { formatEndereco, refTag } from '@/lib/cartorio'
 import { log } from '@/lib/logger'
+import { notifyGChat, cartorioMsg } from '@/lib/gchat'
 
 // Envio de solicitação de matrícula ao cartório (2º Ofício, canal e-mail).
 // Compartilhado entre a rota manual (/api/cartorio/enviar-email) e o gatilho
@@ -115,6 +116,12 @@ export async function solicitarMatriculas(
   const totalEnviado = results.filter(r => r.ok).length
   const simulados    = results.filter(r => r.simulado).length
   const pulados      = results.filter(r => r.skipped).length
+
+  if (!dryRun && totalEnviado > 0) {
+    const oficio = results.find(r => r.ok)?.oficio ?? '2º Ofício'
+    await notifyGChat(cartorioMsg.emailEnviado(totalEnviado, oficio)).catch(() => {})
+  }
+
   await log('info', 'cartorio-email', dryRun ? 'Simulação de envio' : (totalEnviado ? 'E-mails enviados (1 por imóvel)' : 'Nenhum enviado'), {
     pedidos: links.length, auto, dryRun, totalEnviado, simulados, pulados,
   }).catch(() => {})
