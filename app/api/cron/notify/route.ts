@@ -20,7 +20,9 @@ export async function POST(req: NextRequest) {
   const dur = duration_s ? ` · ${Math.round(duration_s)}s` : ''
 
   let msg: string
-  if (status === 'success') {
+  if (status === 'dispatched') {
+    msg = `🔁 *${workflow}* disparado`
+  } else if (status === 'success') {
     msg = `✅ *${workflow}* concluído${dur}`
   } else {
     msg = `❌ *${workflow}* FALHOU${dur}${error ? `\n\`${error.slice(0, 300)}\`` : ''}`
