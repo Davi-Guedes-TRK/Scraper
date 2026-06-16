@@ -128,8 +128,8 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Analisar',
     items: [
       {
-        href: '/pregao',
-        label: 'Pregão',
+        href: '/mercado',
+        label: 'Mercado',
         icon: (
           <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 17l4-6 4 3 5-8 5 5" />
