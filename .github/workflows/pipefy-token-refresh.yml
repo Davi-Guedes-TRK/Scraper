@@ -80,3 +80,12 @@ jobs:
 
       # Nota: process.env em serverless functions do Vercel é lido por invocação —
       # o novo token entra em vigor na próxima requisição sem precisar de redeploy.
+      - name: Notificar conclusão
+        if: always()
+        env:
+          SCRAPER_API_KEY: ${{ secrets.SCRAPER_API_KEY }}
+          SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
+        run: |
+          STATUS="${{ job.status }}"
+          [ "$STATUS" = "success" ] && STATUS="success" || STATUS="failure"
+          curl -sf -X POST "$SITE_URL/api/cron/notify"             -H "x-api-key: $SCRAPER_API_KEY"             -H "Content-Type: application/json"             -d "{\"workflow\":\"Pipefy Token\",\"status\":\"$STATUS\"}" || true

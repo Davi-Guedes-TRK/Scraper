@@ -7,7 +7,7 @@
 // Saída prática: candidato `melhor` + nível de `confianca`, que alimenta o GATE
 // de auto-envio ao cartório (auto-envia só quando há candidato de confiança alta).
 
-import { buscarCandidatos } from './wfs-idedf'
+import { buscarCandidatos, type Candidato } from './wfs-idedf'
 import { parseEnderecoDF } from './endereco-df'
 import { buscarCandidatosCTM, consultarPiscinasCTM } from './cadastro-territorial'
 

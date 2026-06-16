@@ -26,3 +26,12 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: python scripts/wimoveis_sync.py --tipo aluguel --paginas 20 --publicados-ha 1
+      - name: Notificar conclusão
+        if: always()
+        env:
+          SCRAPER_API_KEY: ${{ secrets.SCRAPER_API_KEY }}
+          SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
+        run: |
+          STATUS="${{ job.status }}"
+          [ "$STATUS" = "success" ] && STATUS="success" || STATUS="failure"
+          curl -sf -X POST "$SITE_URL/api/cron/notify"             -H "x-api-key: $SCRAPER_API_KEY"             -H "Content-Type: application/json"             -d "{\"workflow\":\"Wimoveis\",\"status\":\"$STATUS\"}" || true
