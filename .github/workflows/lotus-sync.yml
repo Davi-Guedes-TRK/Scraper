@@ -31,7 +31,9 @@ jobs:
         env:
           SCRAPER_API_KEY: ${{ secrets.SCRAPER_API_KEY }}
           SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
+          VERCEL_BYPASS_TOKEN: ${{ secrets.VERCEL_BYPASS_TOKEN }}
         run: |
           STATUS="${{ job.status }}"
           [ "$STATUS" = "success" ] && STATUS="success" || STATUS="failure"
-          curl -sf -X POST "$SITE_URL/api/cron/notify"             -H "x-api-key: $SCRAPER_API_KEY"             -H "Content-Type: application/json"             -d "{\"workflow\":\"Lotus Cidade\",\"status\":\"$STATUS\"}" || true
+          curl -sf -X POST "$SITE_URL/api/cron/notify"             -H "x-vercel-protection-bypass: $VERCEL_BYPASS_TOKEN"
+            -H "x-api-key: $SCRAPER_API_KEY"             -H "Content-Type: application/json"             -d "{\"workflow\":\"Lotus Cidade\",\"status\":\"$STATUS\"}" || true
