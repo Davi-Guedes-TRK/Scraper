@@ -7,9 +7,9 @@
 // Saída prática: candidato `melhor` + nível de `confianca`, que alimenta o GATE
 // de auto-envio ao cartório (auto-envia só quando há candidato de confiança alta).
 
-import { buscarCandidatos, type Candidato } from './wfs-idedf'
+import { buscarCandidatos } from './wfs-idedf'
 import { parseEnderecoDF } from './endereco-df'
-import { consultarPiscinasCTM } from './cadastro-territorial'
+import { buscarCandidatosCTM, consultarPiscinasCTM } from './cadastro-territorial'
 
 export type CandidatoPontuado = Candidato & {
   score: number
@@ -102,7 +102,14 @@ export async function acharCandidatos(opts: {
   const casa_lote = opts.casa_lote ?? desc.casa_lote ?? null
   const area_m2   = opts.area_m2   ?? desc.area_m2   ?? null
 
-  const brutos = await buscarCandidatos({ ...opts, quadra, conjunto, setor })
+  // CTM Layer 10 tem dados mais completos que o WFS (inclui lotes omitidos no geonode).
+  // Usa CTM para buscas por endereço; WFS como fallback ou para buscas por ponto.
+  let brutos = quadra
+    ? await buscarCandidatosCTM({ quadra, conjunto, setor })
+    : []
+  if (!brutos.length) {
+    brutos = await buscarCandidatos({ ...opts, quadra, conjunto, setor })
+  }
 
   const ref     = tokens([opts.endereco, quadra, conjunto, setor, casa_lote].filter(Boolean).join(' '))
   const refLote = loteNum(casa_lote) ?? loteNum(opts.endereco)
