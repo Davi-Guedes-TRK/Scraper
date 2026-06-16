@@ -145,7 +145,6 @@ export function OnboardingClient({ papel, nomeInicial }: { papel: Papel; nomeIni
     if (!state.error) {
       if (skipping) {
         router.push('/dashboard')
-        router.refresh()
       } else {
         setStep('tour')
       }
@@ -177,7 +176,6 @@ export function OnboardingClient({ papel, nomeInicial }: { papel: Papel; nomeIni
       setTourIdx(i => i + 1)
     } else {
       router.push('/dashboard')
-      router.refresh()
     }
   }
 
