@@ -62,12 +62,14 @@ function addrScore(ref: Set<string>, cand: string | null): number {
 }
 
 /** Proximidade de área: 0% de diferença = 1, 100%+ de diferença = 0. null se faltar dado.
- *  Retorna null quando a área do anúncio é < 50% da área do lote — indica área construída
- *  vs área de terreno (escalas incompatíveis); nesses casos o score é ignorado. */
+ *  area_proj vindo do CTM é área CONSTRUÍDA (soma das edificações) — comparável diretamente
+ *  com area_m2 do anúncio. Vindo do WFS era área de terreno (muito maior); guard de 50%
+ *  evitava comparação inválida. Com CTM isso não é mais necessário. */
 function areaScore(areaM2: number | null | undefined, areaProj: number | null): number | null {
   if (!areaM2 || !areaProj) return null
-  if (areaM2 < areaProj * 0.5) return null  // área construída vs terreno — não comparar
-  return Math.max(0, 1 - Math.abs(areaProj - areaM2) / areaM2)
+  // Guard apenas para o caso WFS (terreno >> área construída do anúncio)
+  if (areaM2 < areaProj * 0.3) return null
+  return Math.max(0, 1 - Math.abs(areaProj - areaM2) / Math.max(areaM2, areaProj))
 }
 
 // Extrai área (m²), piscina e pistas de endereço do texto da descrição do anúncio.

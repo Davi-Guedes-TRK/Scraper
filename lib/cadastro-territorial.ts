@@ -42,6 +42,7 @@ function ctmParaLote(a: CtmLote): LoteRegistrado {
 
 // Busca candidatos de lote via CTM Layer 10 (pu_end_usual LIKE '%QI XX CJ Y%').
 // Mais completo que o WFS — inclui lotes que o geonode:lote_registrado omite.
+// Enriquece com área construída (Layer 5 Edificação) para diferenciar lotes por tamanho.
 export async function buscarCandidatosCTM(opts: {
   quadra?: string | null
   conjunto?: string | null
@@ -51,7 +52,6 @@ export async function buscarCandidatosCTM(opts: {
   const { quadra, conjunto, setor } = opts
   if (!quadra) return []
 
-  // Monta padrão de busca pelo formato do pu_end_usual: "SHIS QI 27 CJ 4"
   const cj = conjunto ? ` CJ ${conjunto}` : ''
   const st = setor ? `${setor} ` : ''
   const pattern = `${st}${quadra}${cj}`
@@ -67,15 +67,39 @@ export async function buscarCandidatosCTM(opts: {
   const j = await r.json() as {
     features?: { attributes: CtmLote; centroid?: { x: number; y: number } }[]
   }
+  const features = (j.features ?? []).filter(f => f.centroid)
+  if (!features.length) return []
 
-  return (j.features ?? [])
-    .filter(f => f.centroid)
-    .map(f => ({
-      lote: ctmParaLote(f.attributes),
+  // Busca área construída por lote (Layer 5) em paralelo — vários registros por CIU
+  // (casa principal + garagem + edícula...), soma todos para área total construída.
+  const cius = features.map(f => f.attributes.pu_ciu).filter(Boolean) as string[]
+  const areaEdif = cius.length ? await fetchAreaEdificacao(cius) : new Map<string, number>()
+
+  return features.map(f => {
+    const lote = ctmParaLote(f.attributes)
+    lote.area_proj = (f.attributes.pu_ciu ? areaEdif.get(f.attributes.pu_ciu) : null) ?? null
+    return {
+      lote,
       endereco: f.attributes.pu_end_usual ?? null,
       centro: [f.centroid!.x, f.centroid!.y] as [number, number],
       distancia_m: null,
-    }))
+    }
+  })
+}
+
+async function fetchAreaEdificacao(cius: string[]): Promise<Map<string, number>> {
+  const lista = cius.map(c => `'${c}'`).join(',')
+  const url = `${CTM_BASE}/5/query?where=ed_ciu+IN+(${encodeURIComponent(lista)})` +
+    `&outFields=ed_ciu,ed_area&returnGeometry=false&f=json`
+  const r = await fetch(url, { headers: { 'User-Agent': 'TRK-Imoveis/1.0' } })
+  if (!r.ok) return new Map()
+  const j = await r.json() as { features?: { attributes: { ed_ciu: string; ed_area: number | null } }[] }
+  const result = new Map<string, number>()
+  for (const f of j.features ?? []) {
+    const { ed_ciu, ed_area } = f.attributes
+    if (ed_ciu && ed_area) result.set(ed_ciu, (result.get(ed_ciu) ?? 0) + ed_area)
+  }
+  return result
 }
 
 // ── Piscinas ──────────────────────────────────────────────────────────────────
