@@ -188,7 +188,14 @@ export async function GET(req: NextRequest) {
         SELECT COALESCE(SUM(ff.valor_previsto), 0)::float8 AS retorno
         FROM nido_fechamentos f
         JOIN nido_fechamentos_financeiro ff ON ff.codigo_fechamento = f.codigo_fechamento
-        WHERE f.codigo_imovel ILIKE ANY(ARRAY['VK%','LK%','GY%','CL%'])
+        WHERE f.codigo_imovel IN (
+          SELECT BTRIM(tem_nido)
+          FROM pipefy_captacoes
+          WHERE fase_atual = 'Captado'
+            AND COALESCE(BTRIM(origem_oportunidade), '') != 'Captado por Corretor'
+            AND tem_nido IS NOT NULL
+            AND BTRIM(tem_nido) != ''
+        )
           AND f.tipo_negocio = 'LOCACAO'
           AND ff.beneficiario = 'EMPRESA'
           AND ff.operacao = 'Debito'
