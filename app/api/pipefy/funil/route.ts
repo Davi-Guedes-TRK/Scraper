@@ -178,13 +178,19 @@ export async function GET(req: NextRequest) {
   // Tabelas nido_fechamentos e nido_fechamentos_financeiro migradas para o Supabase principal via
   // scripts/migrate_nido_to_supabase.py
   let roi: { retorno: number; custoFixoMes: number; onusPorLead: number; leads: number; meses: number } | undefined
-  if (isDemais) {
+  if (isDemais || isCorretor) {
     const CUSTO_FIXO_MES = 9035.03 // Telegram 35,03 + LDR 4.000 + Closer 5.000
     const ONUS_POR_LEAD  = 12.90   // custo de consulta de ônus por lead
     const meses = Math.max(1, Math.round(
       (new Date(ate).getTime() - new Date(desde).getTime()) / (30 * 24 * 60 * 60 * 1000)
     ))
     try {
+      // ADM: origem != corretor; Corretor: origem = corretor
+      // Retorno = empresa_debito no Nido (comissão TRK, já descontada a parte dos corretores)
+      const origemFiltro = isDemais
+        ? sql`COALESCE(BTRIM(origem_oportunidade), '') != 'Captado por Corretor'`
+        : sql`COALESCE(BTRIM(origem_oportunidade), '') = 'Captado por Corretor'`
+
       const nidoRows = await sql`
         SELECT COALESCE(SUM(ff.valor_previsto), 0)::float8 AS retorno
         FROM nido_fechamentos f
@@ -193,7 +199,7 @@ export async function GET(req: NextRequest) {
           SELECT BTRIM(tem_nido)
           FROM pipefy_captacoes
           WHERE fase_atual = 'Captado'
-            AND COALESCE(BTRIM(origem_oportunidade), '') != 'Captado por Corretor'
+            AND ${origemFiltro}
             AND tem_nido IS NOT NULL
             AND BTRIM(tem_nido) != ''
         )
@@ -203,15 +209,16 @@ export async function GET(req: NextRequest) {
           AND f.data_fechamento >= ${desde}
           AND f.data_fechamento < (${ate}::date + INTERVAL '1 day')
       `
+      const retornoRaw = (nidoRows[0] as { retorno: number }).retorno ?? 0
       roi = {
-        retorno:      (nidoRows[0] as { retorno: number }).retorno ?? 0,
+        retorno:      retornoRaw,
         custoFixoMes: CUSTO_FIXO_MES,
         onusPorLead:  ONUS_POR_LEAD,
         leads:        (statsRows[0] as { negociacao: number }).negociacao ?? 0,
         meses,
       }
     } catch {
-      // tabelas ainda não migradas — roi fica undefined
+      // tabelas nido — roi fica undefined se falhar
     }
   }
 

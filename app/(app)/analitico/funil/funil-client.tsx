@@ -114,15 +114,22 @@ function PanelCard({ title, children, className = '' }: { title: string; childre
 }
 
 // Funil horizontal com valores financeiros por etapa
-function FunilVisual({ stats, anuncios, anunciosValor }: { stats: Stats; anuncios: number; anunciosValor: number }) {
-  const max = Math.max(anuncios, stats.oportunidades, 1)
-  const stages = [
-    { label: 'Anúncios Ativos', value: anuncios, color: C.anuncios, valor: anunciosValor, time: null },
-    { label: 'Oportunidades', value: stats.oportunidades, color: C.oportunidades, valor: stats.valor_geral, time: stats.dias_oportunidades },
-    { label: 'Qualificadas', value: stats.qualificados, color: C.leads, valor: stats.valor_qualificados, time: stats.dias_qualificacao },
-    { label: 'Negociação', value: stats.negociacao, color: C.visitados, valor: stats.valor_negociacao, time: stats.dias_negociacao },
-    { label: 'Captadas', value: stats.captados, color: C.captados, valor: stats.valor_captados, time: stats.dias_captado },
+function FunilVisual({ stats, anuncios, anunciosValor, origemFunil }: {
+  stats: Stats; anuncios: number; anunciosValor: number
+  origemFunil: 'todos' | 'corretor' | 'demais'
+}) {
+  const all = [
+    { label: 'Anúncios Ativos', value: anuncios,             color: C.anuncios,      valor: anunciosValor,           time: null },
+    { label: 'Oportunidades',   value: stats.oportunidades,  color: C.oportunidades, valor: stats.valor_geral,       time: stats.dias_oportunidades },
+    { label: 'Leads',           value: stats.qualificados,   color: C.leads,         valor: stats.valor_qualificados,time: stats.dias_qualificacao },
+    { label: 'Negociação',      value: stats.negociacao,     color: C.visitados,     valor: stats.valor_negociacao,  time: stats.dias_negociacao },
+    { label: 'Captado',         value: stats.captados,       color: C.captados,      valor: stats.valor_captados,    time: stats.dias_captado },
   ]
+  // Corretor não tem Oportunidades nem Leads — contato direto chega em Negociação
+  const stages = origemFunil === 'corretor'
+    ? [all[0], all[3], all[4]]
+    : all
+  const max = Math.max(anuncios, stats.oportunidades, 1)
 
   return (
     <div className="card rounded-lg p-3">
@@ -285,7 +292,7 @@ function ValorTooltip({ active, payload, label }: {
   )
 }
 
-function RoiCard({ roi }: { roi: Roi }) {
+function RoiCard({ roi, label = 'ADM' }: { roi: Roi; label?: string }) {
   const totalCusto = roi.custoFixoMes * roi.meses + roi.onusPorLead * roi.leads
   const roiPct = totalCusto > 0 ? ((roi.retorno - totalCusto) / totalCusto) * 100 : 0
   const custoPorLead = roi.leads > 0 ? totalCusto / roi.leads : 0
@@ -294,7 +301,7 @@ function RoiCard({ roi }: { roi: Roi }) {
   return (
     <div className="card rounded-lg p-4">
       <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-3">
-        ROI — ADM
+        ROI — {label}
       </p>
       <div className="grid grid-cols-4 gap-4">
         <div>
@@ -486,7 +493,7 @@ export function FunilClient() {
       )}
 
       {/* Row 1 — Funil visual com valores */}
-      {loading ? <ChartSkeleton h={80} /> : s && <FunilVisual stats={s} anuncios={data?.anunciosAtivos ?? 0} anunciosValor={data?.anunciosValor ?? 0} />}
+      {loading ? <ChartSkeleton h={80} /> : s && <FunilVisual stats={s} anuncios={data?.anunciosAtivos ?? 0} anunciosValor={data?.anunciosValor ?? 0} origemFunil={origemFunil} />}
 
       {/* Row 2 — Origem da oportunidade */}
       <PanelCard title="Origem da Oportunidade">
@@ -572,9 +579,11 @@ export function FunilClient() {
         </ResponsiveContainer>
       </PanelCard>
 
-      {/* ROI — só aparece na view ADM, no final da página */}
-      {origemFunil === 'demais' && (
-        loading ? <ChartSkeleton h={72} /> : data?.roi ? <RoiCard roi={data.roi} /> : null
+      {/* ROI — aparece nas views ADM e Corretor, no final da página */}
+      {(origemFunil === 'demais' || origemFunil === 'corretor') && (
+        loading ? <ChartSkeleton h={72} /> : data?.roi
+          ? <RoiCard roi={data.roi} label={origemFunil === 'corretor' ? 'Corretor' : 'ADM'} />
+          : null
       )}
 
     </div>
