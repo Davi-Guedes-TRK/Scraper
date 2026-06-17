@@ -174,6 +174,32 @@ export async function GET(req: NextRequest) {
 
   const f = filtrosRow[0] as { bairros: string[] | null; tipos: string[] | null }
 
+  // ROI — apenas no funil ADM (demais origens)
+  let roi: { retorno: number; custoFixoMes: number; leads: number; meses: number } | undefined
+  if (isDemais) {
+    const CUSTO_FIXO_MES = 9035.03 // Telegram 35,03 + LDR 4.000 + Closer 5.000
+    const meses = Math.max(1, Math.round(
+      (new Date(ate).getTime() - new Date(desde).getTime()) / (30 * 24 * 60 * 60 * 1000)
+    ))
+    const nidoRows = await sql`
+      SELECT COALESCE(SUM(ff.valor_previsto), 0)::float8 AS retorno
+      FROM nido_fechamentos f
+      JOIN nido_fechamentos_financeiro ff ON ff.codigo_fechamento = f.codigo_fechamento
+      WHERE f.codigo_imovel ILIKE ANY(ARRAY['VK%','LK%','GY%','CL%'])
+        AND f.tipo_negocio = 'LOCACAO'
+        AND ff.beneficiario = 'EMPRESA'
+        AND ff.operacao = 'Debito'
+        AND f.data_fechamento >= ${desde}
+        AND f.data_fechamento < (${ate}::date + INTERVAL '1 day')
+    `
+    roi = {
+      retorno:     (nidoRows[0] as { retorno: number }).retorno ?? 0,
+      custoFixoMes: CUSTO_FIXO_MES,
+      leads:        (statsRows[0] as { negociacao: number }).negociacao ?? 0,
+      meses,
+    }
+  }
+
   return Response.json({
     stats:          statsRows[0],
     motivos:        motivosRows,
@@ -186,5 +212,6 @@ export async function GET(req: NextRequest) {
     anunciosValor:  (anunciosRow[0] as { valor: number })?.valor ?? 0,
     bairros:        ['Todos', ...(f?.bairros ?? [])],
     tipos:          ['Todos', ...(f?.tipos   ?? [])],
+    ...(roi ? { roi } : {}),
   })
 }

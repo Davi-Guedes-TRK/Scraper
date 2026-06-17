@@ -25,6 +25,13 @@ type PorTipo = { tipo: string; oportunidades: number; perdidos: number; captados
 type PorMes = { mes: string; oportunidades: number; captados: number; ticket_medio: number | null }
 type Origem = { origem: string; total: number; captados: number }
 
+type Roi = {
+  retorno: number
+  custoFixoMes: number
+  leads: number
+  meses: number
+}
+
 type Data = {
   stats: Stats
   motivos: Motivo[]; fases: Fase[]
@@ -33,6 +40,7 @@ type Data = {
   anunciosAtivos: number
   anunciosValor: number
   bairros: string[]; tipos: string[]
+  roi?: Roi
 }
 
 // ── Paleta ────────────────────────────────────────────────────────────────────
@@ -276,6 +284,45 @@ function ValorTooltip({ active, payload, label }: {
   )
 }
 
+function RoiCard({ roi }: { roi: Roi }) {
+  const totalCusto = roi.custoFixoMes * roi.meses
+  const roiPct = totalCusto > 0 ? ((roi.retorno - totalCusto) / totalCusto) * 100 : 0
+  const custoPorLead = roi.leads > 0 ? totalCusto / roi.leads : 0
+  const roiColor = roiPct >= 0 ? '#16a34a' : '#ef4444'
+
+  return (
+    <div className="card rounded-lg p-4">
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-3">
+        ROI — ADM
+      </p>
+      <div className="grid grid-cols-4 gap-4">
+        <div>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Retorno</p>
+          <p className="text-xl font-extrabold tabular mt-1" style={{ color: '#16a34a' }}>{fmtBRL(roi.retorno)}</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">via Nido</p>
+        </div>
+        <div>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Investimento</p>
+          <p className="text-xl font-extrabold tabular mt-1 text-foreground">{fmtBRL(totalCusto)}</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">{roi.meses} {roi.meses === 1 ? 'mês' : 'meses'} × {fmtBRL(roi.custoFixoMes)}</p>
+        </div>
+        <div>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Custo / Lead</p>
+          <p className="text-xl font-extrabold tabular mt-1 text-foreground">{fmtBRL(custoPorLead)}</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">{roi.leads} leads gerados</p>
+        </div>
+        <div>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-widest">ROI</p>
+          <p className="text-2xl font-extrabold tabular mt-1" style={{ color: roiColor }}>
+            {roiPct > 0 ? '+' : ''}{roiPct.toFixed(1)}%
+          </p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">{roiPct >= 0 ? 'positivo' : 'negativo'}</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Componente principal ──────────────────────────────────────────────────────
 
 function ChartSkeleton({ h = 180 }: { h?: number }) {
@@ -386,7 +433,7 @@ export function FunilClient() {
             </button>
             {/* Toggle origem */}
             <div className="flex rounded-lg border border-border overflow-hidden">
-              {([['todos', 'Todos'], ['corretor', 'Corretor'], ['demais', 'Demais origens']] as const).map(([v, l]) => (
+              {([['todos', 'Todos'], ['corretor', 'Corretor'], ['demais', 'ADM']] as const).map(([v, l]) => (
                 <button
                   key={v}
                   onClick={() => setOrigemFunil(v)}
@@ -439,6 +486,11 @@ export function FunilClient() {
 
       {/* Row 1 — Funil visual com valores */}
       {loading ? <ChartSkeleton h={80} /> : s && <FunilVisual stats={s} anuncios={data?.anunciosAtivos ?? 0} anunciosValor={data?.anunciosValor ?? 0} />}
+
+      {/* ROI — só aparece na view ADM */}
+      {origemFunil === 'demais' && (
+        loading ? <ChartSkeleton h={72} /> : data?.roi ? <RoiCard roi={data.roi} /> : null
+      )}
 
       {/* Row 2 — Origem da oportunidade */}
       <PanelCard title="Origem da Oportunidade">
