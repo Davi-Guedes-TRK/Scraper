@@ -2,7 +2,7 @@ name: Dedup pHash — Cluster Semanal
 
 on:
   schedule:
-    - cron: '0 15 * * 0'   # 12:00 BRT domingo — após scrapers da semana
+    - cron: '0 15 * * *'   # 12:00 BRT todos os dias — após scrapers
   workflow_dispatch:
 
 concurrency:
