@@ -1125,6 +1125,7 @@ export function TriagemClient() {
         const data: { items: Imovel[]; total: number } = await res.json()
         setItems(data.items)
         setTotal(data.total)
+        localStorage.setItem('triagem_last_seen', new Date().toISOString())
       } catch (err) {
         toast(`Erro ao carregar: ${err instanceof Error ? err.message : 'desconhecido'}`, 'error')
       } finally {
