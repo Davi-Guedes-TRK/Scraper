@@ -8,10 +8,8 @@ export const maxDuration = 30
 const WORKFLOWS: Record<string, { label: string; brt: string }> = {
   'olx-sync':             { label: 'OLX',               brt: '07:00' },
   'dfimoveis-sync':       { label: 'DFImóveis',          brt: '08:00' },
-  'chaves-sync':          { label: 'Chaves na Mão',      brt: '08:00' },
   'lotus-sync':           { label: 'Lotus Cidade',       brt: '06:00' },
   'vivareal-sync':        { label: 'Viva Real',          brt: '09:00' },
-  'wimoveis-sync':        { label: 'Wimoveis',           brt: '09:00' },
   'zap-sync':             { label: 'ZAP Imóveis',        brt: '10:00' },
   'lancamentos-sync':     { label: 'Lançamentos DF',     brt: '07:00' },
   'pipefy-sync':          { label: 'Pipefy',             brt: 'multi' },

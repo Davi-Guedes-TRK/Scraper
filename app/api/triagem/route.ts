@@ -41,7 +41,6 @@ export async function GET() {
                sem_exclusividade, grupo_id
         FROM imoveis_todos
         WHERE status_triagem = 'pendente'
-          AND portal <> 'chavesnamao'
           AND (creci IS NULL OR creci != '22784')
           -- TRK administra LOCAÇÃO: fora anúncios de venda (por tipo ou tipo_imovel)
           AND coalesce(tipo, '') NOT ILIKE 'venda'
@@ -54,7 +53,6 @@ export async function GET() {
         SELECT count(*)::int AS total
         FROM imoveis_todos
         WHERE status_triagem = 'pendente'
-          AND portal <> 'chavesnamao'
           AND (creci IS NULL OR creci != '22784')
           AND coalesce(tipo, '') NOT ILIKE 'venda'
           AND coalesce(tipo_imovel, '') NOT ILIKE 'venda%'

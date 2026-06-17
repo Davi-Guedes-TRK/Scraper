@@ -9,7 +9,7 @@ const env = readFileSync(resolve(import.meta.dirname, '..', '.env.local'), 'utf8
 const url = env.match(/^DATABASE_URL=(.+)$/m)[1].trim()
 const sql = postgres(url)
 
-const VIEW_TABLES = ['imoveis_dfimoveis','imoveis_olx','imoveis_vivareal','imoveis_zap','imoveis_chavesnamao']
+const VIEW_TABLES = ['imoveis_dfimoveis','imoveis_olx','imoveis_vivareal','imoveis_zap']
 
 try {
   // 1) garante as colunas nas 5 tabelas da view (idempotente)

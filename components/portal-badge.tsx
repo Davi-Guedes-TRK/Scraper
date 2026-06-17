@@ -1,15 +1,15 @@
 const STYLES: Record<string, string> = {
   dfimoveis: 'bg-blue-100 text-blue-700',
   olx:       'bg-orange-100 text-orange-700',
-  wimoveis:  'bg-cyan-100 text-cyan-700',
-  facebook:  'bg-indigo-100 text-indigo-700',
+  vivareal:  'bg-pink-100 text-pink-700',
+  zap:       'bg-violet-100 text-violet-700',
 }
 
 const LABELS: Record<string, string> = {
   dfimoveis: 'DFImóveis',
   olx:       'OLX',
-  wimoveis:  'WImóveis',
-  facebook:  'Facebook',
+  vivareal:  'Viva Real',
+  zap:       'ZAP',
 }
 
 export function PortalBadge({ portal }: { portal: string }) {

@@ -51,7 +51,6 @@ export async function GET(req: NextRequest) {
         if (pubHa > 0) args.push(`--publicados-ha=${pubHa}`)
         if (portal === 'dfimoveis') args.push(`--cidade=${cidadeSlug}`, `--tipo=${tipo}`, `--tipo-imovel=${tipoImovel}`)
         else if (portal === 'olx') args.push(`--tipo=${tipo}`, `--estado=${estado}`)
-        else if (portal === 'wimoveis') args.push(`--tipo=${tipo}`)
 
         send({ type: 'start', cmd: `${PYTHON} ${args.join(' ')}`, cidade: cidadeSlug })
 

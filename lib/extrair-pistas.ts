@@ -23,7 +23,7 @@ export type Pistas = {
 const ALLOWED_HOSTS = [
   'img.dfimoveis.com.br', 'img1.dfimoveis.com.br', 'img2.dfimoveis.com.br',
   'img.olx.com.br', 'images.olx.com.br', 'img.olxcdn.com', 'cdn.olxbr.com',
-  'photos.zap.com.br', 'img.wimoveis.com.br',
+  'photos.zap.com.br', 'photos.vivareal.com',
 ]
 
 const REFERER: Record<string, string> = {
@@ -31,7 +31,8 @@ const REFERER: Record<string, string> = {
   'olx.com.br':       'https://www.olx.com.br/',
   'olxcdn.com':       'https://www.olx.com.br/',
   'olxbr.com':        'https://www.olx.com.br/',
-  'wimoveis.com.br':  'https://www.wimoveis.com.br/',
+  'zap.com.br':       'https://www.zapimoveis.com.br/',
+  'vivareal.com':     'https://www.vivareal.com.br/',
 }
 
 function getReferer(hostname: string) {

@@ -54,12 +54,10 @@ const imoveisBase = {
   grupo_meta: jsonb('grupo_meta'),        // {n, portais[], anunciantes[]} — só no canônico
 }
 
-export const imoveisOlx         = pgTable('imoveis_olx',         imoveisBase)
-export const imoveisDfimoveis   = pgTable('imoveis_dfimoveis',   imoveisBase)
-export const imoveisWimoveis    = pgTable('imoveis_wimoveis',    imoveisBase)
-export const imoveisVivareal    = pgTable('imoveis_vivareal',    imoveisBase)
-export const imoveisZap         = pgTable('imoveis_zap',         imoveisBase)
-export const imoveisChavesnamao = pgTable('imoveis_chavesnamao', imoveisBase)
+export const imoveisOlx       = pgTable('imoveis_olx',       imoveisBase)
+export const imoveisDfimoveis = pgTable('imoveis_dfimoveis', imoveisBase)
+export const imoveisVivareal  = pgTable('imoveis_vivareal',  imoveisBase)
+export const imoveisZap       = pgTable('imoveis_zap',       imoveisBase)
 
 export type Imovel = typeof imoveisOlx.$inferSelect
 export type NovoImovel = typeof imoveisOlx.$inferInsert

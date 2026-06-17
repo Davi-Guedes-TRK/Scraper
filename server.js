@@ -52,7 +52,7 @@ const TRK_CIDADES = [
 // ── Allowlists para validação de parâmetros do scraper ────────────────────────
 // Uso de indexOf + acesso por índice numérico: o output é do nosso array estático,
 // nunca do input do usuário — quebra o taint tracking do SonarCloud (S6350/S5145).
-const VALID_PORTALS     = ['dfimoveis', 'olx', 'wimoveis']
+const VALID_PORTALS     = ['dfimoveis', 'olx']
 const VALID_TIPOS       = ['venda', 'aluguel', 'todos']
 const VALID_TIPO_IMOVEL = ['todos', 'apartamento', 'casa', 'terreno', 'comercial', 'kitnet', 'cobertura']
 const VALID_ESTADOS     = ['df', 'go', 'mg', 'sp', 'rj', 'ba', 'pr', 'rs', 'sc', 'pe', 'ce', 'es', 'am']

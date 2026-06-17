@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import sql from '@/lib/db'
 import { log } from '@/lib/logger'
 
-const ALLOWED_TABLES = ['imoveis_olx', 'imoveis_dfimoveis', 'imoveis_wimoveis'] as const
+const ALLOWED_TABLES = ['imoveis_olx', 'imoveis_dfimoveis'] as const
 type AllowedTable = (typeof ALLOWED_TABLES)[number]
 
 // Mirrors scraper/storage/supabase.py SCHEMA_COLUMNS
@@ -21,20 +21,12 @@ const SCHEMA_COLUMNS: Record<AllowedTable, string[]> = {
     'dados_brutos', 'coletado_em', 'atualizado_em', 'validado_em',
     'ativo', 'creci', 'tipo', 'imagens',
   ],
-  imoveis_wimoveis: [
-    'link', 'titulo', 'preco', 'area_m2', 'quartos', 'suites', 'vagas', 'banheiros',
-    'bairro', 'cidade', 'estado', 'tipo_imovel', 'descricao', 'telefone',
-    'nome_anunciante', 'tipo_anunciante', 'id_anuncio', 'data_publicacao',
-    'dados_brutos', 'coletado_em', 'atualizado_em', 'preco_reduzido',
-    'bairro_id', 'ativo', 'creci', 'tipo', 'imagens',
-  ],
 }
 
 function portalToTable(portal: string): AllowedTable | null {
   const map: Record<string, AllowedTable> = {
     olx: 'imoveis_olx',
     dfimoveis: 'imoveis_dfimoveis',
-    wimoveis: 'imoveis_wimoveis',
   }
   return map[portal.toLowerCase()] ?? null
 }
