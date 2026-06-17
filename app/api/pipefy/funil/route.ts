@@ -18,13 +18,18 @@ function resolverDesde(range: string): string {
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
-  const bairro = searchParams.get('bairro')      ?? 'Todos'
-  const tipo   = searchParams.get('tipo_imovel') ?? 'Todos'
+  const bairro      = searchParams.get('bairro')       ?? 'Todos'
+  const tipo        = searchParams.get('tipo_imovel')  ?? 'Todos'
+  const origemFunil = searchParams.get('origem_funil') ?? 'todos' // 'todos' | 'corretor' | 'demais'
 
   const desdeParam = searchParams.get('desde')
   const ateParam   = searchParams.get('ate')
   const desde = desdeParam || resolverDesde(searchParams.get('range') ?? 'tudo')
   const ate   = ateParam   || new Date().toISOString().slice(0, 10)
+
+  // Filtro de origem: 'corretor' = apenas "Captado por Corretor"; 'demais' = todo o resto
+  const isCorretor = origemFunil === 'corretor'
+  const isDemais   = origemFunil === 'demais'
 
   const [statsRows, motivosRows, fasesRows, porBairroRows, porTipoRows, porMesRows, origemRows, filtrosRow, anunciosRow] = await Promise.all([
 
@@ -48,6 +53,8 @@ export async function GET(req: NextRequest) {
       WHERE criado_em >= ${desde} AND criado_em < (${ate}::date + INTERVAL '1 day')
         AND (${bairro} = 'Todos' OR bairro = ${bairro})
         AND (${tipo}   = 'Todos' OR tipo_imovel = ${tipo})
+        AND (NOT ${isCorretor} OR COALESCE(BTRIM(origem_oportunidade), '') = 'Captado por Corretor')
+        AND (NOT ${isDemais}   OR COALESCE(BTRIM(origem_oportunidade), '') != 'Captado por Corretor')
     `,
 
     sql`
@@ -57,6 +64,8 @@ export async function GET(req: NextRequest) {
         AND fase_atual = 'Não Captado'
         AND (${bairro} = 'Todos' OR bairro = ${bairro})
         AND (${tipo}   = 'Todos' OR tipo_imovel = ${tipo})
+        AND (NOT ${isCorretor} OR COALESCE(BTRIM(origem_oportunidade), '') = 'Captado por Corretor')
+        AND (NOT ${isDemais}   OR COALESCE(BTRIM(origem_oportunidade), '') != 'Captado por Corretor')
       GROUP BY 1 ORDER BY 2 DESC
     `,
 
@@ -66,6 +75,8 @@ export async function GET(req: NextRequest) {
       WHERE criado_em >= ${desde} AND criado_em < (${ate}::date + INTERVAL '1 day')
         AND (${bairro} = 'Todos' OR bairro = ${bairro})
         AND (${tipo}   = 'Todos' OR tipo_imovel = ${tipo})
+        AND (NOT ${isCorretor} OR COALESCE(BTRIM(origem_oportunidade), '') = 'Captado por Corretor')
+        AND (NOT ${isDemais}   OR COALESCE(BTRIM(origem_oportunidade), '') != 'Captado por Corretor')
       GROUP BY 1 ORDER BY 2 DESC
     `,
 
@@ -79,6 +90,8 @@ export async function GET(req: NextRequest) {
       FROM pipefy_captacoes
       WHERE criado_em >= ${desde} AND criado_em < (${ate}::date + INTERVAL '1 day')
         AND (${tipo} = 'Todos' OR tipo_imovel = ${tipo})
+        AND (NOT ${isCorretor} OR COALESCE(BTRIM(origem_oportunidade), '') = 'Captado por Corretor')
+        AND (NOT ${isDemais}   OR COALESCE(BTRIM(origem_oportunidade), '') != 'Captado por Corretor')
       GROUP BY 1 ORDER BY 2 DESC
     `,
 
@@ -92,6 +105,8 @@ export async function GET(req: NextRequest) {
       FROM pipefy_captacoes
       WHERE criado_em >= ${desde} AND criado_em < (${ate}::date + INTERVAL '1 day')
         AND (${bairro} = 'Todos' OR bairro = ${bairro})
+        AND (NOT ${isCorretor} OR COALESCE(BTRIM(origem_oportunidade), '') = 'Captado por Corretor')
+        AND (NOT ${isDemais}   OR COALESCE(BTRIM(origem_oportunidade), '') != 'Captado por Corretor')
       GROUP BY 1 ORDER BY 2 DESC
     `,
 
@@ -105,6 +120,8 @@ export async function GET(req: NextRequest) {
       WHERE criado_em >= ${desde} AND criado_em < (${ate}::date + INTERVAL '1 day')
         AND (${bairro} = 'Todos' OR bairro = ${bairro})
         AND (${tipo}   = 'Todos' OR tipo_imovel = ${tipo})
+        AND (NOT ${isCorretor} OR COALESCE(BTRIM(origem_oportunidade), '') = 'Captado por Corretor')
+        AND (NOT ${isDemais}   OR COALESCE(BTRIM(origem_oportunidade), '') != 'Captado por Corretor')
       GROUP BY 1 ORDER BY 1
     `,
 
@@ -117,6 +134,8 @@ export async function GET(req: NextRequest) {
       WHERE criado_em >= ${desde} AND criado_em < (${ate}::date + INTERVAL '1 day')
         AND (${bairro} = 'Todos' OR bairro = ${bairro})
         AND (${tipo}   = 'Todos' OR tipo_imovel = ${tipo})
+        AND (NOT ${isCorretor} OR COALESCE(BTRIM(origem_oportunidade), '') = 'Captado por Corretor')
+        AND (NOT ${isDemais}   OR COALESCE(BTRIM(origem_oportunidade), '') != 'Captado por Corretor')
       GROUP BY 1 ORDER BY 2 DESC
     `,
 
@@ -127,10 +146,9 @@ export async function GET(req: NextRequest) {
       FROM pipefy_captacoes
     `,
 
-    // Anúncios ativos no mercado (imoveis_todos) nas regiões do funil. cidade = RA (slug);
-    // normaliza (sem acento/caixa/separador) pra casar "lago-sul" com "Lago Sul" do Pipefy.
-    // DEDUP por imóvel único (título normalizado + área/quartos/vagas) — o mesmo imóvel
-    // aparece em 2 portais. Retorna CONTAGEM (~717) e SOMA do preço (preco é texto BR -> parse).
+    // Anúncios ativos no mercado (imoveis_todos) nas regiões do funil.
+    // Filtra preço >= 10k (remove terrenos/valores inconsistentes).
+    // DEDUP por imóvel único (título normalizado + área/quartos/vagas).
     sql`
       SELECT count(*)::int AS total, COALESCE(sum(p), 0)::float8 AS valor
       FROM (
@@ -150,6 +168,7 @@ export async function GET(req: NextRequest) {
           lower(regexp_replace(translate(it.titulo, 'ÁÀÂÃÉÊÍÓÔÕÚÜÇáàâãéêíóôõúüç', 'AAAAEEIOOOUUCaaaaeeiooouuc'), '[^A-Za-z0-9]', '', 'g')),
           it.area_m2, it.quartos, it.vagas, it.preco DESC NULLS LAST
       ) d
+      WHERE d.p >= 10000
     `,
   ])
 

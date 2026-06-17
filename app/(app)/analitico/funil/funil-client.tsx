@@ -286,32 +286,34 @@ export function FunilClient() {
   const searchParams = useSearchParams()
   const router = useRouter()
 
-  const [bairro,     setBairro]     = useState(() => searchParams.get('bairro') ?? 'Todos')
-  const [tipo,       setTipo]       = useState(() => searchParams.get('tipo') ?? 'Todos')
-  const [range,      setRange]      = useState(() => searchParams.get('range') ?? 'ano')
-  const [showCustom, setShowCustom] = useState(false)
-  const [customDe,   setCustomDe]   = useState(() => searchParams.get('de') ?? '')
-  const [customAte,  setCustomAte]  = useState(() => searchParams.get('ate') ?? '')
+  const [bairro,      setBairro]      = useState(() => searchParams.get('bairro') ?? 'Todos')
+  const [tipo,        setTipo]        = useState(() => searchParams.get('tipo') ?? 'Todos')
+  const [range,       setRange]       = useState(() => searchParams.get('range') ?? 'ano')
+  const [origemFunil, setOrigemFunil] = useState<'todos' | 'corretor' | 'demais'>(() => (searchParams.get('origem') ?? 'todos') as 'todos' | 'corretor' | 'demais')
+  const [showCustom,  setShowCustom]  = useState(false)
+  const [customDe,    setCustomDe]    = useState(() => searchParams.get('de') ?? '')
+  const [customAte,   setCustomAte]   = useState(() => searchParams.get('ate') ?? '')
   const [data,       setData]       = useState<Data | null>(null)
   const [loading,    setLoading]    = useState(true)
   const [erro,       setErro]       = useState<string | null>(null)
 
   const today = new Date().toISOString().slice(0, 10)
 
-  const syncUrl = useCallback((b: string, t: string, r: string, de: string, ate: string) => {
+  const syncUrl = useCallback((b: string, t: string, r: string, de: string, ate: string, of: string) => {
     const p = new URLSearchParams()
     if (b !== 'Todos') p.set('bairro', b)
     if (t !== 'Todos') p.set('tipo', t)
     if (r !== 'ano') p.set('range', r)
     if (de) p.set('de', de)
     if (ate) p.set('ate', ate)
+    if (of !== 'todos') p.set('origem', of)
     router.replace(`?${p.toString()}`, { scroll: false })
   }, [router])
 
-  const load = useCallback(async (b: string, t: string, r: string, de?: string, ate?: string) => {
+  const load = useCallback(async (b: string, t: string, r: string, of: string, de?: string, ate?: string) => {
     setLoading(true); setErro(null)
     try {
-      const p = new URLSearchParams({ bairro: b, tipo_imovel: t })
+      const p = new URLSearchParams({ bairro: b, tipo_imovel: t, origem_funil: of })
       if (de && ate) { p.set('desde', de); p.set('ate', ate) }
       else           { p.set('range', r) }
       const res = await fetch(`/api/pipefy/funil?${p}`, { cache: 'no-store' })
@@ -327,10 +329,10 @@ export function FunilClient() {
   const customAtivo = showCustom && !!customDe && !!customAte
 
   useEffect(() => {
-    syncUrl(bairro, tipo, range, customDe, customAte)
-    if (customAtivo) load(bairro, tipo, range, customDe, customAte)
-    else             load(bairro, tipo, range)
-  }, [bairro, tipo, range, customAtivo, customDe, customAte, load, syncUrl])
+    syncUrl(bairro, tipo, range, customDe, customAte, origemFunil)
+    if (customAtivo) load(bairro, tipo, range, origemFunil, customDe, customAte)
+    else             load(bairro, tipo, range, origemFunil)
+  }, [bairro, tipo, range, origemFunil, customAtivo, customDe, customAte, load, syncUrl])
 
   const s = data?.stats
 
@@ -382,6 +384,20 @@ export function FunilClient() {
                 <line x1="3" y1="10" x2="21" y2="10"/>
               </svg>
             </button>
+            {/* Toggle origem */}
+            <div className="flex rounded-lg border border-border overflow-hidden">
+              {([['todos', 'Todos'], ['corretor', 'Corretor'], ['demais', 'Demais origens']] as const).map(([v, l]) => (
+                <button
+                  key={v}
+                  onClick={() => setOrigemFunil(v)}
+                  className={`px-2.5 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
+                    origemFunil === v
+                      ? 'bg-primary text-white'
+                      : 'bg-background text-muted-foreground hover:bg-muted'
+                  }`}
+                >{l}</button>
+              ))}
+            </div>
             {/* Selects bairro/tipo */}
             <select value={bairro} onChange={e => setBairro(e.target.value)}
               className="h-8 px-2.5 text-sm rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
@@ -415,7 +431,7 @@ export function FunilClient() {
       {erro && (
         <div className="rounded-lg border border-red-500/20 bg-red-500/10 text-red-400 text-sm px-4 py-3 flex items-center justify-between gap-3">
           <span>{erro}</span>
-          <button onClick={() => load(bairro, tipo, range, customDe || undefined, customAte || undefined)} className="text-xs font-medium underline hover:no-underline cursor-pointer shrink-0">
+          <button onClick={() => load(bairro, tipo, range, origemFunil, customDe || undefined, customAte || undefined)} className="text-xs font-medium underline hover:no-underline cursor-pointer shrink-0">
             Tentar novamente
           </button>
         </div>
