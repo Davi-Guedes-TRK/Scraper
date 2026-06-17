@@ -63,7 +63,7 @@ FIELD_MAP: dict[str, tuple[str, str]] = {
     'Bairro':                                      ('bairro',                 'str'),
     'Tipo de Imóvel':                              ('tipo_imovel',            'str'),
     'Ônus':                                        ('onus',                   'str'),
-    'Tem Cadastro no Nido?':                       ('tem_nido',               'str'),
+    'VK':                                          ('tem_nido',               'str'),
     'Valor Estimado':                              ('valor_estimado',         'money'),
     'Data de Contato':                             ('data_contato',           'date'),
     'Houve abertura do proprietário?':             ('abertura_proprietario',  'str'),
