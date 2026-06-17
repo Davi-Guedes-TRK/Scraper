@@ -179,7 +179,7 @@ export async function GET(req: NextRequest) {
   // scripts/migrate_nido_to_supabase.py
   let roi: { retorno: number; custoFixoMes: number; onusPorLead: number; leads: number; meses: number } | undefined
   if (isDemais || isCorretor) {
-    const CUSTO_FIXO_MES  = 9035.03 // Telegram 35,03 + LDR 4.000 + Closer 5.000
+    const CUSTO_FIXO_MES  = isDemais ? 6535.03 : 2500 // ADM: Telegram 35,03 + LDR 4k + Closer 2,5k | Corretor: só Closer 2,5k
     const ONUS_POR_LEAD   = 12.90   // custo de consulta de ônus por lead
     const INICIO_OPERACAO = new Date('2026-06-01')
     const dataInicio = new Date(Math.max(new Date(desde).getTime(), INICIO_OPERACAO.getTime()))
