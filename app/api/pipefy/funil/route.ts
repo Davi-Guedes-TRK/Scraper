@@ -177,9 +177,10 @@ export async function GET(req: NextRequest) {
   // ROI — apenas no funil ADM (demais origens)
   // Tabelas nido_fechamentos e nido_fechamentos_financeiro migradas para o Supabase principal via
   // scripts/migrate_nido_to_supabase.py
-  let roi: { retorno: number; custoFixoMes: number; leads: number; meses: number } | undefined
+  let roi: { retorno: number; custoFixoMes: number; onusPorLead: number; leads: number; meses: number } | undefined
   if (isDemais) {
-    const CUSTO_FIXO_MES = 9035.03
+    const CUSTO_FIXO_MES = 9035.03 // Telegram 35,03 + LDR 4.000 + Closer 5.000
+    const ONUS_POR_LEAD  = 12.90   // custo de consulta de ônus por lead
     const meses = Math.max(1, Math.round(
       (new Date(ate).getTime() - new Date(desde).getTime()) / (30 * 24 * 60 * 60 * 1000)
     ))
@@ -205,6 +206,7 @@ export async function GET(req: NextRequest) {
       roi = {
         retorno:      (nidoRows[0] as { retorno: number }).retorno ?? 0,
         custoFixoMes: CUSTO_FIXO_MES,
+        onusPorLead:  ONUS_POR_LEAD,
         leads:        (statsRows[0] as { negociacao: number }).negociacao ?? 0,
         meses,
       }

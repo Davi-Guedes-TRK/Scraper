@@ -28,6 +28,7 @@ type Origem = { origem: string; total: number; captados: number }
 type Roi = {
   retorno: number
   custoFixoMes: number
+  onusPorLead: number
   leads: number
   meses: number
 }
@@ -285,7 +286,7 @@ function ValorTooltip({ active, payload, label }: {
 }
 
 function RoiCard({ roi }: { roi: Roi }) {
-  const totalCusto = roi.custoFixoMes * roi.meses
+  const totalCusto = roi.custoFixoMes * roi.meses + roi.onusPorLead * roi.leads
   const roiPct = totalCusto > 0 ? ((roi.retorno - totalCusto) / totalCusto) * 100 : 0
   const custoPorLead = roi.leads > 0 ? totalCusto / roi.leads : 0
   const roiColor = roiPct >= 0 ? '#16a34a' : '#ef4444'
