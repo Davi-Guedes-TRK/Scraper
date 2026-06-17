@@ -10,9 +10,27 @@ Ou defina as variáveis no .env.local e rode:
 
 import os
 import sys
+import re
 import psycopg2
 import psycopg2.extras
 from urllib.parse import urlparse, unquote
+from pathlib import Path
+
+def load_env_local():
+    """Carrega .env.local da raiz do projeto se existir."""
+    root = Path(__file__).parent.parent
+    for fname in [".env.local", ".env"]:
+        p = root / fname
+        if p.exists():
+            for line in p.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, _, v = line.partition("=")
+                    v = v.strip().strip('"')
+                    if k.strip() not in os.environ:
+                        os.environ[k.strip()] = v
+
+load_env_local()
 
 # ── Origem: DW TRK ─────────────────────────────────────────────────────────
 SRC = {
@@ -26,9 +44,9 @@ SRC = {
 # ── Destino: Supabase principal ─────────────────────────────────────────────
 DST_URL = os.environ.get("DATABASE_URL", "")
 if not DST_URL:
-    sys.exit("Erro: DATABASE_URL não definida.")
+    sys.exit("Erro: DATABASE_URL nao definida.")
 if not SRC["password"]:
-    sys.exit("Erro: DW_PASS não definida.")
+    sys.exit("Erro: DW_PASS nao definida. Passe via: $env:DW_PASS='...' (PowerShell)")
 
 DDL_FECHAMENTOS = """
 CREATE TABLE IF NOT EXISTS nido_fechamentos (
@@ -83,7 +101,7 @@ def parse_url(url):
 
 
 def migrate_table(src_cur, dst_conn, dst_cur, table, ddl, batch=500):
-    print(f"\n→ {table}")
+    print(f"\n>> {table}")
     src_cur.execute(f"SELECT * FROM {table}")
     cols = [d[0] for d in src_cur.description]
     rows = src_cur.fetchall()
@@ -104,7 +122,7 @@ def migrate_table(src_cur, dst_conn, dst_cur, table, ddl, batch=500):
         print(f"  {inserted}/{len(rows)}", end="\r")
 
     dst_conn.commit()
-    print(f"  {inserted} linhas inseridas ✓")
+    print(f"  {inserted} linhas inseridas OK")
 
 
 def main():

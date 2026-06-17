@@ -487,11 +487,6 @@ export function FunilClient() {
       {/* Row 1 — Funil visual com valores */}
       {loading ? <ChartSkeleton h={80} /> : s && <FunilVisual stats={s} anuncios={data?.anunciosAtivos ?? 0} anunciosValor={data?.anunciosValor ?? 0} />}
 
-      {/* ROI — só aparece na view ADM */}
-      {origemFunil === 'demais' && (
-        loading ? <ChartSkeleton h={72} /> : data?.roi ? <RoiCard roi={data.roi} /> : null
-      )}
-
       {/* Row 2 — Origem da oportunidade */}
       <PanelCard title="Origem da Oportunidade">
         {loading ? <ChartSkeleton h={180} /> : data?.origem?.length
@@ -575,6 +570,11 @@ export function FunilClient() {
           </LineChart>
         </ResponsiveContainer>
       </PanelCard>
+
+      {/* ROI — só aparece na view ADM, no final da página */}
+      {origemFunil === 'demais' && (
+        loading ? <ChartSkeleton h={72} /> : data?.roi ? <RoiCard roi={data.roi} /> : null
+      )}
 
     </div>
   )
