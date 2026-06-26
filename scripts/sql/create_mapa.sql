@@ -13,6 +13,21 @@ CREATE TABLE IF NOT EXISTS public.mapa_demanda (
 
 -- Imóveis ativos (nido situacao='Ativo'), geocodificados. Colunas extras (endereco/geo_fonte/
 -- flags) são aditivas — a API só seleciona codigo_imovel,bairro,lat,lng,tipo_imovel,preco.
+-- Atendimentos em aberto, grão fino (1 linha = 1 atendimento) p/ filtros dinâmicos do heat.
+-- lat/lng = centroide da RA com leve jitter (espalha pontos da mesma região → blob de calor).
+CREATE TABLE IF NOT EXISTS public.mapa_atendimentos (
+  codigo_atendimento text PRIMARY KEY,
+  bairro             text,
+  tipo_negocio       text,   -- COMPRA | LOCAÇÃO | AVALIAÇÃO
+  tipo_imovel        text,   -- tipo_imovel_buscado
+  classe             text,   -- Residencial | Comercial | Terreno/Rural | Outro
+  tipo_utilizacao    text,
+  preco_max          numeric,
+  lat                double precision,
+  lng                double precision,
+  sincronizado_em    timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS public.mapa_ativos (
   codigo_imovel       text PRIMARY KEY,
   bairro              text,

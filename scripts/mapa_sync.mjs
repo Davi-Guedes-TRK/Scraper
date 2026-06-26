@@ -29,6 +29,11 @@ const REGEO = process.argv.includes('--regeo')
 const sleep = (ms) => new Promise(r => setTimeout(r, ms))
 const up = (s) => (s ?? '').toString().trim().toUpperCase()
 const num = (v) => { const n = Number(String(v ?? '').replace(/[^\d.,-]/g, '').replace(/\.(?=\d{3})/g, '').replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : null }
+const classe = (t) => { const s = (t || '').toUpperCase()
+  if (/SALA|LOJA|COMERCIAL|GALP|PR[ÉE]DIO|ANDAR|LAJE|PONTO|ESCANINHO|POUSADA/.test(s)) return 'Comercial'
+  if (/TERRENO|LOTE|CH[ÁA]CARA|CHACARA|FAZENDA|S[ÍI]TIO|[ÁA]REA/.test(s)) return 'Terreno/Rural'
+  if (/APART|CASA|KIT|FLAT|COBERT|RESID|DUPLEX|SOBRADO|LOFT|VILA/.test(s)) return 'Residencial'
+  return 'Outro' }
 
 let geoCalls = 0
 async function nominatim(q) {
@@ -103,6 +108,28 @@ try {
   if (demRows.length) await sb`INSERT INTO public.mapa_demanda ${sb(demRows, 'bairro', 'lat', 'lng', 'peso')}`
   const pesoTot = demRows.reduce((a, r) => a + r.peso, 0)
   console.log(`demanda: ${demRows.length} regiões (peso total ${pesoTot}; ${demRows.filter(r => r.peso === 0).length} só p/ join do pipe)`)
+
+  // ── ATENDIMENTOS em aberto (grão fino p/ filtros do heat) ──
+  const atendRaw = await dw`
+    SELECT codigo_atendimento, upper(btrim(bairro_interesse)) bairro, tipo_negocio,
+           tipo_imovel_buscado, tipo_utilizacao, preco_maximo
+    FROM nido_atendimentos
+    WHERE situacao = 'Ativo' AND NULLIF(btrim(bairro_interesse), '') IS NOT NULL`
+  const aRows = []
+  for (const a of atendRaw) {
+    const c = centroideDe(a.bairro); if (!c) continue
+    aRows.push({
+      codigo_atendimento: String(a.codigo_atendimento), bairro: a.bairro,
+      tipo_negocio: a.tipo_negocio || null, tipo_imovel: a.tipo_imovel_buscado || null,
+      classe: classe(a.tipo_imovel_buscado), tipo_utilizacao: a.tipo_utilizacao || null,
+      preco_max: num(a.preco_maximo),
+      lat: c[0] + (Math.random() - 0.5) * 0.012, lng: c[1] + (Math.random() - 0.5) * 0.012,
+    })
+  }
+  await sb`DELETE FROM public.mapa_atendimentos`
+  const AC = ['codigo_atendimento', 'bairro', 'tipo_negocio', 'tipo_imovel', 'classe', 'tipo_utilizacao', 'preco_max', 'lat', 'lng']
+  for (let i = 0; i < aRows.length; i += 200) { const lote = aRows.slice(i, i + 200); if (lote.length) await sb`INSERT INTO public.mapa_atendimentos ${sb(lote, ...AC)}` }
+  console.log(`atendimentos: ${aRows.length} (grão fino p/ filtros do heat)`)
 
   // ── ATIVOS (nido) → geocode → mapa_ativos ──
   const ativos = await dw`
