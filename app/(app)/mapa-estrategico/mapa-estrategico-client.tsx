@@ -93,6 +93,8 @@ export default function MapaEstrategicoClient() {
     <div className="w-full h-full relative">
       <style>{`
         .leaflet-container { background: var(--muted); font-family: inherit; }
+        /* monocromático sem trocar de host: cinza só no basemap (markers/heat ficam coloridos) */
+        .leaflet-tile-pane { filter: grayscale(1) contrast(1.04) brightness(1.02); }
         .leaflet-popup-content-wrapper { border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 8px 30px rgba(0,0,0,.12); padding: 2px; }
         .leaflet-popup-tip { border: 1px solid var(--border); }
         .leaflet-bar a { border-radius: 8px !important; color: var(--foreground); }
@@ -123,10 +125,9 @@ export default function MapaEstrategicoClient() {
 
       <MapContainer center={center} zoom={12} className="w-full h-full z-0" style={{ width: '100%', height: '100%' }} zoomControl={true}>
         <TileLayer
-          attribution='&copy; OpenStreetMap &copy; CARTO'
-          url="https://{s}.basemap.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-          subdomains="abcd"
-          maxZoom={20}
+          attribution='&copy; OpenStreetMap'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          maxZoom={19}
         />
 
         {showHeat && <HeatmapLayer points={heatPoints} />}
