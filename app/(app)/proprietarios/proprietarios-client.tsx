@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatTile } from '@/components/ui/stat-tile'
 import { SearchInput } from '@/components/ui/toolbar'
@@ -22,6 +22,38 @@ const STATUS_STYLE: Record<string, { label: string; bg: string; fg: string }> = 
   pendente: { label: 'na fila', bg: 'color-mix(in srgb, var(--chart-3) 18%, transparent)', fg: 'var(--chart-3)' },
   gerado: { label: 'pronto', bg: 'color-mix(in srgb, var(--success) 18%, transparent)', fg: 'var(--success)' },
   erro: { label: 'erro', bg: 'color-mix(in srgb, var(--destructive) 18%, transparent)', fg: 'var(--destructive)' },
+}
+
+// Render leve do markdown gerado pelo dossiê (#/##/###, **negrito**, listas "- ", _itálico_ de linha).
+function mdInline(text: string): ReactNode[] {
+  return text.split('**').map((part, i) => (i % 2 === 1 ? <strong key={i}>{part}</strong> : <span key={i}>{part}</span>))
+}
+
+function DossieMd({ source }: { source: string }) {
+  const out: ReactNode[] = []
+  let bullets: string[] = []
+  const flush = () => {
+    if (!bullets.length) return
+    out.push(
+      <ul key={`u${out.length}`} className="list-disc pl-5 my-1.5 space-y-1">
+        {bullets.map((b, i) => <li key={i} className="text-[12.5px] leading-relaxed text-foreground">{mdInline(b)}</li>)}
+      </ul>,
+    )
+    bullets = []
+  }
+  for (const raw of source.split('\n')) {
+    if (raw.startsWith('- ')) { bullets.push(raw.slice(2)); continue }
+    flush()
+    const t = raw.trim()
+    if (!t) { out.push(<div key={`s${out.length}`} className="h-2.5" />); continue }
+    if (t.startsWith('### ')) out.push(<h3 key={out.length} className="text-[12px] font-mono font-semibold mt-3 mb-1" style={{ color: 'var(--chart-1)' }}>{mdInline(t.slice(4))}</h3>)
+    else if (t.startsWith('## ')) out.push(<h2 key={out.length} className="text-[14px] font-semibold mt-4 mb-1.5 pb-1" style={{ borderBottom: '1px solid var(--border)' }}>{mdInline(t.slice(3))}</h2>)
+    else if (t.startsWith('# ')) out.push(<h1 key={out.length} className="text-[16px] font-bold mb-1 text-foreground">{mdInline(t.slice(2))}</h1>)
+    else if (t.length > 1 && t.startsWith('_') && t.endsWith('_')) out.push(<p key={out.length} className="text-[11px] italic text-muted-foreground">{t.slice(1, -1)}</p>)
+    else out.push(<p key={out.length} className="text-[12.5px] leading-relaxed text-foreground">{mdInline(t)}</p>)
+  }
+  flush()
+  return <div>{out}</div>
 }
 
 export function ProprietariosClient({ proprietarios }: { proprietarios: Proprietario[] }) {
@@ -197,7 +229,7 @@ export function ProprietariosClient({ proprietarios }: { proprietarios: Propriet
                 <button onClick={() => setDossie(null)} className="text-muted-foreground hover:text-foreground text-lg leading-none">×</button>
               </div>
             </div>
-            <pre className="p-4 overflow-auto text-[12px] leading-relaxed whitespace-pre-wrap text-foreground font-sans">{dossie.markdown}</pre>
+            <div className="p-4 overflow-auto"><DossieMd source={dossie.markdown} /></div>
           </div>
         </div>
       )}
