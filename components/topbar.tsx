@@ -23,6 +23,7 @@ const TITLES: Record<string, string> = {
   '/analitico/funil-inquilinos': 'Funil de Inquilinos',
   '/analitico/funil': 'Funil de Captação',
   '/analitico': 'Analítico',
+  '/mapa-estrategico': 'Mapa Estratégico',
   '/scrapers': 'Sistema · Scrapers',
 }
 
