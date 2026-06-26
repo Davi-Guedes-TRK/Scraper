@@ -37,7 +37,7 @@ async function getMapaData() {
 
 export async function GET() {
   try {
-    const data = await withCache('mapa-estrategico-v1', getMapaData, 3600) // cache de 1 hora
+    const data = await withCache('mapa-estrategico-v1', 3600, getMapaData) // cache de 1 hora
     return NextResponse.json(data)
   } catch (err) {
     console.error('Error fetching mapa estrategico:', err)
