@@ -67,22 +67,113 @@ async function montarDossie(dw, cod) {
     SELECT codigo_imovel, tipo_negocio, valor_fechamento, data_fechamento, situacao
     FROM nido_fechamentos WHERE codigo_imovel = ANY(${codes}) ORDER BY data_fechamento DESC NULLS LAST` : []
 
-  const [ult] = await dw`SELECT max(data_atualizacao) m FROM nido_atendimentos WHERE codigo_pessoa = ${cod}`
+  // PERFIL COMERCIAL: o que o proprietário busca/buscou comprar ou alugar (atendimentos dele).
+  const atend = await dw`
+    SELECT tipo_negocio, finalidade, tipo_imovel_buscado, preco_minimo, preco_maximo,
+           bairro_interesse, regiao_interesse, qtd_minima_dormitorios, andamento, situacao, data_cadastro
+    FROM nido_atendimentos WHERE codigo_pessoa = ${cod} ORDER BY data_cadastro DESC LIMIT 8`
+  // Propostas ligadas à pessoa (intenção / negociação).
+  const props = await dw`
+    SELECT tipo_negocio, tipo_proposta, valor_proposto, situacao, motivo_recusa, data_cadastro
+    FROM nido_propostas WHERE codigo_pessoa = ${cod} ORDER BY data_cadastro DESC LIMIT 8`
 
+  // Tempo de relação + última interação (varre atendimentos, fechamentos e propostas).
+  const datas = [...atend.map(a => a.data_cadastro), ...fech.map(f => f.data_fechamento), ...props.map(x => x.data_cadastro)]
+    .filter(Boolean).map(x => new Date(x).getTime()).sort((a, b) => a - b)
+  const desde = datas.length ? new Date(datas[0]).getFullYear() : null
+  const ultima = datas.length ? new Date(datas[datas.length - 1]) : null
+  const idade = p.data_nascimento ? Math.floor((Date.now() - new Date(p.data_nascimento).getTime()) / 31557600000) : null
+
+  const fa = (mn, mx) => { const a = Number(mn) || 0, b = Number(mx) || 0; return (!a && !b) ? '' : (a && b ? `${brl(a)}–${brl(b)}` : brl(a || b)) }
+  const atLine = (a) => [a.tipo_negocio, a.tipo_imovel_buscado, fa(a.preco_minimo, a.preco_maximo),
+    a.bairro_interesse || a.regiao_interesse, a.qtd_minima_dormitorios ? `${a.qtd_minima_dormitorios}+ dorm` : null,
+    a.andamento || a.situacao, d(a.data_cadastro)].filter(Boolean).join(' · ')
+  const prLine = (x) => [d(x.data_cadastro), x.tipo_negocio, x.tipo_proposta, brl(x.valor_proposto), x.situacao,
+    x.motivo_recusa ? `(${x.motivo_recusa})` : null].filter(Boolean).join(' · ')
+
+  const buscandoAgora = atend.filter(a =>
+    /aberto|andamento|ativo|negocia/i.test(`${a.andamento ?? ''} ${a.situacao ?? ''}`) &&
+    !/fechad|encerr|perd|cancel|inativ/i.test(`${a.andamento ?? ''} ${a.situacao ?? ''}`))
+
+  const papeis = ['Proprietário', ...(p.e_cliente ? ['também Cliente (lado comprador)'] : [])]
+  const persona = []
+  if (imoveis.length >= 3) persona.push(`investidor / multi-imóvel (${imoveis.length})`)
+  else if (imoveis.length) persona.push(`${imoveis.length} imóvel(is) no Nido`)
+  if (buscandoAgora.length) persona.push('está buscando imóvel AGORA')
+  else if (atend.length) persona.push('já buscou imóvel conosco')
+  if (fech.length) persona.push(`${fech.length} negócio(s) fechado(s)`)
+  if (!atend.length && !fech.length && !props.length) persona.push('relação só de listagem (nunca negociou conosco)')
+
+  const dadosPessoais = [idade ? `${idade} anos` : null, p.estado_civil, p.profissao,
+    p.sexo === 'M' ? 'masc.' : p.sexo === 'F' ? 'fem.' : null].filter(Boolean).join(' · ')
+  const resid = [p.endereco, p.numero && String(p.numero) !== '0' ? p.numero : null, p.bairro, p.cidade, p.uf]
+    .map(x => (x ?? '').toString().trim()).filter(Boolean).join(', ')
   const tels = [p.telefone_1, p.telefone_2, p.telefone_3].filter(Boolean).join(' · ') || '—'
   const mails = [p.email_1, p.email_2, p.email_3].filter(Boolean).join(' · ') || '—'
   const assessores = [...new Set(profs.map(x => `${x.nome_uso}${x.equipe ? ' (' + x.equipe + ')' : ''}`))]
 
+  // PERFIL DE ATUAÇÃO: padrão do portfólio (classe, tipos, regiões, faixa de valor, disposição).
+  const classe = (t) => { const s = (t || '').toUpperCase()
+    if (/SALA|LOJA|COMERCIAL|GALP|PR[ÉE]DIO|ANDAR|LAJE|PONTO|ESCANINHO|POUSADA/.test(s)) return 'Comercial'
+    if (/TERRENO|LOTE|CH[ÁA]CARA|CHACARA|FAZENDA|S[ÍI]TIO|[ÁA]REA/.test(s)) return 'Terreno/Rural'
+    if (/APART|CASA|KIT|FLAT|COBERT|RESID|DUPLEX|SOBRADO|LOFT|VILA/.test(s)) return 'Residencial'
+    return 'Outro' }
+  const regiaoPretty = (b) => (b || '').replace(/Setor De Habita[çc][õo]es Individuais Sul/i, 'Lago Sul')
+    .replace(/Setor De Habita[çc][õo]es Individuais Norte/i, 'Lago Norte').trim()
+  const tally = (arr, keyf) => { const m = new Map(); for (const x of arr) { const k = (keyf(x) || '').trim() || '—'; m.set(k, (m.get(k) || 0) + 1) } return [...m.entries()].sort((a, b) => b[1] - a[1]) }
+  const topN = (t, n = 5) => t.slice(0, n).map(([k, c]) => `${k} (${c})`).join(' · ')
+  const tClasse = tally(imoveis, i => classe(i.tipo_imovel))
+  const tReg = tally(imoveis, i => regiaoPretty(i.bairro))
+  const vendas = imoveis.map(i => Number(i.preco_venda) || 0).filter(v => v > 0)
+  const locs = imoveis.map(i => Number(i.preco_locacao) || 0).filter(v => v > 0)
+  const faixaV = vendas.length ? `${brl(Math.min(...vendas))} – ${brl(Math.max(...vendas))}` : null
+  const faixaL = locs.length ? `${brl(Math.min(...locs))} – ${brl(Math.max(...locs))}` : null
+  const nVenda = imoveis.filter(i => i.disponivel_venda).length
+  const nLoc = imoveis.filter(i => i.disponivel_locacao).length
+  const nVago = imoveis.filter(i => i.vago).length
+  // Demanda (o que ele busca nos atendimentos) por classe/tipo/região.
+  const tBusca = tally(atend, a => classe(a.tipo_imovel_buscado))
+  const tBuscaTipo = tally(atend, a => a.tipo_imovel_buscado)
+  const tBuscaReg = tally(atend, a => regiaoPretty(a.bairro_interesse || a.regiao_interesse))
+  if (imoveis.length && tClasse[0] && tReg[0]) persona.push(`foco: ${tClasse[0][0].toLowerCase()} em ${tReg[0][0]}`)
+
   const L = []
   L.push(`# Dossiê do Proprietário — rodada de escuta TRK`)
-  L.push(`_Gerado do dw_trk (Nido). Status de administração é best-effort (o DW é CRM de corretagem)._\n`)
-  L.push(`## Cliente`)
-  L.push(`- **Nome:** ${p.tratamento ? p.tratamento + ' ' : ''}${p.nome}  (cód ${p.codigo_pessoa})`)
+  L.push(`_Gerado do dw_trk (Nido). Perfil = o que o Nido sabe da pessoa; status de imóvel é de anúncio (CRM de corretagem)._\n`)
+
+  L.push(`## Quem é`)
+  L.push(`- **Nome:** ${p.tratamento ? p.tratamento + ' ' : ''}${p.nome}  (cód ${p.codigo_pessoa}${p.situacao ? ` · ${p.situacao}` : ''})`)
+  L.push(`- **Papel:** ${papeis.join(' · ')}`)
   L.push(`- **Telefones:** ${tels}`)
   L.push(`- **E-mails:** ${mails}`)
-  L.push(`- **Perfil:** ${[p.profissao, p.estado_civil, [p.cidade, p.uf].filter(Boolean).join('/')].filter(Boolean).join(' · ') || '—'}`)
-  L.push(`- **Assessor(es) que tocaram imóvel:** ${assessores.join('; ') || '— (sem vínculo de corretor no Nido)'}`)
-  L.push(`- **Última interação (atendimento):** ${d(ult?.m)}`)
+  if (dadosPessoais) L.push(`- **Dados pessoais:** ${dadosPessoais}`)
+  if (resid) L.push(`- **Reside em:** ${resid}`)
+  L.push(`- **Relação com a TRK:** ${desde ? `desde ${desde}` : 'sem negócio registrado'} · ${imoveis.length} imóveis · ${fech.length} fechamentos · ${atend.length} atendimentos · ${props.length} propostas`)
+  L.push(`- **Última interação:** ${ultima ? d(ultima) : '—'}`)
+  L.push(`- **Síntese:** ${persona.join('; ') || '—'}`)
+  if (assessores.length) L.push(`- **Já foi atendido por:** ${assessores.join('; ')}`)
+
+  L.push(`\n## Perfil de atuação (padrão dos imóveis dele)`)
+  if (imoveis.length) {
+    L.push(`- **Classe:** ${topN(tClasse)}`)
+    L.push(`- **Tipos:** ${topN(tally(imoveis, i => i.tipo_imovel), 6)}`)
+    L.push(`- **Regiões:** ${topN(tReg, 6)}`)
+    if (faixaV) L.push(`- **Faixa de valor (venda):** ${faixaV}`)
+    if (faixaL) L.push(`- **Faixa de valor (locação):** ${faixaL}`)
+    L.push(`- **Disposição:** ${[nVenda ? `${nVenda} à venda` : null, nLoc ? `${nLoc} p/ locação` : null, nVago ? `${nVago} vago(s)` : null].filter(Boolean).join(' · ') || 'não anunciados'}`)
+  } else L.push(`_Sem imóvel vinculado pra inferir padrão._`)
+
+  L.push(`\n## O que busca / buscou (demanda)`)
+  if (atend.length) {
+    const reg = tBuscaReg.filter(([k]) => k !== '—')
+    L.push(`- **Resumo:** ${topN(tBuscaTipo, 3)}${reg.length ? ` · regiões: ${topN(reg, 3)}` : ''}`)
+    for (const a of atend) L.push(`- ${atLine(a)}`)
+  } else L.push(`_Sem atendimento registrado — não procurou comprar/alugar pela TRK._`)
+  if (props.length) {
+    L.push(`\n**Propostas:**`)
+    for (const x of props) L.push(`- ${prLine(x)}`)
+  }
+
   L.push(`\n## Imóveis (${imoveis.length})`)
   if (!imoveis.length) L.push(`_Nenhum imóvel vinculado a este proprietário no Nido._`)
   for (const i of imoveis) {
@@ -93,17 +184,27 @@ async function montarDossie(dw, cod) {
     L.push(`- **Disponível:** ${[i.disponivel_locacao ? 'locação' : null, i.disponivel_venda ? 'venda' : null].filter(Boolean).join(' + ') || 'não anunciado'}`)
     L.push(`- **Atend. por:** ${profDe(i.codigo_imovel).join('; ') || '—'}`)
   }
+
   L.push(`\n## Histórico de negócios (fechamentos: ${fech.length})`)
   if (!fech.length) L.push(`_Sem fechamento registrado._`)
   for (const f of fech.slice(0, 10)) L.push(`- ${d(f.data_fechamento)} · ${f.tipo_negocio} · ${brl(f.valor_fechamento)} · ${f.situacao} · imóvel ${f.codigo_imovel}`)
+
+  const ops = oportunidades(imoveis, fech)
+  for (const a of buscandoAgora) ops.unshift(`🔥 Buscando AGORA: ${atLine(a)} — gancho direto pra conversa.`)
+  if (p.e_cliente && !buscandoAgora.length) ops.push('Marcado como Cliente (comprador) no Nido — sondar intenção de compra.')
   L.push(`\n## Possíveis oportunidades (sugeridas)`)
-  for (const o of oportunidades(imoveis, fech)) L.push(`- ${o}`)
+  for (const o of [...new Set(ops)]) L.push(`- ${o}`)
+
   L.push(`\n## Pontos de atenção / Próximo passo`)
   L.push(`- _(preencher na conversa — não está no DW)_`)
 
   return {
     md: L.join('\n'),
-    dados: { nome: p.nome, telefones: tels, n_imoveis: imoveis.length, n_fechamentos: fech.length, oportunidades: oportunidades(imoveis, fech) },
+    dados: {
+      nome: p.nome, telefones: tels, papeis, persona, desde, idade,
+      n_imoveis: imoveis.length, n_fechamentos: fech.length, n_atendimentos: atend.length, n_propostas: props.length,
+      buscando_agora: buscandoAgora.map(atLine), oportunidades: [...new Set(ops)],
+    },
   }
 }
 
