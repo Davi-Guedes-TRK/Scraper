@@ -61,3 +61,19 @@ export const imoveisZap       = pgTable('imoveis_zap',       imoveisBase)
 
 export type Imovel = typeof imoveisOlx.$inferSelect
 export type NovoImovel = typeof imoveisOlx.$inferInsert
+
+export const mapaDemanda = pgTable('mapa_demanda', {
+  bairro: text('bairro').primaryKey(),
+  lat: doublePrecision('lat'),
+  lng: doublePrecision('lng'),
+  peso: bigint('peso', { mode: 'number' })
+})
+
+export const mapaAtivos = pgTable('mapa_ativos', {
+  codigo_imovel: text('codigo_imovel').primaryKey(),
+  bairro: text('bairro'),
+  lat: doublePrecision('lat'),
+  lng: doublePrecision('lng'),
+  tipo_imovel: text('tipo_imovel'),
+  preco: doublePrecision('preco')
+})
