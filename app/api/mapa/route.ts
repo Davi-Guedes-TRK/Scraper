@@ -16,12 +16,14 @@ async function getMapaData() {
     WHERE lat IS NOT NULL AND lng IS NOT NULL
   `
 
-  // Pipe herda o centroide do bairro (mapa_demanda) e exclui fases finais.
+  // Pipe = captação EM ANDAMENTO. Herda o centroide do bairro (mapa_demanda) e exclui
+  // os terminais reais ('Não Captado' = perdido, 'Captado' = concluído). valor_estimado
+  // é o campo preenchido (valor_locacao_desejado vem vazio no Pipefy).
   const pipe = await sql`
-    SELECT p.card_id, p.bairro, p.tipo_imovel, p.valor_locacao_desejado, p.fase_atual, d.lat, d.lng
+    SELECT p.card_id, p.bairro, p.tipo_imovel, p.valor_estimado, p.fase_atual, d.lat, d.lng
     FROM pipefy_captacoes p
     LEFT JOIN mapa_demanda d ON UPPER(TRIM(p.bairro)) = d.bairro
-    WHERE coalesce(p.fase_atual, '') NOT IN ('fechado', 'locado', 'nao_captado')
+    WHERE coalesce(p.fase_atual, '') NOT IN ('Não Captado', 'Captado')
       AND d.lat IS NOT NULL
   `
 
@@ -31,7 +33,7 @@ async function getMapaData() {
 export async function GET() {
   try {
     // v2: shape novo (atendimentos em grão fino + flags nos ativos)
-    const data = await withCache('mapa-estrategico-v2', 3600, getMapaData)
+    const data = await withCache('mapa-estrategico-v3', 3600, getMapaData)
     return NextResponse.json(data)
   } catch (err) {
     console.error('Error fetching mapa estrategico:', err)

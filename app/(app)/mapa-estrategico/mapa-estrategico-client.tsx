@@ -9,7 +9,7 @@ if (typeof window !== 'undefined') { (window as any).L = L; require('leaflet.hea
 
 type Atend = { codigo_atendimento: string; bairro: string; tipo_negocio: string | null; tipo_imovel: string | null; classe: string | null; tipo_utilizacao: string | null; preco_max: number | string | null; lat: number; lng: number }
 type Ativo = { codigo_imovel: string; bairro: string; lat: number; lng: number; tipo_imovel: string | null; preco: number | string | null; disponivel_venda: boolean | null; disponivel_locacao: boolean | null }
-type Pipe = { card_id: number; bairro: string; tipo_imovel: string | null; valor_locacao_desejado: string | null; fase_atual: string | null; lat: number; lng: number }
+type Pipe = { card_id: number; bairro: string; tipo_imovel: string | null; valor_estimado: number | string | null; fase_atual: string | null; lat: number; lng: number }
 
 function cssVar(n: string, f: string): string {
   if (typeof window === 'undefined') return f
@@ -236,7 +236,7 @@ export default function MapaEstrategicoClient() {
                 <span className="font-semibold" style={{ color: cor.pipe }}>◆ Pipeline · #{p.card_id}</span><br />
                 <span className="text-muted-foreground">{p.fase_atual}</span><br />
                 {p.bairro} · {p.tipo_imovel}<br />
-                {p.valor_locacao_desejado ? <span className="font-semibold">{p.valor_locacao_desejado}</span> : <span className="text-muted-foreground">valor não informado</span>}
+                {p.valor_estimado ? <span className="font-semibold">{fmtBRL(p.valor_estimado)}</span> : <span className="text-muted-foreground">valor não informado</span>}
               </div>
             </Popup>
           </CircleMarker>

@@ -99,7 +99,7 @@ try {
   // bairros do pipe (mesmo filtro da API) p/ herdarem centroide no join
   const pipeBairros = await sb`
     SELECT DISTINCT upper(btrim(bairro)) bairro FROM public.pipefy_captacoes
-    WHERE NULLIF(btrim(bairro),'') IS NOT NULL AND coalesce(fase_atual,'') NOT IN ('fechado','locado','nao_captado')`
+    WHERE NULLIF(btrim(bairro),'') IS NOT NULL AND coalesce(fase_atual,'') NOT IN ('Não Captado','Captado')`
 
   const demMap = new Map()
   for (const r of atend) { const c = centroideDe(r.bairro); if (c) demMap.set(r.bairro, { lat: c[0], lng: c[1], peso: Number(r.n) }) }
