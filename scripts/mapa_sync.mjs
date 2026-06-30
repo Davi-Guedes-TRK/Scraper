@@ -34,10 +34,6 @@ const classe = (t) => { const s = (t || '').toUpperCase()
   if (/TERRENO|LOTE|CH[ÁA]CARA|CHACARA|FAZENDA|S[ÍI]TIO|[ÁA]REA/.test(s)) return 'Terreno/Rural'
   if (/APART|CASA|KIT|FLAT|COBERT|RESID|DUPLEX|SOBRADO|LOFT|VILA/.test(s)) return 'Residencial'
   return 'Outro' }
-// Jitter gaussiano (Box-Muller, clamp ±2.5σ) → nuvem de pontos com densidade radial natural
-// em torno do centroide (heat orgânico), em vez de uma caixa uniforme.
-const gauss = () => { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random()
-  return Math.max(-2.5, Math.min(2.5, Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v))) }
 
 let geoCalls = 0
 async function nominatim(q) {
@@ -132,7 +128,7 @@ try {
       tipo_negocio: a.tipo_negocio || null, tipo_imovel: a.tipo_imovel_buscado || null,
       classe: classe(a.tipo_imovel_buscado), tipo_utilizacao: a.tipo_utilizacao || null,
       preco_max: num(a.preco_maximo), data_cadastro: a.data_cadastro || null,
-      lat: c[0] + gauss() * 0.006, lng: c[1] + gauss() * 0.006,
+      lat: c[0] + (Math.random() - 0.5) * 0.012, lng: c[1] + (Math.random() - 0.5) * 0.012,
     })
   }
   await sb`DELETE FROM public.mapa_atendimentos`

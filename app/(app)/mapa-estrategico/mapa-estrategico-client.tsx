@@ -34,10 +34,8 @@ function HeatmapLayer({ points }: { points: [number, number, number][] }) {
   const map = useMap()
   useEffect(() => {
     if (!points?.length) return
-    // max alto o suficiente p/ o calor virar GRADIENTE (e não um disco saturado): só fica
-    // vermelho onde há muita sobreposição. blur > radius = bordas suaves/orgânicas.
     // @ts-ignore leaflet.heat estende L em runtime
-    const heat = L.heatLayer(points, { radius: 25, blur: 34, maxZoom: 13, max: 12, minOpacity: 0.15, gradient: HEAT_GRADIENT }).addTo(map)
+    const heat = L.heatLayer(points, { radius: 32, blur: 24, maxZoom: 14, minOpacity: 0.3, gradient: HEAT_GRADIENT }).addTo(map)
     return () => { map.removeLayer(heat) }
   }, [map, points])
   return null
