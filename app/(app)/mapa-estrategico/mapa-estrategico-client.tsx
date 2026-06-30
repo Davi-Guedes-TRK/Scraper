@@ -146,6 +146,12 @@ export default function MapaEstrategicoClient() {
   }), [data, ativoVenda, ativoLoc, selClasseAtivo])
 
   const pipeF = useMemo(() => data.pipe.filter(p => selFase.has(p.fase_atual || '')), [data, selFase])
+  // Jitter FIXO por card (calculado 1x quando os dados chegam) — senão os pontos pulam a cada filtro.
+  const pipePos = useMemo(() => {
+    const m = new Map<number, [number, number]>()
+    for (const p of data.pipe) m.set(p.card_id, [p.lat + (Math.random() - 0.5) * 0.004, p.lng + (Math.random() - 0.5) * 0.004])
+    return m
+  }, [data.pipe])
 
   if (loading) {
     return (
@@ -252,7 +258,7 @@ export default function MapaEstrategicoClient() {
         ))}
 
         {showPipe && pipeF.map(p => (
-          <CircleMarker key={`pipe-${p.card_id}`} center={[p.lat + (Math.random() - 0.5) * 0.004, p.lng + (Math.random() - 0.5) * 0.004]} radius={6} pathOptions={{ color: '#fff', weight: 1.5, fillColor: cor.pipe, fillOpacity: 0.9 }}>
+          <CircleMarker key={`pipe-${p.card_id}`} center={pipePos.get(p.card_id) ?? [p.lat, p.lng]} radius={6} pathOptions={{ color: '#fff', weight: 1.5, fillColor: cor.pipe, fillOpacity: 0.9 }}>
             <Popup>
               <div className="text-[12px] leading-relaxed">
                 <span className="font-semibold" style={{ color: cor.pipe }}>◆ Pipeline · #{p.card_id}</span><br />
