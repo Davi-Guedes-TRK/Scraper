@@ -24,7 +24,9 @@ const classeDe = (t: string | null): string => {
 }
 const HEAT_GRADIENT: Record<number, string> = { 0.2: '#ddd6fe', 0.45: '#a78bfa', 0.7: '#f59e0b', 1.0: '#ef4444' }
 const fmtBRL = (v: number | string | null) => (v ? 'R$ ' + Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 0 }) : '—')
-const titleCase = (s: string) => s.replace(/\s+/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
+const SMALL = new Set(['de', 'da', 'do', 'das', 'dos', 'e'])
+const titleCase = (s: string) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase().split(' ')
+  .map((w, i) => (i > 0 && SMALL.has(w)) ? w : (w ? w[0].toUpperCase() + w.slice(1) : w)).join(' ')
 const uniq = <T,>(arr: T[]) => Array.from(new Set(arr))
 const toggle = (s: Set<string>, v: string) => { const n = new Set(s); if (n.has(v)) n.delete(v); else n.add(v); return n }
 
@@ -249,8 +251,8 @@ export default function MapaEstrategicoClient() {
               <div className="text-[12px] leading-relaxed">
                 <span className="font-semibold" style={{ color: cor.ativo }}>● Ativo · {a.codigo_imovel}</span><br />
                 {a.endereco || '—'}<br />
-                <span className="text-muted-foreground">{a.bairro}</span><br />
-                {a.tipo_imovel} · {[a.disponivel_venda ? 'venda' : null, a.disponivel_locacao ? 'locação' : null].filter(Boolean).join(' + ') || '—'}<br />
+                <span className="text-muted-foreground">{titleCase(a.bairro)}</span><br />
+                {titleCase(a.tipo_imovel || '')} · {[a.disponivel_venda ? 'venda' : null, a.disponivel_locacao ? 'locação' : null].filter(Boolean).join(' + ') || '—'}<br />
                 <span className="font-semibold">{fmtBRL(a.preco)}</span>
               </div>
             </Popup>
@@ -262,8 +264,8 @@ export default function MapaEstrategicoClient() {
             <Popup>
               <div className="text-[12px] leading-relaxed">
                 <span className="font-semibold" style={{ color: cor.pipe }}>◆ Pipeline · #{p.card_id}</span><br />
-                {p.endereco || p.bairro}<br />
-                <span className="text-muted-foreground">{p.fase_atual} · {p.tipo_imovel}</span><br />
+                {p.endereco || titleCase(p.bairro)}<br />
+                <span className="text-muted-foreground">{p.fase_atual} · {titleCase(p.tipo_imovel || '')}</span><br />
                 {p.valor_estimado ? <span className="font-semibold">{fmtBRL(p.valor_estimado)}</span> : <span className="text-muted-foreground">valor não informado</span>}
               </div>
             </Popup>
