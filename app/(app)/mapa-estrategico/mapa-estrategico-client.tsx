@@ -7,7 +7,7 @@ import 'leaflet/dist/leaflet.css'
 
 if (typeof window !== 'undefined') { (window as any).L = L; require('leaflet.heat') }
 
-type Atend = { codigo_atendimento: string; bairro: string; tipo_negocio: string | null; tipo_imovel: string | null; classe: string | null; tipo_utilizacao: string | null; preco_max: number | string | null; lat: number; lng: number }
+type Atend = { codigo_atendimento: string; bairro: string; tipo_negocio: string | null; tipo_imovel: string | null; classe: string | null; tipo_utilizacao: string | null; preco_max: number | string | null; data_cadastro: string | null; lat: number; lng: number }
 type Ativo = { codigo_imovel: string; bairro: string; lat: number; lng: number; tipo_imovel: string | null; preco: number | string | null; disponivel_venda: boolean | null; disponivel_locacao: boolean | null; endereco: string | null }
 type Pipe = { card_id: number; bairro: string; tipo_imovel: string | null; valor_estimado: number | string | null; fase_atual: string | null; lat: number; lng: number; endereco: string | null }
 
@@ -88,6 +88,8 @@ export default function MapaEstrategicoClient() {
   const [selRegiao, setSelRegiao] = useState<Set<string>>(new Set())
   const [precoMin, setPrecoMin] = useState('')
   const [precoMax, setPrecoMax] = useState('')
+  const [dtDe, setDtDe] = useState('')
+  const [dtAte, setDtAte] = useState('')
   // filtros ativos
   const [ativoVenda, setAtivoVenda] = useState(true)
   const [ativoLoc, setAtivoLoc] = useState(true)
@@ -115,6 +117,8 @@ export default function MapaEstrategicoClient() {
   const classeAtivoOpts = useMemo(() => uniq(data.ativos.map(a => classeDe(a.tipo_imovel))).sort(), [data])
   const faseOpts = useMemo(() => uniq(data.pipe.map(p => p.fase_atual).filter(Boolean) as string[]).sort(), [data])
 
+  const isoDaysAgo = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10)
+  const setJanela = (n: number | null) => { if (n == null) { setDtDe(''); setDtAte('') } else { setDtDe(isoDaysAgo(n)); setDtAte('') } }
   const precoOk = (v: number | string | null) => {
     const mn = precoMin ? Number(precoMin) : null, mx = precoMax ? Number(precoMax) : null
     if (mn == null && mx == null) return true
@@ -124,10 +128,15 @@ export default function MapaEstrategicoClient() {
     if (mx != null && n > mx) return false
     return true
   }
+  const dataOk = (d: string | null) => {
+    if (dtDe && (!d || new Date(d).getTime() < new Date(dtDe).getTime())) return false
+    if (dtAte && (!d || new Date(d).getTime() > new Date(dtAte + 'T23:59:59').getTime())) return false
+    return true
+  }
 
   const atendF = useMemo(() => data.atendimentos.filter(a =>
-    selNeg.has(a.tipo_negocio || '') && selClasseDem.has(a.classe || '') && selRegiao.has(a.bairro || '') && precoOk(a.preco_max),
-  ), [data, selNeg, selClasseDem, selRegiao, precoMin, precoMax])
+    selNeg.has(a.tipo_negocio || '') && selClasseDem.has(a.classe || '') && selRegiao.has(a.bairro || '') && precoOk(a.preco_max) && dataOk(a.data_cadastro),
+  ), [data, selNeg, selClasseDem, selRegiao, precoMin, precoMax, dtDe, dtAte])
   const heatPoints = useMemo(() => atendF.map(a => [a.lat, a.lng, 1] as [number, number, number]), [atendF])
 
   const ativosF = useMemo(() => data.ativos.filter(a => {
@@ -167,6 +176,18 @@ export default function MapaEstrategicoClient() {
 
         {/* DEMANDA */}
         <Section title="Demanda" color="#ef4444" on={showHeat} onToggle={() => setShowHeat(v => !v)} count={atendF.length}>
+          <FilterRow label="Janela (abertura do FAC)">
+            <Chip label="7 dias" on={!!dtDe && dtDe === isoDaysAgo(7) && !dtAte} onClick={() => setJanela(7)} />
+            <Chip label="30 dias" on={!!dtDe && dtDe === isoDaysAgo(30) && !dtAte} onClick={() => setJanela(30)} />
+            <Chip label="90 dias" on={!!dtDe && dtDe === isoDaysAgo(90) && !dtAte} onClick={() => setJanela(90)} />
+            <Chip label="Tudo" on={!dtDe && !dtAte} onClick={() => setJanela(null)} />
+          </FilterRow>
+          <FilterRow label="Intervalo (de / até)">
+            <input type="date" value={dtDe} onChange={e => setDtDe(e.target.value)} aria-label="Data de"
+              className="h-7 px-2 text-[11px] rounded-md bg-transparent" style={{ border: '1px solid var(--border)', color: 'var(--foreground)' }} />
+            <input type="date" value={dtAte} onChange={e => setDtAte(e.target.value)} aria-label="Data até"
+              className="h-7 px-2 text-[11px] rounded-md bg-transparent" style={{ border: '1px solid var(--border)', color: 'var(--foreground)' }} />
+          </FilterRow>
           <FilterRow label="Tipo de negócio">
             {negOpts.map(o => <Chip key={o} label={titleCase(o)} on={selNeg.has(o)} onClick={() => setSelNeg(s => toggle(s, o))} />)}
           </FilterRow>

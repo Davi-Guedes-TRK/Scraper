@@ -77,6 +77,7 @@ try {
   await sb`ALTER TABLE public.mapa_ativos ADD COLUMN IF NOT EXISTS geo_fonte text`
   await sb`ALTER TABLE public.mapa_ativos ADD COLUMN IF NOT EXISTS sincronizado_em timestamptz DEFAULT now()`
   await sb`CREATE UNIQUE INDEX IF NOT EXISTS mapa_ativos_codigo_uk ON public.mapa_ativos (codigo_imovel)`
+  await sb`ALTER TABLE public.mapa_atendimentos ADD COLUMN IF NOT EXISTS data_cadastro timestamptz`
 
   // Ponte: reaproveita geocode de uma run anterior (mapa_imoveis) p/ não re-geocodificar.
   const temImoveis = await sb`SELECT to_regclass('public.mapa_imoveis') t`
@@ -112,7 +113,7 @@ try {
   // ── ATENDIMENTOS em aberto (grão fino p/ filtros do heat) ──
   const atendRaw = await dw`
     SELECT codigo_atendimento, upper(btrim(bairro_interesse)) bairro, tipo_negocio,
-           tipo_imovel_buscado, tipo_utilizacao, preco_maximo
+           tipo_imovel_buscado, tipo_utilizacao, preco_maximo, data_cadastro
     FROM nido_atendimentos
     WHERE situacao = 'Ativo' AND NULLIF(btrim(bairro_interesse), '') IS NOT NULL`
   const aRows = []
@@ -122,12 +123,12 @@ try {
       codigo_atendimento: String(a.codigo_atendimento), bairro: a.bairro,
       tipo_negocio: a.tipo_negocio || null, tipo_imovel: a.tipo_imovel_buscado || null,
       classe: classe(a.tipo_imovel_buscado), tipo_utilizacao: a.tipo_utilizacao || null,
-      preco_max: num(a.preco_maximo),
+      preco_max: num(a.preco_maximo), data_cadastro: a.data_cadastro || null,
       lat: c[0] + (Math.random() - 0.5) * 0.012, lng: c[1] + (Math.random() - 0.5) * 0.012,
     })
   }
   await sb`DELETE FROM public.mapa_atendimentos`
-  const AC = ['codigo_atendimento', 'bairro', 'tipo_negocio', 'tipo_imovel', 'classe', 'tipo_utilizacao', 'preco_max', 'lat', 'lng']
+  const AC = ['codigo_atendimento', 'bairro', 'tipo_negocio', 'tipo_imovel', 'classe', 'tipo_utilizacao', 'preco_max', 'data_cadastro', 'lat', 'lng']
   for (let i = 0; i < aRows.length; i += 200) { const lote = aRows.slice(i, i + 200); if (lote.length) await sb`INSERT INTO public.mapa_atendimentos ${sb(lote, ...AC)}` }
   console.log(`atendimentos: ${aRows.length} (grão fino p/ filtros do heat)`)
 

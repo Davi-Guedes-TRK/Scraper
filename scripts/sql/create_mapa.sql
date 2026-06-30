@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS public.mapa_atendimentos (
   classe             text,   -- Residencial | Comercial | Terreno/Rural | Outro
   tipo_utilizacao    text,
   preco_max          numeric,
+  data_cadastro      timestamptz,   -- abertura do FAC (p/ filtro de janela de tempo)
   lat                double precision,
   lng                double precision,
   sincronizado_em    timestamptz NOT NULL DEFAULT now()

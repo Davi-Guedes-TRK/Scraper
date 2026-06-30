@@ -5,7 +5,7 @@ import { withCache } from '@/lib/redis'
 async function getMapaData() {
   // Demanda em grão fino (1 linha = 1 atendimento em aberto) → permite filtrar e recalcular o heat no client.
   const atendimentos = await sql`
-    SELECT codigo_atendimento, bairro, tipo_negocio, tipo_imovel, classe, tipo_utilizacao, preco_max, lat, lng
+    SELECT codigo_atendimento, bairro, tipo_negocio, tipo_imovel, classe, tipo_utilizacao, preco_max, data_cadastro, lat, lng
     FROM mapa_atendimentos
     WHERE lat IS NOT NULL AND lng IS NOT NULL
   `
@@ -34,7 +34,7 @@ async function getMapaData() {
 export async function GET() {
   try {
     // v2: shape novo (atendimentos em grão fino + flags nos ativos)
-    const data = await withCache('mapa-estrategico-v4', 3600, getMapaData)
+    const data = await withCache('mapa-estrategico-v5', 3600, getMapaData)
     return NextResponse.json(data)
   } catch (err) {
     console.error('Error fetching mapa estrategico:', err)
