@@ -3,13 +3,40 @@ Scraper: dfimoveis.com.br → Supabase (tabela imoveis_dfimoveis)
 Coleta anúncios de aluguel no DF. Usa curl_cffi para bypass de TLS.
 Uso: python scripts/dfimoveis_sync.py [--tipo aluguel|venda] [--cidade todos|brasilia|...] [--paginas N]
 """
-import os, re, json, time, random, logging, argparse
+import os, re, json, time, random, logging, argparse, sys, urllib.request
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
 import psycopg2
 from psycopg2.extras import execute_values
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
+
+_STATS = {"http403": 0, "ok": 0}
+
+def _load_env_local():
+    """Standalone (Tarefa Agendada): lê DATABASE_URL/GCHAT_WEBHOOK_URL do .env.local."""
+    if os.environ.get("DATABASE_URL"):
+        return
+    p = Path(__file__).resolve().parent.parent / ".env.local"
+    if not p.exists():
+        return
+    for line in p.read_text(encoding="utf-8").splitlines():
+        m = re.match(r"^([A-Za-z0-9_]+)=(.*)$", line.strip())
+        if m and not os.environ.get(m.group(1)):
+            os.environ[m.group(1)] = m.group(2).strip().strip('"').strip("'")
+
+def _gchat(text: str):
+    url = os.environ.get("GCHAT_WEBHOOK_URL")
+    if not url:
+        return
+    try:
+        req = urllib.request.Request(
+            url, data=json.dumps({"text": text}).encode("utf-8"),
+            headers={"Content-Type": "application/json"})
+        urllib.request.urlopen(req, timeout=10)
+    except Exception:
+        pass
 
 BASE_URL    = "https://www.dfimoveis.com.br"
 IMPERSONATE = "chrome124"
@@ -60,9 +87,12 @@ def fetch_page(session, url: str) -> str | None:
     try:
         r = session.get(url, timeout=30)
         if r.status_code == 200:
+            _STATS["ok"] += 1
             return r.text
         if r.status_code == 404:
             return None
+        if r.status_code == 403:
+            _STATS["http403"] += 1
         log.warning("Status %d em %s", r.status_code, url)
         return None
     except Exception as e:
@@ -401,6 +431,7 @@ def main():
         log.error("Cidade '%s' inválida. Use: %s", args.cidade, ", ".join(CIDADES_DF))
         return
 
+    _load_env_local()
     session = _session()
     conn    = psycopg2.connect(os.environ["DATABASE_URL"])
     total   = 0
@@ -414,8 +445,20 @@ def main():
         if i < len(cidades):
             time.sleep(2.0)
 
-    log.info("Concluído — %d anúncios salvos", total)
     conn.close()
+
+    # Fail-loud: 0 coletado quase nunca é normal. 403 em tudo = IP bloqueado.
+    if total == 0:
+        bloqueado = _STATS["http403"] > 0 and _STATS["ok"] == 0
+        msg = ("❌ dfimoveis_sync: 0 anúncios coletados — "
+               + (f"BLOQUEADO por IP (HTTP 403 x{_STATS['http403']})" if bloqueado
+                  else "nenhum card encontrado (seletor/site mudou?)"))
+        log.error(msg)
+        _gchat(msg)
+        sys.exit(1)
+
+    log.info("Concluído — %d anúncios salvos", total)
+    _gchat(f"✅ dfimoveis_sync (local): {total} anúncios coletados")
 
 if __name__ == "__main__":
     main()
