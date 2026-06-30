@@ -34,7 +34,7 @@ async function getMapaData() {
 export async function GET() {
   try {
     // v2: shape novo (atendimentos em grão fino + flags nos ativos)
-    const data = await withCache('mapa-estrategico-v6', 3600, getMapaData)
+    const data = await withCache('mapa-estrategico-v7', 3600, getMapaData)
     return NextResponse.json(data)
   } catch (err) {
     console.error('Error fetching mapa estrategico:', err)
