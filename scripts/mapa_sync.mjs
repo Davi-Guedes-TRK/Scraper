@@ -94,8 +94,10 @@ try {
 
   // ── DEMANDA: atendimentos em aberto por bairro (UPPER) ──
   const atend = await dw`
-    SELECT upper(btrim(bairro_interesse)) bairro, count(*) n FROM nido_atendimentos
-    WHERE situacao = 'Ativo' AND NULLIF(btrim(bairro_interesse), '') IS NOT NULL
+    SELECT upper(btrim(COALESCE(NULLIF(btrim(bairro_interesse), ''), regiao_interesse))) bairro, count(*) n
+    FROM nido_atendimentos
+    WHERE situacao = 'Ativo'
+      AND COALESCE(NULLIF(btrim(bairro_interesse), ''), NULLIF(btrim(regiao_interesse), '')) IS NOT NULL
     GROUP BY 1`
   // bairros do pipe (mesmo filtro da API) p/ herdarem centroide no join
   const pipeBairros = await sb`
@@ -112,10 +114,12 @@ try {
 
   // ── ATENDIMENTOS em aberto (grão fino p/ filtros do heat) ──
   const atendRaw = await dw`
-    SELECT codigo_atendimento, upper(btrim(bairro_interesse)) bairro, tipo_negocio,
-           tipo_imovel_buscado, tipo_utilizacao, preco_maximo, data_cadastro
+    SELECT codigo_atendimento,
+           upper(btrim(COALESCE(NULLIF(btrim(bairro_interesse), ''), regiao_interesse))) bairro,
+           tipo_negocio, tipo_imovel_buscado, tipo_utilizacao, preco_maximo, data_cadastro
     FROM nido_atendimentos
-    WHERE situacao = 'Ativo' AND NULLIF(btrim(bairro_interesse), '') IS NOT NULL`
+    WHERE situacao = 'Ativo'
+      AND COALESCE(NULLIF(btrim(bairro_interesse), ''), NULLIF(btrim(regiao_interesse), '')) IS NOT NULL`
   const aRows = []
   for (const a of atendRaw) {
     const c = centroideDe(a.bairro); if (!c) continue
