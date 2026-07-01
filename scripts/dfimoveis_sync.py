@@ -383,6 +383,8 @@ ON CONFLICT (link) DO UPDATE SET
   tipo_imovel     = EXCLUDED.tipo_imovel,
   tipo            = EXCLUDED.tipo,
   bairro          = EXCLUDED.bairro,
+  cidade          = EXCLUDED.cidade,
+  estado          = EXCLUDED.estado,
   descricao       = EXCLUDED.descricao,
   nome_anunciante = EXCLUDED.nome_anunciante,
   tipo_anunciante = EXCLUDED.tipo_anunciante,
