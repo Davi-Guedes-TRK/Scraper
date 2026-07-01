@@ -1392,8 +1392,9 @@ export function TriagemClient() {
             <option value="0-2000">Até R$ 2k</option>
             <option value="2000-5000">R$ 2k – 5k</option>
             <option value="5000-10000">R$ 5k – 10k</option>
-            <option value="10000-20000">R$ 10k – 20k</option>
+            <option value="10000-0">Acima de R$ 10k</option>
             <option value="20000-0">Acima de R$ 20k</option>
+            <option value="50000-0">Acima de R$ 50k</option>
           </select>
           <select value={filterBairro} onChange={e => setFilter('bairro', e.target.value)} className={selectClass}>
             <option value="Todos">Região: todas</option>
